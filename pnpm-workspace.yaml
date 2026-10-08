@@ -1,0 +1,13 @@
+packages:
+  - apps/*
+  - packages/*
+# Legacy Drizzle migration loader pulls a vulnerable esbuild development server.
+# Patch only that obsolete range; validate generation/migrations after upgrades.
+overrides:
+  'esbuild@<=0.24.2': 0.25.12
+allowBuilds:
+  '@embedded-postgres/windows-x64': true
+  embedded-postgres: true
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
