@@ -27,8 +27,29 @@ test("verified request ownership, reviewed equivalence, following and private li
   const privateTitle = `Đường Riêng Tư ${run}`;
   const accounts: { email: string; id?: string }[] = [];
   const createdIds = new Set<string>();
-  const otherContext = await browser.newContext({ baseURL });
-  const anonymousContext = await browser.newContext({ baseURL });
+  // Simulate the configured self-hosted trusted proxy, as the SQL auth fixture
+  // does: isolated documentation-range IPs prevent unrelated browser specs from
+  // sharing the real 3/min signup bucket. These headers grant no user identity
+  // or role and do not prove a deployed proxy overwrites untrusted client input.
+  // Five UUID-derived groups plus the context discriminator form six suffix
+  // groups: together with 2001:db8, each address has exactly eight IPv6 groups.
+  const proxyScope = run
+    .replace(/-/g, "")
+    .slice(0, 20)
+    .match(/.{4}/g)!
+    .join(":");
+  const proxyHeaders = (context: number) => ({
+    "x-real-ip": `2001:db8:${proxyScope}:${context}`,
+  });
+  await page.context().setExtraHTTPHeaders(proxyHeaders(1));
+  const otherContext = await browser.newContext({
+    baseURL,
+    extraHTTPHeaders: proxyHeaders(2),
+  });
+  const anonymousContext = await browser.newContext({
+    baseURL,
+    extraHTTPHeaders: proxyHeaders(3),
+  });
   const other = await otherContext.newPage();
   const anonymous = await anonymousContext.newPage();
   const vi = requestDictionary("vi");
