@@ -18,4 +18,12 @@ Reproduction steps are in README. The disposable PostgreSQL helper uses unique i
 
 CI guidance: committed frozen lockfile, fake-shaped secrets, disposable PostgreSQL and SMTP, cold migrations, static/unit/integration/browser/build stages with timeouts and cleanup. Do not use live reference databases. PostgreSQL fixtures must be isolated, synthetic and cleaned; label environment-dependent skips explicitly.
 
-Future catalog/library/provider acceptance adds privacy isolation, duplicate/reread concurrency, idempotent reactions, locale/content-policy/cache failures, SSRF/redirect/body limits and indexed pagination. Those tests do not exist merely because this matrix names them.
+## V1 catalog local verification complete
+
+Keep the frozen V0 ledger above distinct from V1 results. Current unit suite has **82 tests** (original80 plus two observed navigation-race/canonical-title projection regressions). The final isolated PostgreSQL suite passed20/20 and final browser suite4/4, with final TypeScript/lint,production build and local production runtime smoke passing. Hosted acceptance remains unverified. Detailed failures, fixes and latest outcomes are in `V1_VALIDATION.md`.
+
+Browser fixtures attach token-redacted-path navigation/script/API completion and failure events, not raw headers/cookies. Exact localized form labels, actual mutations and cookie/session actors are retained; no intercepted fake catalog route or provider is substituted. The comprehensive catalog scenario includes two real email verifications, create/public EN/VI search/detail/edit/stable IDs, concurrent revision conflict, reader/moderator/anonymous denial, hide/removal/404 and scoped cleanup. Its overall budget is300s for many development-compiled routes; normal UI assertions remain15s. A real authorized GET prepares the new-editor development route before its actual client-link assertion, avoiding counting cold compilation as client navigation latency. This is not a production latency claim. No retry is a remedy for an application defect.
+
+Production smoke now includes public catalog pages/API, actual theme hydration, nonexistent work404 and mobile no-overflow/screenshots, but still does not prove real SMTP/public HTTPS cookie/proxy behavior. `scripts/smoke-production.ts` outputs separate `v1-*` screenshots and does not overwrite V0 images.
+
+Future library/provider acceptance adds owner privacy, duplicate/reread concurrency, idempotent reactions, source policy/cache failures and bounded SSRF-safe network jobs; those future tests do not exist merely because this matrix names them.

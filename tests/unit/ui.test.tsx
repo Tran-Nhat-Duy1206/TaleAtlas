@@ -166,6 +166,24 @@ describe("localized account forms", () => {
     ).not.toBeInTheDocument();
     expect(mocks.reset).not.toHaveBeenCalled();
   });
+  it("navigates once after sign-in without racing a router refresh", async () => {
+    mocks.signIn.mockResolvedValue({ error: null });
+    const t = dictionary("en");
+    render(<AuthForm locale="en" mode="login" />);
+    fireEvent.change(screen.getByLabelText(t.email), {
+      target: { value: "reader@example.invalid" },
+    });
+    fireEvent.change(
+      screen.getByLabelText(t.password, { selector: 'input[name="password"]' }),
+      { target: { value: "a-long-password" } },
+    );
+    submitForm();
+    await waitFor(() =>
+      expect(mocks.replace).toHaveBeenCalledWith("/en/settings"),
+    );
+    expect(mocks.replace).toHaveBeenCalledTimes(1);
+    expect(mocks.refresh).not.toHaveBeenCalled();
+  });
   it("maps server errors to localized text and never renders raw diagnostics", async () => {
     mocks.signIn.mockResolvedValue({
       error: { code: "UNKNOWN", message: "private database credentials" },

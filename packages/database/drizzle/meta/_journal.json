@@ -8,6 +8,20 @@
       "when": 1791430052501,
       "tag": "0000_strange_justin_hammer",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791434642346,
+      "tag": "0001_nostalgic_daredevil",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791505144280,
+      "tag": "0002_talented_cloak",
+      "breakpoints": true
     }
   ]
 }

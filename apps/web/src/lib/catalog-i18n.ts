@@ -1,0 +1,186 @@
+import type { Locale } from "./i18n";
+import {
+  WORK_FORMATS,
+  type WorkFormat,
+  type CreatorRole,
+  type ReleaseStatus,
+  type WorkVisibility,
+} from "@taleatlas/database/catalog-types";
+export { WORK_FORMATS };
+export const formatLabels: Record<Locale, Record<WorkFormat, string>> = {
+  en: {
+    MANGA: "Manga",
+    MANHWA: "Manhwa",
+    MANHUA: "Manhua",
+    WEBTOON: "Webtoon",
+    WEB_NOVEL: "Web novel",
+    LIGHT_NOVEL: "Light novel",
+    NOVEL: "Novel",
+    GRAPHIC_NOVEL: "Graphic novel",
+    COMIC: "Comic",
+    SHORT_STORY: "Short story",
+    OTHER: "Other",
+  },
+  vi: {
+    MANGA: "Manga",
+    MANHWA: "Manhwa",
+    MANHUA: "Manhua",
+    WEBTOON: "Webtoon",
+    WEB_NOVEL: "Tiểu thuyết mạng",
+    LIGHT_NOVEL: "Tiểu thuyết nhẹ",
+    NOVEL: "Tiểu thuyết",
+    GRAPHIC_NOVEL: "Tiểu thuyết đồ họa",
+    COMIC: "Truyện tranh",
+    SHORT_STORY: "Truyện ngắn",
+    OTHER: "Khác",
+  },
+};
+export const roleLabels: Record<Locale, Record<CreatorRole, string>> = {
+  en: {
+    AUTHOR: "Author",
+    WRITER: "Writer",
+    ILLUSTRATOR: "Illustrator",
+    ARTIST: "Artist",
+    TRANSLATOR: "Translator",
+    EDITOR: "Editor",
+    PUBLISHER: "Publisher",
+    OTHER: "Other",
+  },
+  vi: {
+    AUTHOR: "Tác giả",
+    WRITER: "Người viết",
+    ILLUSTRATOR: "Họa sĩ minh họa",
+    ARTIST: "Họa sĩ",
+    TRANSLATOR: "Dịch giả",
+    EDITOR: "Biên tập viên",
+    PUBLISHER: "Nhà xuất bản",
+    OTHER: "Khác",
+  },
+};
+export const releaseLabels: Record<Locale, Record<ReleaseStatus, string>> = {
+  en: {
+    UNKNOWN: "Unknown",
+    ANNOUNCED: "Announced",
+    ONGOING: "Ongoing",
+    COMPLETED: "Completed",
+    HIATUS: "On hiatus",
+    CANCELLED: "Cancelled",
+  },
+  vi: {
+    UNKNOWN: "Chưa rõ",
+    ANNOUNCED: "Đã công bố",
+    ONGOING: "Đang phát hành",
+    COMPLETED: "Hoàn thành",
+    HIATUS: "Tạm ngừng",
+    CANCELLED: "Đã hủy",
+  },
+};
+export const visibilityLabels: Record<
+  Locale,
+  Record<WorkVisibility, string>
+> = {
+  en: { DRAFT: "Draft", PUBLISHED: "Published", HIDDEN: "Hidden" },
+  vi: { DRAFT: "Bản nháp", PUBLISHED: "Công khai", HIDDEN: "Ẩn" },
+};
+const en = {
+  browse: "Browse works",
+  admin: "Catalog administration",
+  newWork: "New work",
+  edit: "Edit work",
+  denied: "Access denied. An administrator account is required.",
+  empty: "No catalog entries yet.",
+  save: "Save metadata",
+  saving: "Saving…",
+  saved: "Metadata saved.",
+  error: "The request failed. Please try again.",
+  invalid:
+    "Check the required fields and collection JSON against the field definitions.",
+  conflict:
+    "This entry changed since you opened it. Reload the page to obtain the current revision, then reapply your changes. Nothing was overwritten.",
+  review:
+    "I have reviewed the source citations and confirmed that this public metadata is non-explicit and suitable for publication.",
+  reviewRequired: "Confirm the publication review before publishing.",
+  advanced: "Advanced collections (JSON)",
+  advancedHint:
+    "Use JSON arrays with the keys shown below. Empty arrays are valid. Edition IDs must be retained when referenced by creator credits. Server fields such as normalizedTitle and workId are not accepted.",
+  primaryTitle: "Primary title",
+  primaryLanguage: "Primary title language (language code)",
+  format: "Format",
+  visibility: "Visibility",
+  release: "Release status",
+  language: "Original language (language code)",
+  country: "Country (two uppercase letters)",
+  year: "Publication year",
+  yearLabel: "Publication date label",
+  sourceLabel: "Source label",
+  citation: "Source citation",
+  url: "Source informational URL (HTTPS, optional)",
+  consulted: "Consulted at (ISO timestamp, optional)",
+  titles: "Titles",
+  descriptions: "Descriptions",
+  creators: "Creator credits",
+  editions: "Editions",
+  genres: "Genres",
+  identifiers: "Work identifiers",
+  relations: "Relations",
+  cover: "Cover rights (JSON)",
+  coverHint:
+    "UNKNOWN uses an original placeholder, not an official cover. Approved rights require an existing local raster asset, credit and rights statement.",
+  applyVisibility: "Apply visibility",
+  visibilitySaved: "Visibility updated.",
+  back: "Back to catalog",
+  revision: "Revision",
+  reload: "Reload current entry",
+};
+const vi: typeof en = {
+  browse: "Khám phá tác phẩm",
+  admin: "Quản trị danh mục",
+  newWork: "Thêm tác phẩm",
+  edit: "Sửa tác phẩm",
+  denied: "Không có quyền truy cập. Bạn cần tài khoản quản trị viên.",
+  empty: "Chưa có tác phẩm trong danh mục.",
+  save: "Lưu thông tin",
+  saving: "Đang lưu…",
+  saved: "Đã lưu thông tin.",
+  error: "Yêu cầu thất bại. Vui lòng thử lại.",
+  invalid: "Kiểm tra các trường bắt buộc và JSON theo định nghĩa trường.",
+  conflict:
+    "Tác phẩm đã thay đổi kể từ khi bạn mở trang. Tải lại trang để lấy phiên bản hiện tại rồi áp dụng lại thay đổi. Không có dữ liệu nào bị ghi đè.",
+  review:
+    "Tôi đã xem xét nguồn trích dẫn và xác nhận thông tin công khai này không có nội dung nhạy cảm, phù hợp để công bố.",
+  reviewRequired: "Xác nhận việc xem xét trước khi công bố.",
+  advanced: "Các danh sách nâng cao (JSON)",
+  advancedHint:
+    "Dùng mảng JSON với các khóa bên dưới. Có thể để mảng rỗng. Giữ ID ấn bản khi thông tin người sáng tạo tham chiếu đến nó. Không chấp nhận các trường máy chủ như normalizedTitle hay workId.",
+  primaryTitle: "Tên chính",
+  primaryLanguage: "Ngôn ngữ tên chính (mã ngôn ngữ)",
+  format: "Định dạng",
+  visibility: "Trạng thái hiển thị",
+  release: "Trạng thái phát hành",
+  language: "Ngôn ngữ gốc (mã ngôn ngữ)",
+  country: "Quốc gia (hai chữ cái viết hoa)",
+  year: "Năm xuất bản",
+  yearLabel: "Nhãn thời gian xuất bản",
+  sourceLabel: "Tên nguồn",
+  citation: "Trích dẫn nguồn",
+  url: "Liên kết thông tin nguồn (HTTPS, không bắt buộc)",
+  consulted: "Thời điểm tham khảo (ISO, không bắt buộc)",
+  titles: "Các tên gọi",
+  descriptions: "Mô tả",
+  creators: "Thông tin người sáng tạo",
+  editions: "Ấn bản",
+  genres: "Thể loại",
+  identifiers: "Mã định danh tác phẩm",
+  relations: "Quan hệ tác phẩm",
+  cover: "Quyền sử dụng ảnh bìa (JSON)",
+  coverHint:
+    "UNKNOWN dùng hình thay thế nguyên bản, không phải bìa chính thức. Quyền đã xác nhận cần ảnh raster cục bộ, ghi công và tuyên bố quyền sử dụng.",
+  applyVisibility: "Áp dụng trạng thái hiển thị",
+  visibilitySaved: "Đã cập nhật trạng thái hiển thị.",
+  back: "Về danh mục",
+  revision: "Phiên bản",
+  reload: "Tải lại tác phẩm hiện tại",
+};
+export function catalogDictionary(locale: Locale) {
+  return locale === "vi" ? vi : en;
+}

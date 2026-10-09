@@ -1,6 +1,6 @@
 # TaleAtlas
 
-**Discover Stories. Find Your People.** V0 foundation is implemented and local acceptance is complete; hosted validation remains pending and no production deployment is claimed. This repository establishes a web/account foundation; it does not yet implement a story catalog, personal library, metadata provider or recommendation engine. See [validation](docs/VALIDATION.md) for observed evidence, maintained separately from implementation claims.
+**Discover Stories. Find Your People.** V0 foundation is locally accepted and preserved at `8e00ae4`. V1 persisted global catalog and EN/VI public/admin UI passed mandatory local acceptance gates; see [V1 evidence](docs/V1_VALIDATION.md). No hosted deployment, personal library, active metadata provider or recommendation engine is claimed. Frozen [V0 validation](docs/VALIDATION.md) remains separate from V1 evidence.
 
 ## Stack and layout
 
@@ -48,24 +48,26 @@ For manual development only, `node --import tsx scripts/test-mail.ts` starts syn
 
 ## Commands
 
-| Command | Purpose |
-| --- | --- |
-| `pnpm dev` / `pnpm build` / `pnpm start` | Develop, compile, serve web app |
-| `pnpm typecheck` / `pnpm lint` | Static checks |
-| `pnpm test` | Vitest unit checks |
-| `pnpm test:integration` | Integration configuration; isolated DB only |
-| `pnpm test:e2e` | Playwright browser checks |
-| `pnpm db:generate` / `pnpm db:migrate` | Generate reviewed SQL / apply explicit migrations |
+| Command                                  | Purpose                                           |
+| ---------------------------------------- | ------------------------------------------------- |
+| `pnpm dev` / `pnpm build` / `pnpm start` | Develop, compile, serve web app                   |
+| `pnpm typecheck` / `pnpm lint`           | Static checks                                     |
+| `pnpm test`                              | Vitest unit checks                                |
+| `pnpm test:integration`                  | Integration configuration; isolated DB only       |
+| `pnpm test:e2e`                          | Playwright browser checks                         |
+| `pnpm db:generate` / `pnpm db:migrate`   | Generate reviewed SQL / apply explicit migrations |
 
 Scripts are defined in root `package.json`; a script's presence is not evidence it passed. Production SMTP, Neon/Vercel credentials and GitHub authentication are not supplied. GitHub social sign-in is not configured.
 
 ## Verification and repository setup
 
-Latest observed checks passed: root static typecheck (all packages and tests, including Next type generation), 57 unit tests across six files, lint and production build after native shell navigation/Vietnamese font corrections. Cold isolated UTF-8 PostgreSQL 18.4 migration, repeat migration and generate-with-no-changes passed; six real PostgreSQL integration tests passed with SMTP capture, auth verification/login/reset/session revocation/deletion, role injection/downgrade and forged-origin denial, concurrent limiter (12 attempts → 5 allowed/7 rejected), rollback, uniqueness and foreign keys. `pnpm audit --prod` reported zero vulnerabilities; this is not a security certification.
+Frozen V0 checks passed: root static typecheck (all packages and tests, including Next type generation), 57 unit tests across six files, lint and production build after native shell navigation/Vietnamese font corrections. Cold isolated UTF-8 PostgreSQL 18.4 migration, repeat migration and generate-with-no-changes passed; six real PostgreSQL integration tests passed with SMTP capture, auth verification/login/reset/session revocation/deletion, role injection/downgrade and forged-origin denial, concurrent limiter (12 attempts → 5 allowed/7 rejected), rollback, uniqueness and foreign keys. `pnpm audit --prod` reported zero vulnerabilities; this is not a security certification.
 
 **V0 LOCAL ACCEPTANCE COMPLETE; hosted validation remains pending.** After native root-layout locale/account links and bounded Tailwind source scanning, all three development Playwright tests passed in two consecutive runs. Final post-font/navigation/bounded-source production build and smoke passed: Vietnamese SSR HTML language, health/readiness, EN/VI navigation, robots/sitemap and zero browser page errors. Historical mobile/reload/navigation failures were observed and addressed, not waived. Development Next logs still show `destination stream errored` during interrupted navigation/prefetch and standard Node NO_COLOR warnings; passing browser tests do not imply clean development server logs. No such stream diagnostic was observed in production smoke. No live Neon/Vercel/GitHub repository provisioning, real SMTP delivery or deployed TLS/proxy/cookie proof is claimed. GitHub CI is prepared, not actually executed.
 
-For a new unpublished checkout: `git init -b main`, review `git status`/secret exclusions, then `git add .` and `git commit -m "Initialize TaleAtlas V0"`. Do not reinitialize an existing Git repository. After authenticating privately to GitHub, create an empty repository named **TaleAtlas** through GitHub's UI (or `gh repo create TaleAtlas --private --source=. --remote=origin --push` only when logged in and approved). With the UI-created remote, run `git remote add origin <your-TaleAtlas-URL>` and `git push -u origin main`. No GitHub authentication or remote creation is claimed here; never commit `.env` or tokens.
+The official existing destination is **[Tran-Nhat-Duy1206/TaleAtlas](https://github.com/Tran-Nhat-Duy1206/TaleAtlas)** (`origin=https://github.com/Tran-Nhat-Duy1206/TaleAtlas.git`, intended default branch `main`). It was cloned/inspected and was empty at inspection; local V0 history remains intact. Work continues on `feat/v1-global-catalog`. Never recreate/reinitialize this codebase or repository, force-push, or synchronize to StoryNest. Preserve existing remote history if it changes.
+
+GitHub authentication/synchronization is separate from V1 acceptance. Validate mandatory gates before meaningful Conventional Commits; push verified feature commits when private authentication is available and open a PR into `main`. Do not merge V1 or begin V2. An empty remote needs a separately reviewed initial baseline before a feature PR has a base branch; do not silently overwrite/create main with significant V1 code. Authentication is now verified privately, and remote `main` and the existing feature branch were observed at preserved V0 `8e00ae4`; no remote baseline recreation is needed. V1 push/PR and hosted CI remain pending. Never commit `.env`, local credentials, API keys, database passwords or raw sensitive diagnostics.
 
 ## Documentation
 
