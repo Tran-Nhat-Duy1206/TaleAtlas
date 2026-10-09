@@ -449,32 +449,33 @@ describe.sequential(
                 resolve?: (rows: unknown) => unknown,
                 reject?: (error: unknown) => unknown,
               ) =>
-                Reflect.apply(member, object, [
-                  async (rows: unknown) => {
-                    if (!interleaved) {
-                      interleaved = true;
-                      await updateWork(
-                        target.id,
-                        {
-                          ...targetValue,
-                          revision: 1,
-                          visibility: "HIDDEN",
-                          publicationReviewAcknowledged: false,
-                          titles: [
-                            {
-                              title: "NEW PRIVATE TITLE MUST NOT LEAK",
-                              language: "vi",
-                              kind: "PRIMARY",
-                            },
-                          ],
-                        },
-                        headers(),
-                      );
-                    }
-                    return resolve ? resolve(rows) : rows;
-                  },
-                  reject,
-                ]);
+                Promise.resolve(
+                  Reflect.apply(member, object, [
+                    async (rows: unknown) => {
+                      if (!interleaved) {
+                        interleaved = true;
+                        await updateWork(
+                          target.id,
+                          {
+                            ...targetValue,
+                            revision: 1,
+                            visibility: "HIDDEN",
+                            publicationReviewAcknowledged: false,
+                            titles: [
+                              {
+                                title: "NEW PRIVATE TITLE MUST NOT LEAK",
+                                language: "vi",
+                                kind: "PRIMARY",
+                              },
+                            ],
+                          },
+                          headers(),
+                        );
+                      }
+                      return rows;
+                    },
+                  ]),
+                ).then(resolve, reject);
             return (...args: unknown[]) => {
               const next = Reflect.apply(member, object, args);
               return next &&
@@ -534,6 +535,26 @@ describe.sequential(
           q: work.primaryTitle,
           locale: "vi",
         });
+        // Fuzzy search legitimately includes other entities. Force equal-title
+        // distractor coverage instead of relying on random UUID similarity.
+        if (mode === "search")
+          await create(
+            input({
+              primaryTitle: value.primaryTitle,
+              titles: [
+                {
+                  title: "Other public entity",
+                  language: "vi",
+                  kind: "PRIMARY",
+                },
+              ],
+            }),
+          );
+        const beforePage = await listWorks(query);
+        expect(beforePage.total).toBeGreaterThanOrEqual(
+          mode === "search" ? 2 : 1,
+        );
+        expect(beforePage.items.map((item) => item.id)).toContain(work.id);
         const db = getDatabase();
         let interleaved = false;
         const transactionConfigs: unknown[] = [];
@@ -551,48 +572,54 @@ describe.sequential(
                   resolve?: (rows: unknown) => unknown,
                   reject?: (error: unknown) => unknown,
                 ) =>
-                  Reflect.apply(member, object, [
-                    async (rows: unknown) => {
-                      if (workRows && !interleaved) {
-                        interleaved = true;
-                        expect(rows).toMatchObject([
-                          { id: work.id, visibility: "PUBLISHED" },
-                        ]);
-                        // Writers retain their original DB/transaction path, with
-                        // real auth, and cannot recurse into reader instrumentation.
-                        spy.mockReturnValue(db);
-                        try {
-                          await updateWork(
-                            work.id,
-                            {
-                              ...value,
-                              revision: 1,
-                              visibility: "HIDDEN",
-                              publicationReviewAcknowledged: false,
-                              titles: [
-                                {
-                                  title: "NEW PRIVATE LOCALIZED TITLE",
-                                  language: "vi",
-                                  kind: "PRIMARY",
-                                },
-                              ],
-                              descriptions: [
-                                {
-                                  language: "vi",
-                                  text: "NEW PRIVATE DESCRIPTION",
-                                },
-                              ],
-                            },
-                            headers(),
+                  Promise.resolve(
+                    Reflect.apply(member, object, [
+                      async (rows: unknown) => {
+                        if (workRows && !interleaved) {
+                          interleaved = true;
+                          expect(rows).toEqual(
+                            expect.arrayContaining([
+                              expect.objectContaining({
+                                id: work.id,
+                                visibility: "PUBLISHED",
+                              }),
+                            ]),
                           );
-                        } finally {
-                          spy.mockReturnValue(gated);
+                          // Writers retain their original DB/transaction path, with
+                          // real auth, and cannot recurse into reader instrumentation.
+                          spy.mockReturnValue(db);
+                          try {
+                            await updateWork(
+                              work.id,
+                              {
+                                ...value,
+                                revision: 1,
+                                visibility: "HIDDEN",
+                                publicationReviewAcknowledged: false,
+                                titles: [
+                                  {
+                                    title: "NEW PRIVATE LOCALIZED TITLE",
+                                    language: "vi",
+                                    kind: "PRIMARY",
+                                  },
+                                ],
+                                descriptions: [
+                                  {
+                                    language: "vi",
+                                    text: "NEW PRIVATE DESCRIPTION",
+                                  },
+                                ],
+                              },
+                              headers(),
+                            );
+                          } finally {
+                            spy.mockReturnValue(gated);
+                          }
                         }
-                      }
-                      return resolve ? resolve(rows) : rows;
-                    },
-                    reject,
-                  ]);
+                        return rows;
+                      },
+                    ]),
+                  ).then(resolve, reject);
               return (...args: unknown[]) => {
                 const next = Reflect.apply(member, object, args);
                 return next && typeof next === "object"
@@ -640,15 +667,20 @@ describe.sequential(
           expect(transactionConfigs).toEqual([
             { isolationLevel: "repeatable read", accessMode: "read only" },
           ]);
-          const projected = "items" in result ? result.items[0] : result;
+          const projected =
+            "items" in result
+              ? result.items.find((item) => item.id === work.id)
+              : result;
           expect(projected).toMatchObject({
             id: work.id,
             displayTitle: "Old public localized title",
             descriptions: [{ language: "vi", text: "Old public description" }],
           });
           if ("items" in result) {
-            expect(result.total).toBe(1);
-            expect(result.items).toHaveLength(1);
+            expect(result.total).toBe(beforePage.total);
+            expect(result.items.map((item) => item.id)).toEqual(
+              beforePage.items.map((item) => item.id),
+            );
           }
           expect(JSON.stringify(result)).not.toContain("NEW PRIVATE");
         } finally {
@@ -657,7 +689,9 @@ describe.sequential(
         await expect(getWorkBySlug(work.slug, "vi")).rejects.toMatchObject({
           status: 404,
         });
-        expect(await listWorks(query)).toMatchObject({ total: 0, items: [] });
+        const afterPage = await listWorks(query);
+        expect(afterPage.total).toBe(beforePage.total - 1);
+        expect(afterPage.items.map((item) => item.id)).not.toContain(work.id);
         // Confirm the interleaved update really committed its private children.
         expect(await adminGetWork(work.id, headers())).toMatchObject({
           visibility: "HIDDEN",
