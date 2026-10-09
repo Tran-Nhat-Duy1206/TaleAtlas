@@ -11,6 +11,8 @@ export function adminInput(work: AdminWork): WorkInputPayload {
     primaryTitleLanguage: work.primaryTitleLanguage,
     format: work.format,
     visibility: work.visibility,
+    // A persisted work never carries forward acknowledgment for a new command.
+    publicationReviewAcknowledged: false,
     releaseStatus: work.releaseStatus,
     originalLanguage: work.originalLanguage ?? undefined,
     country: work.country ?? undefined,

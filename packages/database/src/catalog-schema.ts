@@ -330,6 +330,40 @@ export const workRelations = pgTable(
     index("work_relations_source_idx").on(t.sourceId),
   ],
 );
+// Append-only field assertions for compound metadata: row source_id means the
+// latest record amendment, not blanket evidence for every unchanged scalar.
+// Join revision to audit for the server-owned actor/decision; null is a removal.
+export const catalogFieldEvidence = pgTable(
+  "catalog_field_evidence",
+  {
+    id: id(),
+    workId: workId(),
+    fieldPath: text("field_path").notNull(),
+    revision: integer("revision").notNull(),
+    value: jsonb("value").$type<string | number | null>().notNull(),
+    sourceId: sourceId(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("catalog_field_evidence_revision_unique").on(
+      t.workId,
+      t.fieldPath,
+      t.revision,
+    ),
+    check(
+      "catalog_field_evidence_path_check",
+      sql`${t.fieldPath} ~ '^(work[.]([A-Za-z]+)|edition[.][0-9a-f-]{36}[.]([A-Za-z]+)|cover[.]([A-Za-z]+))$' AND char_length(${t.fieldPath}) <= 100`,
+    ),
+    check("catalog_field_evidence_revision_check", sql`${t.revision} > 0`),
+    check(
+      "catalog_field_evidence_value_check",
+      sql`jsonb_typeof(${t.value}) IN ('string', 'number', 'null') AND octet_length(${t.value}::text) <= 8192`,
+    ),
+    index("catalog_field_evidence_work_idx").on(t.workId, t.revision),
+    index("catalog_field_evidence_source_idx").on(t.sourceId),
+  ],
+);
+
 // Audit records retain work identity; the catalog hides works rather than deleting them.
 export const catalogAuditEvents = pgTable(
   "catalog_audit_events",
@@ -356,7 +390,7 @@ export const catalogAuditEvents = pgTable(
     ),
     check(
       "catalog_audit_changes_check",
-      sql`jsonb_typeof(${t.changes}) = 'object' AND octet_length(${t.changes}::text) <= 65536 AND (${t.changes} - ARRAY['primaryTitle','primaryTitleLanguage','format','visibility','releaseStatus','originalLanguage','country','publicationYear','publicationLabel','sourceId','titles','descriptions','editions','creators','genres','cover','identifiers','relations']::text[]) = '{}'::jsonb`,
+      sql`jsonb_typeof(${t.changes}) = 'object' AND octet_length(${t.changes}::text) <= 65536 AND (${t.changes} - ARRAY['primaryTitle','primaryTitleLanguage','format','visibility','releaseStatus','originalLanguage','country','publicationYear','publicationLabel','sourceId','titles','descriptions','editions','creators','genres','cover','identifiers','relations','publicationReviewAcknowledged']::text[]) = '{}'::jsonb`,
     ),
     index("catalog_audit_work_idx").on(t.workId),
     index("catalog_audit_actor_idx").on(t.actorUserId),

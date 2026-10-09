@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   normalizeTitle,
   workInputSchema,
+  updateWorkSchema,
+  visibilityInputSchema,
   catalogQuerySchema,
   informationalUrlSchema,
 } from "../../apps/web/src/features/catalog/contracts";
@@ -13,6 +15,65 @@ const input = {
   source: { label: "Publisher", citation: "Publisher bibliography, record 12" },
 };
 describe("catalog contracts", () => {
+  it("requires explicit strict boolean review for every published command", () => {
+    for (const schema of [
+      workInputSchema,
+      updateWorkSchema,
+      visibilityInputSchema,
+    ]) {
+      const base =
+        schema === visibilityInputSchema
+          ? { revision: 1 }
+          : {
+              ...input,
+              ...(schema === updateWorkSchema ? { revision: 1 } : {}),
+            };
+      for (const acknowledgment of [
+        undefined,
+        false,
+        "true",
+        "false",
+        1,
+        null,
+      ]) {
+        expect(
+          schema.safeParse({
+            ...base,
+            visibility: "PUBLISHED",
+            ...(acknowledgment === undefined
+              ? {}
+              : { publicationReviewAcknowledged: acknowledgment }),
+          }).success,
+        ).toBe(false);
+      }
+      expect(
+        schema.safeParse({
+          ...base,
+          visibility: "PUBLISHED",
+          publicationReviewAcknowledged: true,
+        }).success,
+      ).toBe(true);
+      for (const visibility of ["DRAFT", "HIDDEN"]) {
+        for (const acknowledgment of [undefined, false, true])
+          expect(
+            schema.safeParse({
+              ...base,
+              visibility,
+              ...(acknowledgment === undefined
+                ? {}
+                : { publicationReviewAcknowledged: acknowledgment }),
+            }).success,
+          ).toBe(true);
+        expect(
+          schema.safeParse({
+            ...base,
+            visibility,
+            publicationReviewAcknowledged: "false",
+          }).success,
+        ).toBe(false);
+      }
+    }
+  });
   it("normalizes multilingual titles without changing display", () => {
     expect(normalizeTitle("  ĐƯỜNG—đến: 日本! 한글 ")).toBe(
       "duong den 日本 한글",

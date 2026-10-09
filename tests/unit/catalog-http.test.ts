@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import {
+  workInputSchema,
+  updateWorkSchema,
+  visibilityInputSchema,
+} from "../../apps/web/src/features/catalog/contracts";
 const mocks = vi.hoisted(() => ({ sql: vi.fn(), log: vi.fn() }));
 vi.mock("../../apps/web/src/server/env", () => ({
   getAuthEnv: () => ({ APP_ORIGIN: "http://127.0.0.1:3000" }),
@@ -51,6 +56,68 @@ describe("custom catalog HTTP boundaries", () => {
     expect(
       await readJson(request, z.object({ title: z.string() }).strict()),
     ).toEqual({ title: "real input" });
+  });
+  it("enforces publication review on JSON mutation contracts", async () => {
+    for (const schema of [
+      workInputSchema,
+      updateWorkSchema,
+      visibilityInputSchema,
+    ] as z.ZodType[]) {
+      const base =
+        schema === visibilityInputSchema
+          ? { revision: 1 }
+          : {
+              primaryTitle: "Synthetic",
+              format: "NOVEL",
+              releaseStatus: "UNKNOWN",
+              source: { label: "Synthetic", citation: "Invented fixture" },
+              ...(schema === updateWorkSchema ? { revision: 1 } : {}),
+            };
+      const request = (payload: unknown) =>
+        new Request("http://localhost", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      for (const publicationReviewAcknowledged of [
+        undefined,
+        false,
+        "true",
+        1,
+        null,
+      ]) {
+        const response = await safeJson("catalog.review", () =>
+          readJson(
+            request({
+              ...base,
+              visibility: "PUBLISHED",
+              publicationReviewAcknowledged,
+            }),
+            schema,
+          ),
+        );
+        expect(response.status).toBe(400);
+        expect(await response.json()).toEqual({ error: "VALIDATION_ERROR" });
+      }
+      await expect(
+        readJson(
+          request({
+            ...base,
+            visibility: "PUBLISHED",
+            publicationReviewAcknowledged: true,
+          }),
+          schema,
+        ),
+      ).resolves.toMatchObject({ publicationReviewAcknowledged: true });
+      for (const visibility of ["DRAFT", "HIDDEN"])
+        for (const publicationReviewAcknowledged of [undefined, false])
+          await expect(
+            readJson(
+              request({ ...base, visibility, publicationReviewAcknowledged }),
+              schema,
+            ),
+          ).resolves.toMatchObject({ visibility });
+    }
   });
   it("rejects oversized streaming bodies even without Content-Length", async () => {
     const request = new Request("http://localhost", {

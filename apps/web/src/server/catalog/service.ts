@@ -94,6 +94,7 @@ export async function setVisibility(
       parsed.revision,
       parsed.visibility,
       session.user.id,
+      parsed.publicationReviewAcknowledged,
     );
   });
 }

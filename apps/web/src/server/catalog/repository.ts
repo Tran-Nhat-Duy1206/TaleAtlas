@@ -23,7 +23,16 @@ import {
   type ParsedCatalogQuery,
 } from "../../features/catalog/contracts";
 import { CatalogError } from "./errors";
-import { projectWork } from "./projection";
+import { projectWork, selectDisplayTitle } from "./projection";
+import {
+  retainAssertion,
+  addFieldAssertions,
+  recordFieldAssertions,
+  workEvidenceFields,
+  editionEvidenceFields,
+  coverEvidenceFields,
+  type FieldAssertions,
+} from "./provenance";
 import type {
   CatalogPage,
   AggregateWork,
@@ -117,28 +126,16 @@ async function loadWorks(
         toWorkId: workRelations.toWorkId,
         type: workRelations.type,
         slug: works.slug,
-        // Scalar title lookups cannot multiply relation rows (aliases are not unique).
-        // Canonical locale titles take precedence over potentially stale children.
-        displayTitle: sql<string>`coalesce(
-          case when ${works.primaryTitleLanguage} = ${locale} then ${works.primaryTitle} end,
-          (select ${workTitles.title} from ${workTitles}
-            where ${workTitles.workId} = ${works.id}
-              and ${workTitles.kind} = 'PRIMARY' and ${workTitles.language} = ${locale}
-            order by ${workTitles.id} limit 1),
-          (select ${workTitles.title} from ${workTitles}
-            where ${workTitles.workId} = ${works.id} and ${workTitles.kind} = 'ORIGINAL'
-            order by ${workTitles.id} limit 1),
-          ${works.primaryTitle})`,
-        displayTitleLanguage: sql<string>`coalesce(
-          case when ${works.primaryTitleLanguage} = ${locale} then ${works.primaryTitleLanguage} end,
-          (select ${workTitles.language} from ${workTitles}
-            where ${workTitles.workId} = ${works.id}
-              and ${workTitles.kind} = 'PRIMARY' and ${workTitles.language} = ${locale}
-            order by ${workTitles.id} limit 1),
-          (select ${workTitles.language} from ${workTitles}
-            where ${workTitles.workId} = ${works.id} and ${workTitles.kind} = 'ORIGINAL'
-            order by ${workTitles.id} limit 1),
-          ${works.primaryTitleLanguage})`,
+        primaryTitle: works.primaryTitle,
+        primaryTitleLanguage: works.primaryTitleLanguage,
+        originalLanguage: works.originalLanguage,
+        // Same-statement visibility and title snapshot: a concurrent private
+        // edit cannot enter a second unqualified title read after this filter.
+        titles: sql<
+          WorkInput["titles"]
+        >`coalesce((select jsonb_agg(jsonb_build_object(
+          'title', ${workTitles.title}, 'language', ${workTitles.language}, 'kind', ${workTitles.kind}
+        )) from ${workTitles} where ${workTitles.workId} = ${works.id}), '[]'::jsonb)`,
       })
       .from(workRelations)
       .innerJoin(works, eq(works.id, workRelations.toWorkId))
@@ -149,6 +146,12 @@ async function loadWorks(
         ),
       ),
   ]);
+  // Reuse the exact card/detail policy over the visibility-qualified statement
+  // snapshot, without multiplying relation rows or loading private targets later.
+  const localizedRelations = relations.map((r) => ({
+    ...r,
+    ...selectDisplayTitle(r, locale),
+  }));
   return ids.map((id) => {
     const work = workRows.find((w) => w.id === id)!;
     const source = sources.find((s) => s.id === work.sourceId);
@@ -166,7 +169,7 @@ async function loadWorks(
         genres: children(genreRows),
         cover: covers.find((c) => c.workId === id) ?? null,
         identifiers: children(identifiers),
-        relations: children(relations),
+        relations: children(localizedRelations),
       },
       locale,
       admin,
@@ -174,13 +177,17 @@ async function loadWorks(
   });
 }
 export async function findWorkBySlug(slug: string, locale: string) {
-  const db = getDatabase();
-  const [w] = await db
-    .select({ id: works.id })
-    .from(works)
-    .where(and(eq(works.slug, slug), eq(works.visibility, "PUBLISHED")));
-  if (!w) throw new CatalogError(404, "NOT_FOUND");
-  return loadWork(db, w.id, locale);
+  return getDatabase().transaction(
+    async (tx) => {
+      const [w] = await tx
+        .select({ id: works.id })
+        .from(works)
+        .where(and(eq(works.slug, slug), eq(works.visibility, "PUBLISHED")));
+      if (!w) throw new CatalogError(404, "NOT_FOUND");
+      return loadWork(tx, w.id, locale);
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
 }
 export async function searchWorks(
   query: ParsedCatalogQuery,
@@ -190,6 +197,19 @@ export async function searchWorks(
   if (query.q && !normalized)
     return { items: [], total: 0, page: query.page, pageSize: query.pageSize };
   const db = getDatabase();
+  if (admin) return searchWorksWithExecutor(db, query, admin, normalized);
+  // Visibility qualification and every child read share one public snapshot.
+  return db.transaction(
+    (tx) => searchWorksWithExecutor(tx, query, admin, normalized),
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+}
+async function searchWorksWithExecutor(
+  db: Executor,
+  query: ParsedCatalogQuery,
+  admin: boolean,
+  normalized: string,
+): Promise<CatalogPage<AggregateWork | AdminWork>> {
   const escaped = normalized.replace(/[\\%_]/g, "\\$&");
   const exact = sql`exists(select 1 from ${workTitles} where ${workTitles.workId}=${works.id} and ${workTitles.normalized}=${normalized})`;
   const fts = sql`${works.searchVector} @@ plainto_tsquery('simple', ${normalized})`;
@@ -252,11 +272,71 @@ async function replaceChildren(
   id: string,
   input: WorkInput,
   sourceId: string,
+  revision: number,
+  previousWork?: typeof works.$inferSelect,
 ) {
-  const existing = await tx
-    .select({ id: editions.id })
-    .from(editions)
-    .where(eq(editions.workId, id));
+  const [
+    existing,
+    priorTitles,
+    priorDescriptions,
+    priorGenres,
+    priorCovers,
+    priorIdentifiers,
+    priorRelations,
+    priorCredits,
+  ] = await Promise.all([
+    tx.select().from(editions).where(eq(editions.workId, id)),
+    tx
+      .select()
+      .from(workTitles)
+      .where(eq(workTitles.workId, id))
+      .orderBy(workTitles.id),
+    tx.select().from(workDescriptions).where(eq(workDescriptions.workId, id)),
+    tx.select().from(workGenres).where(eq(workGenres.workId, id)),
+    tx.select().from(workCovers).where(eq(workCovers.workId, id)),
+    tx.select().from(workIdentifiers).where(eq(workIdentifiers.workId, id)),
+    tx.select().from(workRelations).where(eq(workRelations.fromWorkId, id)),
+    tx
+      .select({
+        id: workCreators.id,
+        creatorId: workCreators.creatorId,
+        name: creators.name,
+        role: workCreators.role,
+        editionId: workCreators.editionId,
+        sourceId: workCreators.sourceId,
+      })
+      .from(workCreators)
+      .innerJoin(creators, eq(creators.id, workCreators.creatorId))
+      .where(eq(workCreators.workId, id))
+      .orderBy(workCreators.id),
+  ]);
+  const previousEvidence: FieldAssertions = new Map();
+  const nextEvidence: FieldAssertions = new Map();
+  if (previousWork)
+    addFieldAssertions(
+      previousEvidence,
+      "work",
+      previousWork,
+      workEvidenceFields,
+      previousWork.sourceId,
+    );
+  addFieldAssertions(nextEvidence, "work", input, workEvidenceFields, sourceId);
+  for (const e of existing)
+    addFieldAssertions(
+      previousEvidence,
+      `edition.${e.id}`,
+      e,
+      editionEvidenceFields,
+      e.sourceId,
+    );
+  for (const c of priorCovers)
+    addFieldAssertions(
+      previousEvidence,
+      "cover",
+      c,
+      coverEvidenceFields,
+      c.sourceId,
+    );
   const allowed = new Set(existing.map((e) => e.id));
   if (input.editions.some((e) => e.id && !allowed.has(e.id)))
     throw new CatalogError(400, "INVALID_EDITION");
@@ -288,6 +368,16 @@ async function replaceChildren(
       publicationLabel: e.publicationLabel ?? null,
       isbn: e.isbn?.replace(/[ -]/g, "").toUpperCase() ?? null,
     };
+    const old = e.id ? existing.find((r) => r.id === e.id) : undefined;
+    if (old && editionEvidenceFields.every((key) => old[key] === row[key]))
+      row.sourceId = old.sourceId;
+    addFieldAssertions(
+      nextEvidence,
+      `edition.${row.id}`,
+      row,
+      editionEvidenceFields,
+      sourceId,
+    );
     if (e.id) await tx.update(editions).set(row).where(eq(editions.id, e.id));
     else await tx.insert(editions).values(row);
   }
@@ -307,19 +397,38 @@ async function replaceChildren(
     ),
   ];
   await tx.insert(workTitles).values(
-    titles.map((t) => ({
-      ...t,
-      workId: id,
-      normalized: normalizeTitle(t.title),
-      sourceId,
-    })),
+    titles.map((t) => {
+      const old = retainAssertion(priorTitles, t);
+      return {
+        ...t,
+        ...(old ? { id: old.id } : {}),
+        workId: id,
+        normalized: normalizeTitle(t.title),
+        sourceId: old?.sourceId ?? sourceId,
+      };
+    }),
   );
   if (input.descriptions.length)
-    await tx
-      .insert(workDescriptions)
-      .values(input.descriptions.map((d) => ({ ...d, workId: id, sourceId })));
+    await tx.insert(workDescriptions).values(
+      input.descriptions.map((d) => ({
+        ...d,
+        workId: id,
+        sourceId: retainAssertion(priorDescriptions, d)?.sourceId ?? sourceId,
+      })),
+    );
   for (const c of input.creators) {
-    let creatorId = c.id;
+    const editionId =
+      c.editionIndex !== undefined
+        ? ids[c.editionIndex]
+        : (c.editionId ?? null);
+    const oldCredit = retainAssertion(priorCredits, {
+      name: c.name,
+      role: c.role,
+      editionId,
+      ...(c.id ? { creatorId: c.id } : {}),
+    });
+    // Reuse only this work's exact prior credit; equal names never merge across works.
+    let creatorId = c.id ?? oldCredit?.creatorId;
     if (creatorId) {
       const [row] = await tx
         .select()
@@ -332,15 +441,13 @@ async function replaceChildren(
       await tx.insert(creators).values({ id: creatorId, name: c.name });
     }
     await tx.insert(workCreators).values({
+      ...(oldCredit ? { id: oldCredit.id } : {}),
       workId: id,
       creatorId,
       role: c.role,
-      editionId:
-        c.editionIndex !== undefined
-          ? ids[c.editionIndex]
-          : (c.editionId ?? null),
+      editionId,
       displayOrder: c.displayOrder,
-      sourceId,
+      sourceId: oldCredit?.sourceId ?? sourceId,
     });
   }
   for (const g of input.genres) {
@@ -348,21 +455,44 @@ async function replaceChildren(
     const [row] = await tx.select().from(genres).where(eq(genres.slug, g.slug));
     if (!row || row.nameEn !== g.nameEn || row.nameVi !== g.nameVi)
       throw new CatalogError(409, "GENRE_CONFLICT");
-    await tx
-      .insert(workGenres)
-      .values({ workId: id, genreSlug: g.slug, sourceId });
+    await tx.insert(workGenres).values({
+      workId: id,
+      genreSlug: g.slug,
+      sourceId:
+        retainAssertion(priorGenres, { genreSlug: g.slug })?.sourceId ??
+        sourceId,
+    });
   }
-  if (input.cover)
-    await tx
-      .insert(workCovers)
-      .values({ ...input.cover, workId: id, sourceId });
+  if (input.cover) {
+    const coverValues = Object.fromEntries(
+      coverEvidenceFields.map((key) => [key, input.cover![key] ?? null]),
+    );
+    const old = retainAssertion(priorCovers, coverValues);
+    await tx.insert(workCovers).values({
+      ...input.cover,
+      workId: id,
+      sourceId: old?.sourceId ?? sourceId,
+    });
+    addFieldAssertions(
+      nextEvidence,
+      "cover",
+      coverValues,
+      coverEvidenceFields,
+      sourceId,
+    );
+  }
   if (input.identifiers.length)
     await tx.insert(workIdentifiers).values(
-      input.identifiers.map((i) => ({
-        ...identifier(i.namespace, i.value),
-        workId: id,
-        sourceId,
-      })),
+      input.identifiers.map((i) => {
+        const value = identifier(i.namespace, i.value);
+        const old = retainAssertion(priorIdentifiers, value);
+        return {
+          ...value,
+          ...(old ? { id: old.id } : {}),
+          workId: id,
+          sourceId: old?.sourceId ?? sourceId,
+        };
+      }),
     );
   for (const r of input.relations) {
     if (r.toWorkId === id) throw new CatalogError(400, "INVALID_RELATION");
@@ -371,7 +501,11 @@ async function replaceChildren(
       .from(works)
       .where(eq(works.id, r.toWorkId));
     if (!target) throw new CatalogError(400, "INVALID_RELATION");
-    await tx.insert(workRelations).values({ ...r, fromWorkId: id, sourceId });
+    await tx.insert(workRelations).values({
+      ...r,
+      fromWorkId: id,
+      sourceId: retainAssertion(priorRelations, r)?.sourceId ?? sourceId,
+    });
   }
   const searchText = normalizeTitle(
     [
@@ -383,6 +517,14 @@ async function replaceChildren(
     ].join(" "),
   );
   await tx.update(works).set({ searchText }).where(eq(works.id, id));
+  await recordFieldAssertions(
+    tx,
+    id,
+    revision,
+    previousEvidence,
+    nextEvidence,
+    sourceId,
+  );
 }
 function fields(input: WorkInput) {
   return {
@@ -403,9 +545,15 @@ export async function saveWork(
   id?: string,
   revision?: number,
 ) {
+  if (
+    input.visibility === "PUBLISHED" &&
+    input.publicationReviewAcknowledged !== true
+  )
+    throw new CatalogError(400, "VALIDATION_ERROR");
   return getDatabase().transaction(async (tx) => {
     let previousVisibility: WorkInput["visibility"] | undefined;
     let previousRevision: number | null = null;
+    let previousWork: typeof works.$inferSelect | undefined;
     if (id) {
       const [current] = await tx
         .select()
@@ -417,6 +565,7 @@ export async function saveWork(
         throw new CatalogError(409, "CONFLICT");
       previousRevision = current.revision;
       previousVisibility = current.visibility;
+      previousWork = current;
     }
     const workId = id ?? randomUUID();
     const sourceId = randomUUID();
@@ -453,7 +602,14 @@ export async function saveWork(
         searchText: normalizeTitle(input.primaryTitle) || "work",
       });
     }
-    await replaceChildren(tx, workId, input, sourceId);
+    await replaceChildren(
+      tx,
+      workId,
+      input,
+      sourceId,
+      newRevision,
+      previousWork,
+    );
     await tx.insert(catalogAuditEvents).values({
       workId,
       actorUserId: actor,
@@ -470,6 +626,9 @@ export async function saveWork(
       changes: {
         ...fields(input),
         sourceId,
+        ...(input.visibility === "PUBLISHED"
+          ? { publicationReviewAcknowledged: true }
+          : {}),
         // Retain the asserted metadata, not only counts: later edits must not erase
         // earlier original titles/aliases/credits from the privileged history.
         titles: input.titles,
@@ -490,7 +649,10 @@ export async function changeVisibility(
   revision: number,
   visibility: WorkInput["visibility"],
   actor: string,
+  publicationReviewAcknowledged?: boolean,
 ) {
+  if (visibility === "PUBLISHED" && publicationReviewAcknowledged !== true)
+    throw new CatalogError(400, "VALIDATION_ERROR");
   return getDatabase().transaction(async (tx) => {
     const [w] = await tx
       .select()
@@ -515,7 +677,12 @@ export async function changeVisibility(
             : "UPDATE",
       previousRevision: revision,
       newRevision: revision + 1,
-      changes: { visibility },
+      changes: {
+        visibility,
+        ...(visibility === "PUBLISHED"
+          ? { publicationReviewAcknowledged: true }
+          : {}),
+      },
     });
     return loadWork(tx, id, "en", true);
   });

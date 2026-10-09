@@ -54,6 +54,74 @@ it("invalid mutation fails with sanitized validation and no repository write", a
   ).rejects.toMatchObject({ status: 400, code: "VALIDATION" });
   expect(mocks.saveWork).not.toHaveBeenCalled();
 });
+it("rejects unacknowledged published commands before any repository access", async () => {
+  const work = {
+    primaryTitle: "Synthetic",
+    format: "NOVEL",
+    visibility: "PUBLISHED",
+    releaseStatus: "UNKNOWN",
+    source: { label: "Synthetic", citation: "Invented fixture" },
+  };
+  for (const acknowledgment of [undefined, false, "true", 1, null]) {
+    const review =
+      acknowledgment === undefined
+        ? {}
+        : { publicationReviewAcknowledged: acknowledgment };
+    for (const call of [
+      () => createWork({ ...work, ...review }, headers),
+      () => updateWork(id, { ...work, revision: 1, ...review }, headers),
+      () =>
+        setVisibility(
+          id,
+          { visibility: "PUBLISHED", revision: 1, ...review },
+          headers,
+        ),
+    ])
+      await expect(call()).rejects.toMatchObject({
+        status: 400,
+        code: "VALIDATION",
+        message: "VALIDATION",
+      });
+  }
+  expect(mocks.requireRole).toHaveBeenCalledWith(["admin"], headers);
+  for (const repository of [
+    mocks.getDatabase,
+    mocks.saveWork,
+    mocks.changeVisibility,
+    mocks.loadWork,
+    mocks.searchWorks,
+    mocks.findWorkBySlug,
+  ])
+    expect(repository).not.toHaveBeenCalled();
+});
+it.each(["PUBLISHED", "DRAFT", "HIDDEN"])(
+  "accepts valid %s commands after authorization",
+  async (visibility) => {
+    const review =
+      visibility === "PUBLISHED"
+        ? { publicationReviewAcknowledged: true }
+        : { publicationReviewAcknowledged: false };
+    const work = {
+      primaryTitle: "Synthetic",
+      format: "NOVEL",
+      visibility,
+      releaseStatus: "UNKNOWN",
+      source: { label: "Synthetic", citation: "Invented fixture" },
+      ...review,
+    };
+    await createWork(work, headers);
+    await updateWork(id, { ...work, revision: 1 }, headers);
+    await setVisibility(id, { visibility, revision: 1, ...review }, headers);
+    expect(mocks.saveWork).toHaveBeenCalledTimes(2);
+    expect(mocks.saveWork.mock.calls[1]).toEqual([
+      expect.objectContaining(review),
+      "actor",
+      id,
+      1,
+    ]);
+    expect(mocks.changeVisibility).toHaveBeenCalledOnce();
+  },
+);
 it("does not expose query/driver errors", async () => {
   mocks.searchWorks.mockRejectedValue(new Error("SQL private token"));
   await expect(listWorks({})).rejects.toMatchObject({

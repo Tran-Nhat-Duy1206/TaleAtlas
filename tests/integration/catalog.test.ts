@@ -35,6 +35,7 @@ function input(overrides: Record<string, unknown> = {}): WorkInput {
     primaryTitleLanguage: "en",
     format: "NOVEL",
     visibility: "PUBLISHED",
+    publicationReviewAcknowledged: true,
     releaseStatus: "UNKNOWN",
     source: {
       label: f.sourceLabel,
@@ -89,6 +90,7 @@ afterAll(async () => {
     const credits =
       await sql`select creator_id from work_creators where work_id = ${id}`;
     credits.forEach((c) => ownedCreators.add(String(c.creator_id)));
+    await sql`delete from catalog_field_evidence where work_id = ${id}`;
     await sql`delete from catalog_audit_events where work_id = ${id}`;
     await sql`delete from work_relations where from_work_id = ${id} or to_work_id = ${id}`;
     await sql`delete from work_creators where work_id = ${id}`;

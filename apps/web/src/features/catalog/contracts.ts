@@ -87,6 +87,7 @@ export const workInputSchema = z
     primaryTitleLanguage: language.default("und"),
     format: z.enum(WORK_FORMATS),
     visibility: z.enum(WORK_VISIBILITIES),
+    publicationReviewAcknowledged: z.boolean().optional(),
     releaseStatus: z.enum(RELEASE_STATUSES),
     originalLanguage: language.optional(),
     country: z
@@ -199,6 +200,15 @@ export const workInputSchema = z
   .strict()
   .superRefine((v, c) => {
     if (
+      v.visibility === "PUBLISHED" &&
+      v.publicationReviewAcknowledged !== true
+    )
+      c.addIssue({
+        code: "custom",
+        path: ["publicationReviewAcknowledged"],
+        message: "Publication review acknowledgment is required",
+      });
+    if (
       !normalizeTitle(v.primaryTitle) ||
       v.titles.some((t) => !normalizeTitle(t.title))
     )
@@ -282,8 +292,17 @@ export const visibilityInputSchema = z
   .object({
     revision: z.number().int().positive(),
     visibility: z.enum(WORK_VISIBILITIES),
+    publicationReviewAcknowledged: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (v) =>
+      v.visibility !== "PUBLISHED" || v.publicationReviewAcknowledged === true,
+    {
+      path: ["publicationReviewAcknowledged"],
+      message: "Publication review acknowledgment is required",
+    },
+  );
 export const catalogQuerySchema = z
   .object({
     q: z.string().trim().max(200).default(""),

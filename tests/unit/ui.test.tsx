@@ -66,6 +66,8 @@ import { AuthForm } from "../../apps/web/src/components/auth-form";
 import { Preferences } from "../../apps/web/src/components/shell";
 import { Settings } from "../../apps/web/src/components/settings";
 import { dictionary } from "../../apps/web/src/lib/i18n";
+import { WorkEditor } from "../../apps/web/src/components/catalog/WorkEditor";
+import { catalogDictionary } from "../../apps/web/src/lib/catalog-i18n";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -87,7 +89,70 @@ beforeEach(() => {
   ])
     fn.mockResolvedValue({ data: {}, error: null });
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+describe("catalog publication acknowledgment", () => {
+  it.each(["create", "update", "visibility"])(
+    "sends the actual checkbox boolean for %s",
+    async (command) => {
+      const fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ id: "synthetic" }),
+      });
+      vi.stubGlobal("fetch", fetch);
+      const d = catalogDictionary("en");
+      render(
+        <WorkEditor
+          locale="en"
+          id={command === "create" ? undefined : "synthetic"}
+          revision={1}
+          initial={{
+            primaryTitle: "Synthetic",
+            format: "NOVEL",
+            visibility: "PUBLISHED",
+            releaseStatus: "UNKNOWN",
+            publicationReviewAcknowledged: true,
+            source: { label: "Synthetic", citation: "Invented fixture" },
+          }}
+        />,
+      );
+      const checkbox = screen.getByRole("checkbox", { name: d.review });
+      expect(checkbox).not.toBeChecked();
+      const submit = () =>
+        command === "visibility"
+          ? fireEvent.click(
+              screen.getByRole("button", { name: d.applyVisibility }),
+            )
+          : fireEvent.submit(
+              screen.getByRole("button", { name: d.save }).closest("form")!,
+            );
+      submit();
+      expect(fetch).not.toHaveBeenCalled();
+      expect(screen.getByRole("status")).toHaveTextContent(d.reviewRequired);
+      fireEvent.click(checkbox);
+      submit();
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+      expect(
+        JSON.parse(fetch.mock.calls[0][1].body).publicationReviewAcknowledged,
+      ).toBe(true);
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: d.save })).not.toBeDisabled(),
+      );
+      fireEvent.change(screen.getByRole("combobox", { name: d.visibility }), {
+        target: { value: "HIDDEN" },
+      });
+      fireEvent.click(checkbox);
+      submit();
+      await waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      expect(
+        JSON.parse(fetch.mock.calls[1][1].body).publicationReviewAcknowledged,
+      ).toBe(false);
+    },
+  );
+});
 function submitForm() {
   const button = screen.getByRole("button", {
     name: /Create account|Tạo tài khoản|Reset password|Đặt lại mật khẩu|Sign in|Đăng nhập/,

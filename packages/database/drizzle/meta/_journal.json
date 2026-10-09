@@ -22,6 +22,13 @@
       "when": 1791505144280,
       "tag": "0002_talented_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791528305955,
+      "tag": "0003_absent_tag",
+      "breakpoints": true
     }
   ]
 }

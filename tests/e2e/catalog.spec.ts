@@ -12,9 +12,10 @@ test("real verified catalog administrator lifecycle, localization, guards and op
   page,
   baseURL,
 }) => {
-  // This one transactional scenario includes two real email-verification lifecycles
-  // and cold dev compilation of many routes; individual UI assertions remain bounded.
-  test.setTimeout(300_000);
+  // Two real verification lifecycles and many cold webpack routes share this
+  // scenario. Observed Windows runs reached the final reload at ~297s, so allow
+  // a bounded 360s overall; individual UI assertions stay 15s, with no retries.
+  test.setTimeout(360_000);
   const { client: sql } = createDatabase(requireTestDatabase());
   const run = randomUUID();
   const sourceLabel = `E2E synthetic catalog ${run}`;
@@ -124,6 +125,9 @@ test("real verified catalog administrator lifecycle, localization, guards and op
     await target.getByRole("button", { name: vi.save, exact: true }).click();
     const result = await response;
     expect(result.status()).toBe(status);
+    expect(result.request().postDataJSON().publicationReviewAcknowledged).toBe(
+      true,
+    );
     return result;
   }
   async function search(locale: "en" | "vi", q: string, title: string) {
@@ -334,7 +338,12 @@ test("real verified catalog administrator lifecycle, localization, guards and op
     await page
       .getByRole("button", { name: vi.applyVisibility, exact: true })
       .click();
-    expect((await hiddenResponse).status()).toBe(200);
+    const hiddenResult = await hiddenResponse;
+    expect(hiddenResult.status()).toBe(200);
+    expect(
+      typeof hiddenResult.request().postDataJSON()
+        .publicationReviewAcknowledged,
+    ).toBe("boolean");
     await expect(
       page.getByText(`${vi.revision}: 3`, { exact: true }),
     ).toBeVisible();
@@ -381,6 +390,7 @@ test("real verified catalog administrator lifecycle, localization, guards and op
         const credits =
           await sql`select creator_id from work_creators where work_id = ${id}`;
         credits.forEach((c) => creators.add(String(c.creator_id)));
+        await sql`delete from catalog_field_evidence where work_id = ${id}`;
         await sql`delete from catalog_audit_events where work_id = ${id}`;
         await sql`delete from work_relations where from_work_id = ${id} or to_work_id = ${id}`;
         await sql`delete from work_creators where work_id = ${id}`;

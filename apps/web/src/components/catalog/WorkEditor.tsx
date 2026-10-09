@@ -79,19 +79,21 @@ export function WorkEditor({
     const value = (key: string) => String(data.get(key) ?? "");
     const optional = (key: string) => value(key).trim() || undefined;
     const visibility = value("visibility");
-    if (visibility === "PUBLISHED" && data.get("review") !== "on") {
+    const publicationReviewAcknowledged = data.get("review") === "on";
+    if (visibility === "PUBLISHED" && !publicationReviewAcknowledged) {
       setMessage(d.reviewRequired);
       return;
     }
     let payload: unknown;
     try {
       payload = visibilityOnly
-        ? { visibility, revision }
+        ? { visibility, revision, publicationReviewAcknowledged }
         : workInputSchema.parse({
             primaryTitle: value("primaryTitle"),
             primaryTitleLanguage: value("primaryTitleLanguage"),
             format: value("format"),
             visibility,
+            publicationReviewAcknowledged,
             releaseStatus: value("releaseStatus"),
             originalLanguage: optional("originalLanguage"),
             country: optional("country"),
