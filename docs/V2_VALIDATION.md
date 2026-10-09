@@ -46,7 +46,7 @@ V2A exposes internal server domain functions and validated pure contracts only. 
 
 No authorized Neon/Vercel deployment credentials or isolated preview resource have been supplied or validated. A name-only environment check found VERCEL_TOKEN/NEON_API_KEY/NEON_TOKEN absent; workspace discovery found no Vercel project configuration or private environment file (only examples). No secret values were printed. This is bounded local-access evidence, not a claim that the owner has no accounts elsewhere. Local feature work continues without claiming hosted acceptance. No production migration, paid infrastructure, provider subscription or deployed cron is authorized by these tests. HTTPS/session cookies/proxy/serverless recovery and real SMTP require actual preview evidence when access exists. Hobby cron must not exceed once-per-day; a replaceable bounded scheduler will be added only with V2C execution.
 
-## V2B — local gates complete in isolated runs; CI setup correction under validation
+## V2B — complete: local and actual GitHub CI verified
 
 B starts from tested V2A commit `e1aba9e`. Protected HTTP request routes, bilingual form/status pages and conservatively reviewed equivalent-request support are implemented. Forward migration `0005_misty_talisman.sql` adds the used supporter relation and curated search key; migrations 0000–0004 remain unchanged.
 
@@ -60,8 +60,17 @@ V2B was committed and pushed as `7f35109d45aff9ad86ad73e96d8c724f40dc2ba9`. PR2 
 
 The port correction was committed/pushed as `50fcf3e1da091d396d9954e9eb689c90566dfaf6`. Fresh [PR run37961434836](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37961434836) and [push run37961427168](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37961427168) again passed static/unit/SQL/migration/build and the four original browser cases, then correctly returned429 to B registration: fast CI specifications were sharing the real auth signup IP bucket (3/minute). The audit stage was skipped. These are genuine failed runs, not accepted B CI. The B fixture now simulates the existing configured self-hosted proxy using UUID-scoped documentation IPv6 x-real-ip values per browser context, consistent with existing real SQL auth fixtures. Production auth/rate limits and every HTTP200/cookie/SMTP/ownership assertion remain unchanged; there is no global limiter deletion, delay/retry, mocked authentication or identity grant. This is fixture isolation, not proof of deployed proxy overwrite. Run55 passed full TypeScript before/after, all147 unit cases, the genuine B scenario1/1 in4.8m (5.1m total), zero retry with the original360s/15s bounds, lint and whitespace. The isolated trusted-proxy fixture change is ready to publish and then examine fresh actual CI. Frozen baseline ledgers/migrations0000–0003/lockfile, committed applied0004/0005 and both reference worktrees were independently checked unchanged.
 
+### Final actual CI acceptance
+
+Verified implementation commit: **`147d1b3a6699ce979e1c9444d073bf34ab71f28d`** (`fix(test): isolate real auth proxy rate identities`), following V2B feature commit7f35109 and port correction50fcf3e. Both fresh workflows completed SUCCESS:
+
+- [PR37963600779](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37963600779): actual147 unit cases across13 files,51 real PostgreSQL cases across7 files, complete5/5 Chromium suite in3.9m, zero retries, frozen install/type/lint/migration/build and zero-known production audit all passed.
+- [Push37963593744](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37963593744): same actual147/51/5 counts, complete Chromium suite in3.1m, zero retries, all mandatory gates/zero-known audit passed.
+
+Artifact upload was correctly skipped on successful workflows; it is not a failed mandatory gate. Existing runner action/Ubuntu-transition annotations are nonfatal platform notices, not application acceptance failures. The initial failed CI and combined local OOM remain recorded above. Local full browser coverage was isolated across sessions; actual fresh GitHub CI now independently verifies all5 cases together in each workflow. PR2 remains open/unmerged. Provider live use remains disabled/PENDING and hosted TLS/SMTP/deployment remains unverified. V2C and V2D are still unimplemented; V2B acceptance does not claim whole-V2 completion.
+
 ## Remaining sequential milestones
 
-- V2B: publish the locally verified protected routes, bilingual prefilled form, owner lifecycle and conservative reviewed support milestone; inspect actual GitHub CI before proceeding.
+- V2B: accepted locally and in both actual CI workflows at147d1b3; retain the unsuccessful earlier attempts as evidence, not passes.
 - V2C: one shared candidate pipeline, explainable identity retrieval/resolution, source/rights checks, safe network boundaries and bounded authorized processing. Real adapter only if documented intended-use/storage permission is adequate; otherwise deterministic offline fixture acceptance and explicit disabled live discovery.
 - V2D: transactional authorized approve/link/reject, human attestation, provenance-safe decisions, editable metadata suggestions as a separately complete workflow, actual catalog Recently Added/verified release sections and complete end-to-end acceptance.
