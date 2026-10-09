@@ -37,4 +37,12 @@ Runtime uses `DATABASE_URL` (Neon pooled in deployment); migration configuration
 
 GIN search-vector and `pg_trgm` indexes are applied; actual index presence, filtering/pagination and Unicode/Đ normalization have integration evidence. Production-scale latency/query plans are not asserted. Updates lock the work and compare revision before replacing children and recording history. Equal titles and equal creator names never auto-merge work identities. Unknown counts/dates are not seeded. Readiness checks required auth/catalog columns and the trigram function without reading user rows.
 
-**Planned, not current:** user-library uniqueness, reading sessions/progress, provider requests/jobs and work-based threads/reactions. Private notes/user overrides must not enter shared catalog/search tables. See `V1_VALIDATION.md` for current gate evidence.
+**Planned:** user-library uniqueness, reading sessions/progress and work-based threads/reactions. Private notes/user overrides must not enter shared catalog/search tables. V1 history remains in `V1_VALIDATION.md`.
+
+## V2A forward-only foundation (locally verified; CI pending)
+
+New migration0004 adds `work_requests` (private bounded input, owner+submission idempotency, input/state revisions and separately reviewed summary), `request_events` (same-revision append-only decisions/old-new input), `provider_registry` (non-secret disabled policy and atomic window counter), and `ingestion_jobs` (unique intent, bounded attempts, due time, live token/owner/expiry). No candidate/supporter/release/edit-suggestion table is added until its implemented milestone.
+
+Request result FK is present exactly for APPROVED/LINKED_EXISTING; V2A exposes neither approval nor catalog insertion. Nullable user FKs SET NULL retain opaque history after deletion; Work/request/provider FKs RESTRICT protect identity/history. Details/registry JSON object caps are16KiB; audit old+new details cap32KiB, parsed input12KB. Positive revisions, lifecycle/job enums, all-or-none leases, retry ceiling8, public summary verification triplet and per-owner submission uniqueness are database-enforced. Exact transition authorization and application append-only history are server contracts, not triggers/tamper-proof storage. Idempotency is delivery identity, never normalized bibliographic equality.
+
+Run migrations only after review against isolated databases; existing0000–0003 SQL and snapshots remain unchanged. Readiness now probes ingestion tables without reading private rows. Actual acceptance observations and limitations are in `V2_VALIDATION.md`.
