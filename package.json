@@ -14,7 +14,7 @@
     "lint": "pnpm --filter @taleatlas/web lint",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "playwright test",
+    "test:e2e": "node --import tsx ./node_modules/@playwright/test/cli.js test",
     "db:generate": "pnpm --filter @taleatlas/database generate",
     "db:migrate": "pnpm --filter @taleatlas/database migrate"
   },
@@ -23,17 +23,18 @@
     "@testing-library/jest-dom": "6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^24.0.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@types/smtp-server": "^3.5.12",
     "embedded-postgres": "18.4.0-beta.17",
     "jsdom": "^28.0.0",
     "prettier": "3.8.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "smtp-server": "^3.18.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "zod": "^4.6.5"
   }
 }

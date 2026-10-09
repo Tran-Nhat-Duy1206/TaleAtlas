@@ -18,6 +18,7 @@ function subscribeLocation(notify: () => void) {
 }
 import { branding } from "@/lib/branding";
 import { dictionary, type Locale } from "@/lib/i18n";
+import { catalogDictionary } from "@/lib/catalog-i18n";
 import { authClient } from "@/lib/auth-client";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -97,6 +98,12 @@ export function Shell({
         <nav
           aria-label={locale === "vi" ? "Điều hướng chính" : "Main navigation"}
         >
+          <a href={`/${locale}/works`}>{catalogDictionary(locale).browse}</a>
+          {session?.user.role === "admin" && (
+            <a href={`/${locale}/admin/works`}>
+              {catalogDictionary(locale).admin}
+            </a>
+          )}
           {/* Locale changes cross document/root-layout boundaries: use native navigation. */}
           <a
             href={switched}

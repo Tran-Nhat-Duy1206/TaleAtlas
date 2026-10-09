@@ -7,6 +7,8 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: [
         "/api/",
+        "/en/admin",
+        "/vi/admin",
         "/en/settings",
         "/vi/settings",
         "/en/login",

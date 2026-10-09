@@ -116,8 +116,9 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
         return;
       }
       if (mode === "login") {
+        // The destination navigation already fetches fresh authenticated server data.
+        // Refreshing before replace commits races/cancels its RSC stream.
         router.replace(`/${locale}/settings`);
-        router.refresh();
       } else if (mode === "register") router.push(`/${locale}/verify-email`);
       else
         setSuccess(

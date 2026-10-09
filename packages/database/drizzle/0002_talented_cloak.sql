@@ -1,0 +1,2 @@
+ALTER TABLE "work_covers" DROP CONSTRAINT "work_covers_approved_check";--> statement-breakpoint
+ALTER TABLE "work_covers" ADD CONSTRAINT "work_covers_approved_check" CHECK ("work_covers"."rights" = 'UNKNOWN' OR ("work_covers"."asset_path" IS NOT NULL AND "work_covers"."rights_statement" IS NOT NULL AND "work_covers"."credit" IS NOT NULL));

@@ -651,8 +651,11 @@ label small {
 }
 @media (max-width: 640px) {
   .site-header {
-    height: 82px;
-    padding: 0 22px;
+    height: auto;
+    min-height: 82px;
+    padding: 20px 22px;
+    flex-wrap: wrap;
+    gap: 16px;
   }
   .wordmark {
     font-size: 23px;
@@ -667,6 +670,8 @@ label small {
     display: none;
   }
   .site-header nav {
+    width: 100%;
+    flex-wrap: wrap;
     gap: 16px;
   }
   .nav-account {

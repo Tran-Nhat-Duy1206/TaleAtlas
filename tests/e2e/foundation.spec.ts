@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../helpers/browser-test";
 import { randomUUID } from "node:crypto";
 
 test("bilingual navigation, mobile layout and persisted accessible themes", async ({
@@ -41,6 +41,7 @@ test("bilingual navigation, mobile layout and persisted accessible themes", asyn
 test("real registration, email verification, login, protected settings and logout", async ({
   page,
   request,
+  baseURL,
 }) => {
   const email = `${randomUUID()}@example.invalid`;
   await page.goto("/en/settings");
@@ -59,9 +60,10 @@ test("real registration, email verification, login, protected settings and logou
     await response.json();
   const mail = messages.find((message) => message.recipients.includes(email));
   const link = mail?.text.match(
-    /http:\/\/127\.0\.0\.1:3000\/api\/auth\/verify-email[^\s<>]+/,
+    /http:\/\/127\.0\.0\.1:\d+\/api\/auth\/verify-email[^\s<>]+/,
   )?.[0];
   expect(link).toBeTruthy();
+  expect(new URL(link!).origin).toBe(baseURL);
   await page.goto(link!);
   await expect(
     page.getByText("Your email is verified. You can now sign in."),

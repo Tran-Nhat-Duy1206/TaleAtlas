@@ -38,7 +38,7 @@ const en = {
     "Choose light, dark, or your system’s appearance. Your choice stays with you.",
   future: "The next chapter is still being written.",
   futureText:
-    "Story catalogs, reading lists, and community features are not part of this release.",
+    "Browse the growing citation-backed catalog. Personal reading lists and community features are not available yet.",
   footer: "An honest beginning. A thoughtful foundation.",
   email: "Email address",
   password: "Password",
@@ -139,7 +139,7 @@ const vi: typeof en = {
     "Chọn giao diện sáng, tối hoặc theo hệ thống. Lựa chọn của bạn được lưu lại.",
   future: "Chương tiếp theo vẫn đang được viết.",
   futureText:
-    "Danh mục truyện, danh sách đọc và tính năng cộng đồng chưa có trong phiên bản này.",
+    "Khám phá danh mục có trích dẫn nguồn đang phát triển. Danh sách đọc cá nhân và tính năng cộng đồng chưa có.",
   footer: "Khởi đầu chân thật. Nền tảng chu đáo.",
   email: "Địa chỉ email",
   password: "Mật khẩu",

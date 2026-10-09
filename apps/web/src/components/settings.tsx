@@ -24,8 +24,8 @@ export function Settings({ locale }: { locale: Locale }) {
         return;
       }
       await refetch();
+      // Navigate once; an immediate refresh races the destination transition.
       router.replace(`/${locale}/login`);
-      router.refresh();
     } catch {
       setMessage(t.genericError);
     } finally {

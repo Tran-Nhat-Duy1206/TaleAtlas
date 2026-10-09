@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./schema": "./src/schema.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./catalog": "./src/catalog-schema.ts",
+    "./catalog-types": "./src/catalog-types.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",
@@ -14,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "drizzle-orm": "^0.45.2",
+    "drizzle-orm": "^0.45.3",
     "postgres": "^3.4.7"
   },
   "devDependencies": {
