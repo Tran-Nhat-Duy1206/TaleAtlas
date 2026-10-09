@@ -34,7 +34,7 @@ Mutations require exact configured Origin, application/json, bounded streamed bo
 
 ## V2 request contracts (V2B locally verified; actual CI pending)
 
-V2A is verified at `e1aba9efdc76e5b5feb6d353f1fc362d797f8193`; actual [PR CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37935802536) and [push CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37935791732) succeeded. V2B routes below have local unit/SQL, browser and production build/smoke evidence; actual V2B commit/CI acceptance remains pending. Five distinct browser cases passed across two isolated sessions, not one combined5/5 run; the initial4/5 memory-exhaustion/reload timeout remains recorded.
+V2A is verified at `e1aba9efdc76e5b5feb6d353f1fc362d797f8193`; actual [PR CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37935802536) and [push CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37935791732) succeeded. V2B routes below have local unit/SQL, browser and production build/smoke evidence; V2B is published at `7f35109` on open PR #2; actual CI failed a browser test's hardcoded-port setup assertion, with correction/reverification pending (not CI accepted). Five distinct browser cases passed across two isolated sessions, not one combined5/5 run; the initial4/5 memory-exhaustion/reload timeout remains recorded.
 
 | Method/path                             | Contract                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |

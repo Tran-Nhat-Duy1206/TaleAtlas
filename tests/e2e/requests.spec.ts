@@ -16,7 +16,10 @@ test("verified request ownership, reviewed equivalence, following and private li
   baseURL,
 }) => {
   test.setTimeout(360_000);
-  expect(baseURL).toBe("http://127.0.0.1:3010");
+  // Match the isolated port selected by the shared config: local 3010, CI 3000.
+  expect(baseURL).toBe(
+    `http://127.0.0.1:${Number(process.env.E2E_PORT ?? "3000")}`,
+  );
   const { client: sql } = createDatabase(requireTestDatabase());
   const run = randomUUID();
   const title = `Đường Hư Cấu ${run}`;
