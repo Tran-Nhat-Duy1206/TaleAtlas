@@ -32,18 +32,16 @@ export async function appendRequestEvent(
   from: WorkRequestState | null,
   payload: Record<string, unknown> = {},
 ) {
-  await tx
-    .insert(requestEvents)
-    .values({
-      requestId: row.id,
-      actorUserId: actorId,
-      actorSnapshot: actorId ?? "system:ingestion",
-      eventKind: kind,
-      revision: row.revision,
-      fromState: from,
-      toState: row.state,
-      payload,
-    });
+  await tx.insert(requestEvents).values({
+    requestId: row.id,
+    actorUserId: actorId,
+    actorSnapshot: actorId ?? "system:ingestion",
+    eventKind: kind,
+    revision: row.revision,
+    fromState: from,
+    toState: row.state,
+    payload,
+  });
 }
 export async function lockRequest(
   tx: RequestTransaction,
@@ -145,41 +143,46 @@ export async function submitRequest(
     return project(existing);
   });
 }
+export async function getRequestInTransaction(
+  tx: RequestTransaction,
+  requestId: string,
+  ownerId?: string,
+) {
+  const [row] = await tx
+    .select()
+    .from(workRequests)
+    .where(
+      and(
+        eq(workRequests.id, requestId),
+        ownerId === undefined
+          ? undefined
+          : eq(workRequests.ownerUserId, ownerId),
+      ),
+    );
+  if (!row) throw new HttpError(404, "REQUEST_NOT_FOUND");
+  const events = await tx
+    .select({
+      eventKind: requestEvents.eventKind,
+      revision: requestEvents.revision,
+      fromState: requestEvents.fromState,
+      toState: requestEvents.toState,
+      payload: requestEvents.payload,
+      createdAt: requestEvents.createdAt,
+    })
+    .from(requestEvents)
+    .where(eq(requestEvents.requestId, requestId))
+    .orderBy(requestEvents.revision);
+  return {
+    ...project(row),
+    events: events.map((event) => ({
+      ...event,
+      createdAt: event.createdAt.toISOString(),
+    })),
+  };
+}
 export async function getRequest(requestId: string, ownerId?: string) {
   return getDatabase().transaction(
-    async (tx) => {
-      const [row] = await tx
-        .select()
-        .from(workRequests)
-        .where(
-          and(
-            eq(workRequests.id, requestId),
-            ownerId === undefined
-              ? undefined
-              : eq(workRequests.ownerUserId, ownerId),
-          ),
-        );
-      if (!row) throw new HttpError(404, "REQUEST_NOT_FOUND");
-      const events = await tx
-        .select({
-          eventKind: requestEvents.eventKind,
-          revision: requestEvents.revision,
-          fromState: requestEvents.fromState,
-          toState: requestEvents.toState,
-          payload: requestEvents.payload,
-          createdAt: requestEvents.createdAt,
-        })
-        .from(requestEvents)
-        .where(eq(requestEvents.requestId, requestId))
-        .orderBy(requestEvents.revision);
-      return {
-        ...project(row),
-        events: events.map((event) => ({
-          ...event,
-          createdAt: event.createdAt.toISOString(),
-        })),
-      };
-    },
+    (tx) => getRequestInTransaction(tx, requestId, ownerId),
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
 }
@@ -235,6 +238,7 @@ export async function amendRequest(
         publicTitle: null,
         publicFormat: null,
         publicSummaryVerifiedAt: null,
+        publicSearchText: null,
         updatedAt: sql`now()`,
       })
       .where(eq(workRequests.id, requestId))
@@ -274,6 +278,7 @@ export async function cancelRequest(
         publicTitle: null,
         publicFormat: null,
         publicSummaryVerifiedAt: null,
+        publicSearchText: null,
         updatedAt: sql`now()`,
       })
       .where(eq(workRequests.id, requestId))

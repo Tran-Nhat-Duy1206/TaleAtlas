@@ -99,6 +99,11 @@ export function Shell({
           aria-label={locale === "vi" ? "Điều hướng chính" : "Main navigation"}
         >
           <a href={`/${locale}/works`}>{catalogDictionary(locale).browse}</a>
+          {session && (
+            <a href={`/${locale}/requests`}>
+              {locale === "vi" ? "Yêu cầu của tôi" : "My requests"}
+            </a>
+          )}
           {session?.user.role === "admin" && (
             <a href={`/${locale}/admin/works`}>
               {catalogDictionary(locale).admin}

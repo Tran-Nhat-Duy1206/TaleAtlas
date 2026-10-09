@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import { branding } from "@/lib/branding";
 import { dictionary, type Locale } from "@/lib/i18n";
+import { requestSignInReturn } from "@/lib/request-return";
 export type AuthMode =
   | "login"
   | "register"
@@ -72,7 +73,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
         result = await authClient.signIn.email({
           email,
           password,
-          callbackURL: `/${locale}/settings`,
+          callbackURL: requestSignInReturn(search.get("callbackURL"), locale),
         });
       else if (mode === "register")
         result = await authClient.signUp.email({
@@ -118,7 +119,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
       if (mode === "login") {
         // The destination navigation already fetches fresh authenticated server data.
         // Refreshing before replace commits races/cancels its RSC stream.
-        router.replace(`/${locale}/settings`);
+        router.replace(requestSignInReturn(search.get("callbackURL"), locale));
       } else if (mode === "register") router.push(`/${locale}/verify-email`);
       else
         setSuccess(

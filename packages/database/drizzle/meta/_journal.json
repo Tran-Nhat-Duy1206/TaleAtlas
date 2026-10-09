@@ -36,6 +36,13 @@
       "when": 1791550438644,
       "tag": "0004_lowly_mentor",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791552989800,
+      "tag": "0005_misty_talisman",
+      "breakpoints": true
     }
   ]
 }

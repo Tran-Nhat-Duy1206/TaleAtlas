@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { WORK_FORMATS } from "@taleatlas/database/catalog-types";
 import type {
   AggregateWork,
@@ -14,10 +15,12 @@ export function PublicCatalog({
   locale,
   query,
   result,
+  requestPrompt,
 }: {
   locale: Locale;
   query: ParsedCatalogQuery;
   result: CatalogPage<AggregateWork>;
+  requestPrompt?: ReactNode;
 }) {
   const t = { ...publicCopy[locale], format: catalogDictionary(locale).format };
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
@@ -85,6 +88,7 @@ export function PublicCatalog({
           <p>{t.emptyText}</p>
         </section>
       )}
+      {requestPrompt}
       <nav className={styles.pagination} aria-label={t.page}>
         {result.page > 1 && (
           <Link

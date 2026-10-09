@@ -72,6 +72,7 @@ export const workRequests = pgTable(
     resultingWorkId: uuid("resulting_work_id").references(() => works.id, {
       onDelete: "restrict",
     }),
+    publicSearchText: text("public_search_text"),
     publicTitle: text("public_title"),
     publicFormat: text("public_format").$type<RequestFormat>(),
     publicSummaryVerifiedAt: timestamp("public_summary_verified_at", {
@@ -100,6 +101,10 @@ export const workRequests = pgTable(
       "work_requests_public_summary_check",
       sql`(${t.publicTitle} IS NULL AND ${t.publicFormat} IS NULL AND ${t.publicSummaryVerifiedAt} IS NULL) OR (${t.publicTitle} IS NOT NULL AND ${t.publicFormat} IS NOT NULL AND ${t.publicSummaryVerifiedAt} IS NOT NULL)`,
     ),
+    check(
+      "work_requests_public_search_check",
+      sql`(${t.publicSummaryVerifiedAt} IS NOT NULL) = (${t.publicSearchText} IS NOT NULL) AND char_length(${t.publicSearchText}) <= 9000`,
+    ),
     check("work_requests_public_title_check", bounded(t.publicTitle, 600)),
     check(
       "work_requests_public_format_check",
@@ -108,6 +113,28 @@ export const workRequests = pgTable(
     index("work_requests_owner_idx").on(t.ownerUserId),
     index("work_requests_state_idx").on(t.state),
     index("work_requests_normalized_title_idx").on(t.normalizedTitle),
+  ],
+);
+
+export const workRequestSupporters = pgTable(
+  "work_request_supporters",
+  {
+    id: id(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => workRequests.id, { onDelete: "restrict" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("work_request_supporters_user_request_unique").on(
+      t.userId,
+      t.requestId,
+    ),
+    index("work_request_supporters_user_idx").on(t.userId),
+    index("work_request_supporters_request_idx").on(t.requestId),
   ],
 );
 

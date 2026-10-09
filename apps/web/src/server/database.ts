@@ -39,7 +39,8 @@ export async function checkDatabaseHealth(
         (select value from work_identifiers limit 0), (select type from work_relations limit 0),
         (select actor_id_snapshot from catalog_audit_events limit 0),
         (select concat(field_path, revision::text, value::text, source_id::text) from catalog_field_evidence limit 0),
-        (select concat(id::text, state::text, revision::text, input_revision::text) from work_requests limit 0),
+        (select concat(id::text, state::text, revision::text, input_revision::text, public_search_text) from work_requests limit 0),
+        (select concat(user_id, request_id::text) from work_request_supporters limit 0),
         (select concat(request_id::text, revision::text) from request_events limit 0),
         (select concat(id, enabled::text, requests_in_window::text) from provider_registry limit 0),
         (select concat(id::text, state::text, lease_token::text, attempts::text) from ingestion_jobs limit 0)
