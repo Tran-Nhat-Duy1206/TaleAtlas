@@ -65,12 +65,23 @@ The historical complete run (`pwsh-16`) had **2 passing / 2 failing browser test
 - **[PR #1](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/1)** opened into main, verified OPEN with no merge commit. GitHub Quality gates jobs were observed IN_PROGRESS at publication, not green certification. Never merge automatically; V2 remains on hold.
 - Broader performance/load, exhaustive accessibility, every individual constraint and hosted behavior have not been verified. Index existence is proven; production-scale query-plan/latency claims are not made.
 
-## GitHub CI follow-up (in progress)
+## GitHub CI follow-up — verified green
 
 The initial published Quality gates runs failed, not passed. Observed [run37890807928](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37890807928) failed at `pnpm install --frozen-lockfile` with `ERR_PNPM_IGNORED_BUILDS: @embedded-postgres/linux-x64@18.4.0-beta.17`; earlier local Windows passes did not prove Ubuntu install compatibility.
 
 Reviewed the exact locked npm tarball without running scripts: package postinstall is `node scripts/hydrate-symlinks.js`. The complete script reads bundled `native/pg-symlinks.json` and recreates relative shared-library symlinks; all14 manifest entries remain under `native/lib`, with no traversal/absolute targets. No network, child process or PostgreSQL startup is in this lifecycle script. The tarball SHA512 matches lockfile integrity `jVw/MdDtIX/vICH/DKIe6/mHpiCggdx6QVyza4vt/NbcZFsL0KhwglF6F1Koqx3gRBZ9XtN+vi63EsqSyqOSxA==`. This is a bounded lifecycle review, not certification of bundled native binaries or all future releases.
 
-Added only exact `@embedded-postgres/linux-x64` to `allowBuilds`; Windows entry and dependency versions/integrity remain unchanged. Global build-script protection remains enabled. A newly exported tracked tree with no node_modules passed `pnpm install --frozen-lockfile` using pnpm11.7.0 on Windows (523 packages, existing download store reused), and the working checkout frozen install passed. Lockfile and dependency versions did not change. TypeScript/lint and82 unit tests passed. Fresh isolated PostgreSQL18.4 migrations and20 real integration tests passed; all4 Playwright cases passed without retries in4.1 minutes on loopback3010; production build passed. Actual Ubuntu success must still be verified from new GitHub runs; local passes are not a substitute. PR remains unmerged and V2 remains on hold.
+Added only exact `@embedded-postgres/linux-x64` to `allowBuilds`; Windows entry and dependency versions/integrity remain unchanged. Global build-script protection remains enabled. A newly exported tracked tree with no node_modules passed `pnpm install --frozen-lockfile` using pnpm11.7.0 on Windows (523 packages, existing download store reused), and the working checkout frozen install passed. Lockfile and dependency versions did not change. TypeScript/lint and82 unit tests passed. Fresh isolated PostgreSQL18.4 migrations and20 real integration tests passed; all4 Playwright cases passed without retries in4.1 minutes on loopback3010; production build passed. Actual Ubuntu success was then independently verified from the GitHub runs below; local passes were not substituted for hosted CI. PR remains unmerged and V2 remains on hold.
 
-Hosted Neon, Vercel, real SMTP delivery and public HTTPS/proxy behavior remain unverified. GitHub source publication/PR are verified; completed hosted CI results remain pending. Local success is not a hosted-production acceptance claim.
+### Observed GitHub results
+
+Fix commit **`7e489d6dbc75fa7c943b411451283ebb9f4b5c29`** was pushed to `feat/v1-global-catalog`. Both Quality gates runs completed SUCCESS:
+
+- [Pull-request run37892315925](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37892315925): completed2026-10-09T06:15:19Z; verify3m4s.
+- [Push run37892312127](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/37892312127): completed2026-10-09T06:15:49Z; verify3m37s.
+
+Actual logs show Linux `postinstall$ node scripts/hydrate-symlinks.js`, successful frozen install, TypeScript/lint,82 unit tests, explicit migrations,20 PostgreSQL17-service integration tests,production build,Chromium install,all4 actual browser cases (1.6m PR /1.9m push; no flaky/retry reported),and no known production audit vulnerabilities. All executed required gate steps succeeded; failure-only artifact upload was correctly skipped, not a waived test. No further CI root-cause fix was required.
+
+At that tested SHA, PR#1 was OPEN, CLEAN and MERGEABLE with both verify checks SUCCESS and no merge commit. Ready for review and technically eligible for merge after maintainer approval; **not merged by the agent**. Workflow annotations about action-runtime Node20 deprecation/forced Node24 and the upcoming ubuntu-latest image migration remain informational maintenance limitations. Success covers these observed runners/versions, not every architecture, exhaustive security/a11y/load or a future dependency version.
+
+Hosted Neon, Vercel, real SMTP delivery and public HTTPS/proxy behavior remain unverified. GitHub source publication/PR and completed Ubuntu CI are verified; this is not hosted production acceptance. Local success is not a hosted-production acceptance claim.
