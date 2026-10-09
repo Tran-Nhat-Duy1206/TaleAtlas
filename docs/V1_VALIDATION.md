@@ -60,7 +60,9 @@ The historical complete run (`pwsh-16`) had **2 passing / 2 failing browser test
 ## Repository publication and limits
 
 - Mandatory local browser/backend/static/build/runtime gates passed as recorded above.
-- Product/operations/architecture/security documentation and reference cleanliness reviewed. V1 Conventional Commit/tag and official feature PR are the publication milestone; never merge automatically.
+- Product/operations/architecture/security documentation and reference cleanliness reviewed.
+- Verified implementation commit **`10b1c1d565a8c15dcdb63cbbe46163f4817c1685`**, branch **`feat/v1-global-catalog`**, published tag **`v1-local-verified`**. The official remote feature SHA matches; `main` remains preserved V0 `8e00ae47a7a58bb0b6fef31b341eb988d177d779`.
+- **[PR #1](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/1)** opened into main, verified OPEN with no merge commit. GitHub Quality gates jobs were observed IN_PROGRESS at publication, not green certification. Never merge automatically; V2 remains on hold.
 - Broader performance/load, exhaustive accessibility, every individual constraint and hosted behavior have not been verified. Index existence is proven; production-scale query-plan/latency claims are not made.
 
-Hosted Neon, Vercel, real SMTP delivery, public HTTPS/proxy behavior and GitHub remote/CI execution remain unverified. Local success is not a hosted-production acceptance claim.
+Hosted Neon, Vercel, real SMTP delivery and public HTTPS/proxy behavior remain unverified. GitHub source publication/PR are verified; completed hosted CI results remain pending. Local success is not a hosted-production acceptance claim.
