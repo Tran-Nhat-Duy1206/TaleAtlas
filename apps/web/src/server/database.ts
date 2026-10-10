@@ -47,7 +47,11 @@ export async function checkDatabaseHealth(
         (select concat(request_id::text, input_revision::text, job_id::text, candidate::text, matches::text) from ingestion_candidates limit 0),
         (select concat(work_id::text, revision::text, base_work_revision::text, proposed::text, citation::text) from edit_suggestions limit 0),
         (select concat(suggestion_id::text, revision::text, payload::text) from edit_suggestion_events limit 0),
-        (select concat(work_id::text, release_date::text, source_id::text, reviewed_work_revision::text) from catalog_releases limit 0)
+        (select concat(work_id::text, release_date::text, source_id::text, reviewed_work_revision::text) from catalog_releases limit 0),
+        (select concat(id::text, user_id, work_id::text, status::text, revision::text, removed_at::text) from library_entries limit 0),
+        (select concat(entry_id::text, user_id, work_id::text, state::text, edition_id::text, started_on::text, finished_on::text) from reading_sessions limit 0),
+        (select concat(entry_id::text, user_id, entry_revision::text, request_hash, snapshot::text) from library_events limit 0),
+        (select concat(session_id::text, entry_id::text, user_id, work_id::text, entry_revision::text, chapter_number::text, edition_id::text) from reading_progress_events limit 0)
     `;
     await Promise.race([
       query,
