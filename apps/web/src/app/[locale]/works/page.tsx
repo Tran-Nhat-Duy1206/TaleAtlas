@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { discoveryCopy } from "../../../features/catalog/discovery";
 import { headers } from "next/headers";
 import { getSession } from "../../../server/session";
 import {
@@ -57,20 +59,31 @@ export default async function WorksPage({ params, searchParams }: Props) {
     }
   }
   return (
-    <PublicCatalog
-      locale={locale}
-      query={query}
-      result={result}
-      requestPrompt={
-        <MissingStoryPrompt
-          locale={locale}
-          q={query.q}
-          format={query.format}
-          authenticated={authenticated}
-          summaries={summaries}
-          error={requestError}
-        />
-      }
-    />
+    <>
+      <nav aria-label={locale === "vi" ? "Khám phá" : "Discovery"}>
+        <Link href={`/${locale}/recently-added`}>
+          {discoveryCopy[locale].recent}
+        </Link>
+        {" · "}
+        <Link href={`/${locale}/releases`}>
+          {discoveryCopy[locale].releases}
+        </Link>
+      </nav>
+      <PublicCatalog
+        locale={locale}
+        query={query}
+        result={result}
+        requestPrompt={
+          <MissingStoryPrompt
+            locale={locale}
+            q={query.q}
+            format={query.format}
+            authenticated={authenticated}
+            summaries={summaries}
+            error={requestError}
+          />
+        }
+      />
+    </>
   );
 }

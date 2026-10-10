@@ -88,6 +88,9 @@ export default async function MyRequestsPage({ params, searchParams }: Props) {
   return (
     <section className={styles.module}>
       <h1>{t.mine}</h1>
+      <Link href={`/${locale}/edit-suggestions`}>
+        {locale === "vi" ? "Đề xuất chỉnh sửa của tôi" : "My edit suggestions"}
+      </Link>
       <Link className="button" href={`/${locale}/requests/new`}>
         {t.new}
       </Link>

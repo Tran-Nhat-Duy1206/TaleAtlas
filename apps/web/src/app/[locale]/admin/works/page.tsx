@@ -43,6 +43,22 @@ export default async function AdminWorks({
   return (
     <section className={styles.page}>
       <h1>{d.admin}</h1>
+      <nav
+        className={styles.actions}
+        aria-label={locale === "vi" ? "Quản trị V2" : "V2 administration"}
+      >
+        <Link href={`/${locale}/admin/ingestion`}>
+          {locale === "vi" ? "Ứng viên và yêu cầu" : "Candidates and requests"}
+        </Link>
+        <Link href={`/${locale}/admin/edit-suggestions`}>
+          {locale === "vi"
+            ? "Duyệt đề xuất chỉnh sửa"
+            : "Review edit suggestions"}
+        </Link>
+        <Link href={`/${locale}/admin/releases`}>
+          {locale === "vi" ? "Duyệt ngày phát hành" : "Review release dates"}
+        </Link>
+      </nav>
       <Link
         className="button button-primary"
         href={`/${locale}/admin/works/new`}

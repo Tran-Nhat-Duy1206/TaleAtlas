@@ -5,7 +5,16 @@ import * as catalogSchema from "./catalog-schema";
 
 import * as ingestionSchema from "./ingestion-schema";
 
-const schema = { ...authSchema, ...catalogSchema, ...ingestionSchema };
+import * as editSuggestionSchema from "./edit-suggestion-schema";
+import * as releaseSchema from "./release-schema";
+
+const schema = {
+  ...authSchema,
+  ...catalogSchema,
+  ...ingestionSchema,
+  ...editSuggestionSchema,
+  ...releaseSchema,
+};
 
 export function createDatabase(url: string) {
   const parsed = new URL(url);

@@ -7,6 +7,8 @@ export default defineConfig({
     "./src/schema.ts",
     "./src/catalog-schema.ts",
     "./src/ingestion-schema.ts",
+    "./src/edit-suggestion-schema.ts",
+    "./src/release-schema.ts",
   ],
   out: "./drizzle",
   ...((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)

@@ -133,7 +133,9 @@ export default async function RequestDetailPage({ params }: Props) {
                 )}
                 {requestStateLabel(event.toState, locale)}
               </p>
-              {["MODERATED", "SUMMARY_REVIEWED"].includes(event.eventKind) &&
+              {["MODERATED", "SUMMARY_REVIEWED", "REVIEWED"].includes(
+                event.eventKind,
+              ) &&
                 typeof event.payload.reason === "string" && (
                   <p>{event.payload.reason}</p>
                 )}

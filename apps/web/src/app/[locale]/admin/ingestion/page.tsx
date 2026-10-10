@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { z } from "zod";
+import { adminGetWork } from "@/server/catalog/service";
 import { notFound } from "next/navigation";
 import { isLocale } from "@/lib/i18n";
 import { adminGuard } from "@/components/catalog/AdminGuard";
@@ -8,6 +10,7 @@ import {
 } from "@/server/ingestion/candidates";
 import { ingestionDictionary } from "@/components/ingestion/copy";
 import { ProcessButton } from "@/components/ingestion/ProcessButton";
+import { ReviewForm } from "@/components/ingestion/ReviewForm";
 import styles from "@/components/ingestion/ingestion.module.css";
 import { OFFLINE_DISABLED_PROVIDER_DESCRIPTORS } from "@/features/ingestion/provider-records";
 export const dynamic = "force-dynamic";
@@ -39,6 +42,14 @@ export default async function AdminIngestionPage({
   if (!parsed.success) notFound();
   const query = parsed.data;
   const result = await adminIngestion(query, headers);
+  const comparison =
+    raw.compareWorkId === undefined
+      ? null
+      : z.uuid().safeParse(raw.compareWorkId);
+  if (comparison && !comparison.success) notFound();
+  const comparedWork = comparison?.success
+    ? await adminGetWork(comparison.data, headers)
+    : null;
   const href = (page: number) =>
     `?page=${page}${query.requestId ? `&requestId=${encodeURIComponent(query.requestId)}` : ""}`;
   return (
@@ -65,8 +76,29 @@ export default async function AdminIngestionPage({
           <input readOnly value={query.requestId} />
         </label>
       )}
+      {comparedWork && (
+        <aside
+          aria-label={
+            locale === "vi"
+              ? "So sánh dữ kiện đã duyệt"
+              : "Compare curated metadata"
+          }
+        >
+          <h2>
+            {locale === "vi"
+              ? "Tác phẩm hiện tại để so sánh thủ công"
+              : "Current Work for human comparison"}
+          </h2>
+          <p>
+            {locale === "vi"
+              ? "Dữ kiện danh mục khác với gợi ý chưa xác minh. Kiểm tra phiên bản, nguồn và khác biệt; không tự hợp nhất."
+              : "Curated facts are distinct from unverified suggestions. Check revision, evidence and conflicts; no automatic merge."}
+          </p>
+          <pre>{JSON.stringify(comparedWork, null, 2)}</pre>
+        </aside>
+      )}
       {!result.items.length && <p>{d.empty}</p>}
-      {result.items.map(({ request, candidate, matches }) => (
+      {result.items.map(({ request, candidateId, candidate, matches }) => (
         <article key={request.id}>
           <h2>{request.details.title}</h2>
           <p>{request.id}</p>
@@ -102,9 +134,32 @@ export default async function AdminIngestionPage({
           ) : (
             <p>{d.pending}</p>
           )}
+          {request.state === "NEEDS_REVIEW" && candidateId && (
+            <ReviewForm
+              locale={locale}
+              requestId={request.id}
+              revision={request.revision}
+              inputRevision={request.inputRevision}
+              candidateId={candidateId}
+            />
+          )}
           <h3>{d.matches}</h3>
           {matches.length ? (
-            <pre>{JSON.stringify(matches, null, 2)}</pre>
+            <>
+              <pre>{JSON.stringify(matches, null, 2)}</pre>
+              <ul>
+                {matches.map((match) => (
+                  <li key={match.workId}>
+                    <Link
+                      href={`?requestId=${request.id}&compareWorkId=${match.workId}`}
+                    >
+                      {locale === "vi" ? "So sánh tác phẩm" : "Compare Work"}:{" "}
+                      {match.workId}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
           ) : (
             <p>{d.noMatches}</p>
           )}

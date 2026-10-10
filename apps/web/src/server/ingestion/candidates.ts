@@ -241,6 +241,7 @@ export async function adminIngestion(input: unknown, headers: Headers) {
         inputRevision: r.inputRevision,
         details: requestDetailsSchema.parse(r.details),
       },
+      candidateId: s?.id ?? null,
       candidate: s ? NormalizedCandidateSchema.parse(s.candidate) : null,
       matches: z
         .array(IdentityMatchSchema)
