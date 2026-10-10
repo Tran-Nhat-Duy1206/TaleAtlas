@@ -1,0 +1,14 @@
+{
+  "name": "@taleatlas/next-root-glob",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Development-only root-directory glob adapter for Next ESLint 16.4.0",
+  "main": "index.cjs",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "dependencies": {
+    "tinyglobby": "0.2.17"
+  }
+}
