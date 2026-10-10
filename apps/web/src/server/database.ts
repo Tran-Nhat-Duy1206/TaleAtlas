@@ -51,9 +51,23 @@ export async function checkDatabaseHealth(
         (select concat(id::text, user_id, work_id::text, status::text, revision::text, removed_at::text) from library_entries limit 0),
         (select concat(entry_id::text, user_id, work_id::text, state::text, edition_id::text, started_on::text, finished_on::text) from reading_sessions limit 0),
         (select concat(entry_id::text, user_id, entry_revision::text, request_hash, snapshot::text) from library_events limit 0),
-        (select concat(session_id::text, entry_id::text, user_id, work_id::text, entry_revision::text, chapter_number::text, edition_id::text) from reading_progress_events limit 0)
+        (select concat(session_id::text, entry_id::text, user_id, work_id::text, entry_revision::text, chapter_number::text, edition_id::text) from reading_progress_events limit 0),
+        (exists (
+          select 1 from pg_catalog.pg_index
+          where indexrelid = pg_catalog.to_regclass('public.library_events_entry_scope_idx')
+            and indrelid = pg_catalog.to_regclass('public.library_events')
+            and indisvalid and indisready
+        ) and exists (
+          select 1 from pg_catalog.pg_trigger t
+          join pg_catalog.pg_proc p on p.oid = t.tgfoid
+          where t.tgrelid = pg_catalog.to_regclass('public.users')
+            and t.tgname = 'library_user_erasure_replan'
+            and t.tgenabled in ('O', 'A') and not t.tgisinternal
+            and p.oid = pg_catalog.to_regprocedure('public.library_user_erasure_replan()')
+            and not p.prosecdef and p.proconfig is null
+        )) as library_erasure_ready
     `;
-    await Promise.race([
+    const rows = await Promise.race([
       query,
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
@@ -66,6 +80,9 @@ export async function checkDatabaseHealth(
         }, boundedTimeout);
       }),
     ]);
+    if (rows[0]?.library_erasure_ready !== true) {
+      throw new Error("Required private-library erasure migration unavailable");
+    }
     return { status: "ok" };
   } catch (error) {
     logServerError("database.health", error);

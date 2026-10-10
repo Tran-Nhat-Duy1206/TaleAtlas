@@ -323,6 +323,9 @@ export const libraryEvents = pgTable(
       "library_events_snapshot_check",
       sql`jsonb_typeof(${t.snapshot}) = 'object' AND octet_length(${t.snapshot}::text) <= ${sql.raw(String(LIBRARY_MAX_EVENT_SNAPSHOT_BYTES))}`,
     ),
+    // Support one index range for every scoped cascade predicate; measured
+    // cold/stale plans otherwise rebuilt a large owner bitmap per entry.
+    index("library_events_entry_scope_idx").on(t.entryId, t.userId, t.workId),
     index("library_events_entry_timeline_idx").on(
       t.entryId,
       t.createdAt.desc(),

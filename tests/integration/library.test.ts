@@ -3,6 +3,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { catalogAuthFixture } from "../helpers/catalog-auth-fixture";
 import { requireTestDatabase } from "../helpers/test-database";
 import { getAuth } from "../../apps/web/src/server/auth";
+import { checkDatabaseHealth } from "../../apps/web/src/server/database";
 import { applyReviewedSuggestion } from "../../apps/web/src/features/catalog/edit-suggestions";
 import type { AdminWork } from "../../apps/web/src/features/catalog/contracts";
 import {
@@ -128,6 +129,71 @@ function fulfilled(results: PromiseSettledResult<unknown>[]) {
   return results.filter(
     (r): r is PromiseFulfilledResult<unknown> => r.status === "fulfilled",
   );
+}
+type SqlReader = Pick<typeof sql, "unsafe">;
+const privateTables = [
+  "library_entries",
+  "reading_sessions",
+  "library_events",
+  "reading_progress_events",
+] as const;
+async function ownerRowCounts(backend: SqlReader, actor: Actor) {
+  requireTestDatabase();
+  expect(
+    f.users.some((u) => u.id === actor.id && u.email === actor.email),
+  ).toBe(true);
+  const [counts] = await backend.unsafe<
+    {
+      users: number;
+      entries: number;
+      sessions: number;
+      events: number;
+      progress: number;
+      auth_sessions: number;
+      accounts: number;
+    }[]
+  >(
+    `select
+    (select count(*)::int from public.users where id=$1) as users,
+    (select count(*)::int from public.library_entries where user_id=$1) as entries,
+    (select count(*)::int from public.reading_sessions where user_id=$1) as sessions,
+    (select count(*)::int from public.library_events where user_id=$1) as events,
+    (select count(*)::int from public.reading_progress_events where user_id=$1) as progress,
+    (select count(*)::int from public.sessions where user_id=$1) as auth_sessions,
+    (select count(*)::int from public.accounts where user_id=$1) as accounts`,
+    [actor.id],
+  );
+  if (!counts) throw new Error("Owned count query returned no row");
+  return counts;
+}
+async function ownedFacts(backend: SqlReader, userIds: string[]) {
+  requireTestDatabase();
+  expect(userIds.every((id) => f.users.some((u) => u.id === id))).toBe(true);
+  const facts: Record<string, { count: number; digest: string | null }> = {};
+  for (const table of ["users", "accounts", "sessions", ...privateTables]) {
+    // Fixed table/column allowlist; scope is exclusively this UUID run's actual users.
+    const column = table === "users" ? "id" : "user_id";
+    const [value] = await backend.unsafe<
+      { count: number; digest: string | null }[]
+    >(
+      `select count(*)::int as count, md5(string_agg(row_to_json(t)::text, '|' order by id)) as digest from public.${table} t where ${column}=any($1::text[])`,
+      [userIds],
+    );
+    if (!value) throw new Error("Owned fingerprint query returned no row");
+    facts[table] = value;
+  }
+  return facts;
+}
+async function backendSettings(backend: SqlReader) {
+  const [settings] = await backend.unsafe(`select pg_backend_pid() as pid,
+    current_setting('statement_timeout') as statement_timeout,
+    current_setting('plan_cache_mode') as plan_cache_mode,
+    current_setting('enable_bitmapscan') as enable_bitmapscan,
+    current_setting('enable_indexscan') as enable_indexscan,
+    current_setting('enable_seqscan') as enable_seqscan,
+    current_setting('jit') as jit`);
+  if (!settings) throw new Error("Backend settings query returned no row");
+  return settings;
 }
 async function pgCode(operation: Promise<unknown>, code: string) {
   await expect(operation).rejects.toMatchObject({ code });
@@ -1714,6 +1780,185 @@ describe.sequential(
       } finally {
         await sql`delete from rate_limits where id=${unrelatedId} and key=${unrelatedKey}`;
       }
+    });
+
+    it("requires the enabled invoker erasure guard and complete scoped index for readiness", async () => {
+      expect(await checkDatabaseHealth()).toEqual({ status: "ok" });
+      const [index] =
+        await sql`select i.indisvalid, i.indisready, pg_get_indexdef(i.indexrelid) as definition
+        from pg_catalog.pg_index i where i.indexrelid=to_regclass('public.library_events_entry_scope_idx')`;
+      expect(index).toMatchObject({ indisvalid: true, indisready: true });
+      expect(index.definition).toContain("(entry_id, user_id, work_id)");
+      const [trigger] =
+        await sql`select t.tgenabled, p.prosecdef, p.proconfig, pg_get_functiondef(p.oid) as definition
+        from pg_catalog.pg_trigger t join pg_catalog.pg_proc p on p.oid=t.tgfoid
+        where t.tgrelid='public.users'::regclass and t.tgname='library_user_erasure_replan' and not t.tgisinternal`;
+      expect(trigger).toMatchObject({
+        tgenabled: "O",
+        prosecdef: false,
+        proconfig: null,
+      });
+      expect(trigger.definition).toContain("DISCARD PLANS");
+      expect(trigger.definition).not.toContain("DISCARD ALL");
+      expect(trigger.definition).toContain("user_id = OLD.id");
+    });
+
+    it("replans a pinned tiny RI cache at20000 entries without erasing another owner or leaking settings", async () => {
+      const warmWork = await work();
+      const backend = await sql.reserve();
+      const suffix = randomUUID().replaceAll("-", "");
+      const deleteName = `library_delete_${suffix}`,
+        witnessName = `library_witness_${suffix}`;
+      let transaction = false;
+      try {
+        const settings = await backendSettings(backend);
+        expect(settings.statement_timeout).toBe("5s");
+        expect(settings.plan_cache_mode).toBe("auto");
+        // Each verified tiny owner warms this SAME backend's actual scoped RI path.
+        for (let i = 0; i < 6; i++) {
+          const tiny = await f.account("user");
+          await add(warmWork, tiny);
+          await backend.unsafe("BEGIN");
+          transaction = true;
+          await backend.unsafe(
+            "delete from public.users where id=$1 and email=$2",
+            [tiny.id, tiny.email],
+          );
+          expect((await ownerRowCounts(backend, tiny)).entries).toBe(0);
+          await backend.unsafe("ROLLBACK");
+          transaction = false;
+        }
+        let active = await action(await add(await work()), "START_READ");
+        active = await progress(active, {
+          chapterNumber: 7,
+          progressNotes: "Owned erasure rollback fact",
+        });
+        const bulk =
+          await sql`select w.id from works w join catalog_sources s on s.id=w.source_id
+          where s.label=${f.sourceLabel} and w.visibility='DRAFT' order by w.id limit 19999`;
+        const bulkIds = bulk.map((r) => String(r.id));
+        // Reuse only this run's draft identities, but remain independently runnable.
+        if (bulkIds.length < 19999) {
+          bulkIds.push(...(await seedWorks(19999 - bulkIds.length)).ids);
+        }
+        expect(new Set(bulkIds).size).toBe(19999);
+        await seedEntries(bulkIds, true);
+        const before = await ownerRowCounts(backend, owner);
+        expect(before).toMatchObject({
+          users: 1,
+          entries: 20000,
+          sessions: 1,
+          events: 20002,
+          progress: 1,
+        });
+        const otherIds = f.users
+          .filter((a) => a.id !== owner.id)
+          .map((a) => a.id);
+        const others = await ownedFacts(backend, otherIds);
+        await backend.unsafe(
+          `PREPARE ${deleteName}(text,text) AS DELETE FROM public.users WHERE id=$1 AND email=$2 RETURNING id`,
+        );
+        await backend.unsafe(`PREPARE ${witnessName} AS SELECT 37 AS value`);
+        const [quoted] = await backend.unsafe(
+          "select quote_literal($1::text) as actor_id, quote_literal($2::text) as actor_email",
+          [owner.id, owner.email],
+        );
+        await backend.unsafe("BEGIN");
+        transaction = true;
+        const deleted = await backend.unsafe(
+          `EXECUTE ${deleteName}(${quoted.actor_id},${quoted.actor_email})`,
+        );
+        expect(deleted).toEqual([{ id: owner.id }]);
+        expect(await ownerRowCounts(backend, owner)).toEqual({
+          users: 0,
+          entries: 0,
+          sessions: 0,
+          events: 0,
+          progress: 0,
+          auth_sessions: 0,
+          accounts: 0,
+        });
+        expect(await ownedFacts(backend, otherIds)).toEqual(others);
+        expect(await backendSettings(backend)).toEqual(settings);
+        expect(await backend.unsafe(`EXECUTE ${witnessName}`)).toEqual([
+          { value: 37 },
+        ]);
+        expect(
+          await backend.unsafe(
+            "select name from pg_prepared_statements where name=any($1::text[])",
+            [[deleteName, witnessName]],
+          ),
+        ).toHaveLength(2);
+        await backend.unsafe("ROLLBACK");
+        transaction = false;
+        expect(await ownerRowCounts(backend, owner)).toEqual(before);
+        expect(await ownedFacts(backend, otherIds)).toEqual(others);
+        expect(await backendSettings(backend)).toEqual(settings);
+        expect(await backend.unsafe(`EXECUTE ${witnessName}`)).toEqual([
+          { value: 37 },
+        ]);
+        expect(
+          (await getLibraryEntry(active.id, h(owner))).currentSession
+            ?.chapterNumber,
+        ).toBe(7);
+      } finally {
+        if (transaction) await backend.unsafe("ROLLBACK");
+        const definitions = await backend.unsafe(
+          "select name from pg_prepared_statements where name=any($1::text[])",
+          [[deleteName, witnessName]],
+        );
+        for (const definition of definitions) {
+          const name = String(definition.name);
+          if (![deleteName, witnessName].includes(name))
+            throw new Error("Unowned prepared definition");
+          await backend.unsafe(`DEALLOCATE ${name}`);
+        }
+        backend.release();
+      }
+    });
+
+    it("does not erase private facts on unconfirmed, anonymous or wrong-session emailed deletion", async () => {
+      const other = await f.account("user");
+      const e = await progress(
+        await action(await add(await work()), "START_READ"),
+        { chapterNumber: 3 },
+      );
+      const before = await ownedFacts(sql, [owner.id, other.id]);
+      const requested = await getAuth().handler(
+        new Request(`${f.origin}/api/auth/delete-user`, {
+          method: "POST",
+          headers: {
+            Origin: f.origin,
+            "Content-Type": "application/json",
+            Cookie: owner.cookie,
+          },
+          body: JSON.stringify({
+            password: "Synthetic-only-password-17!",
+            callbackURL: `${f.origin}/en`,
+          }),
+        }),
+      );
+      expect(requested.status).toBe(200);
+      expect(await ownedFacts(sql, [owner.id, other.id])).toEqual(before);
+      const message = [...f.messages]
+        .reverse()
+        .find((m) => m.includes(owner.email) && m.includes("delete-user"));
+      const link = message?.match(
+        /http:\/\/localhost:3000\/api\/auth\/[^\s<>]+/,
+      )?.[0];
+      if (!link) throw new Error("Owned confirmation message missing");
+      expect((await getAuth().handler(new Request(link))).status).toBe(404);
+      expect(
+        (
+          await getAuth().handler(
+            new Request(link, { headers: { Cookie: other.cookie } }),
+          )
+        ).status,
+      ).toBe(404);
+      expect(await ownedFacts(sql, [owner.id, other.id])).toEqual(before);
+      expect(
+        (await getLibraryEntry(e.id, h(owner))).currentSession?.chapterNumber,
+      ).toBe(3);
     });
   },
 );

@@ -27,11 +27,11 @@ Live external-provider search/retrieval, automatic/scheduled network execution a
 
 Automatic publication is not approved; human authorization and V1 publication controls remain mandatory. No irreversible automatic Work merge, arbitrary URL fetch, chapter storage or unlicensed cover transfer. Hosted Neon/Vercel/SMTP/HTTPS validation is a separate unverified task. Exact milestone state and observations go in `V2_VALIDATION.md`, not revised V0/V1 history.
 
-## V3 — private reading library (sequential; A local acceptance complete, actual CI pending)
+## V3 — private reading library (sequential; A CI regression repair, NOT accepted)
 
 V3 began only after verified green post-V2-merge main CI. Work is isolated on `feat/v3-reading-library`; publication uses one V3 PR targeting main, which must remain open. No automatic merge, deployment or provider enablement.
 
-- **V3A:** four private owner-scoped tables, forward0008/32-table schema, strict contracts, atomic revision/idempotency-bound domain, explicit session/status/reread semantics, safe unavailable-Work projection and compatible Edition deletion. Local510 units/116 real SQL/all9 Chromium together, fresh/repeat migrations/no drift, types/lint/build and both audits0 passed. Actual milestone publication/CI is pending; no library API/UI claimed yet.
+- **V3A:** four private owner-scoped tables, forward0008/32-table schema, strict contracts, atomic revision/idempotency-bound domain, explicit session/status/reread semantics, safe unavailable-Work projection and compatible Edition deletion. Local510 units/116 real SQL/all9 Chromium together, fresh/repeat migrations/no drift, types/lint/build and both audits0 passed. Published [draft PR #3](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/3) failed sole max-owner erasure SQL case in actual CI; forward0009 measured index/cache repair, fresh/repeat migrations and focused36 SQL passed without weakening limits. Combined119 realSQL, all9 original browsers together14.4m, final build/types/lint/510units/no drift/audits0 passed; new exact-head PR/push CI remains pending. A is not yet accepted. No library API/UI claimed yet.
 - **V3B pending:** owner-guarded CRUD/API/bilingual responsive library/status/favorites/detail UI, confirmed archival, public Work's own saved state and pagination/filter/sort.
 - **V3C pending:** explicit personal chapter/volume/Edition/unknown-total progress, recorded activity and distinguishable session/completion/reread history, UI and race acceptance without fabricated percentages/dates/duration.
 - **V3D pending:** optional private ratings/notes, complete UX/accessibility/production smoke/docs, preserved full gates and final exact-head PR/push CI.
