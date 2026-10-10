@@ -11,4 +11,4 @@ Rules:
 - Translate application copy through centralized dictionaries; product/server status values must not depend on translated labels. Known limitation: transactional emails are English-only; database preferredLocale remains read-only/default en. Interface Vietnamese support does not imply translated email or synchronized profile locale.
 - Secret input values, verification links and tokens never enter client diagnostics.
 
-Future catalog/library cards, progress and discussion components are planned. Validate contrast, focus, mobile reflow, theme hydration and both locales with browser checks before declaring conformance.
+V1 catalog cards/search/editor and V2 EN/VI requests, private candidate/moderation/six-scalar correction forms and recent/exact-release feeds are implemented and locally/CI accepted for their bounded scope; unsupported correction UI remains explicit in the [PR scope review](<V2_PR_REVIEW.md>). Private library/progress and discussion components remain planned; no comprehensive accessibility certification is implied. Validate contrast, focus, mobile reflow, theme hydration and both locales with browser checks before declaring conformance.

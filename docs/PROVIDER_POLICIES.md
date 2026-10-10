@@ -1,4 +1,4 @@
-# Provider policies — historical V2A review and current V2C boundaries
+# Provider policies — historical V2A review and current manual/offline boundaries
 
 Historical V2A review date: **2026-10-09**. The V2C appendix below records this session's review without asserting a new calendar date or changing persisted provider review-date constants. This is our review date, not a claimed publication/update date for source documents. Official documentation was researched read-only with web_search and web_fetch. Graph MCP was unavailable; bounded reads of the pure catalog constants and web package manifest were the source fallback. Branch/base verified as `feat/v2-catalog-ingestion` / `11d544a`.
 
@@ -76,3 +76,7 @@ This session's evidence supports continued default deny for TaleAtlas's exact in
 - **Publisher/author feeds:** the [PRH developer portal](https://developer.penguinrandomhouse.com/) and [vendor feeds](https://www.penguinrandomhouse.biz/vendors/rhi_datafeeds) describe registered/customer onboarding, not a TaleAtlas agreement or general anonymous reuse grant. No source-specific permission/retention agreement or live adapter is established.
 
 A future live adapter requires documented adequate intended-use/storage permission, actual optional capability method, enabled policy and approved source review, plus fixed-host endpoint construction and bounded redirect/DNS/payload/page/timeouts/rate controls. Current manual processing creates only private review candidates and explanations; it does not fetch providers, create/merge/publish Works or approve V2D decisions. No credentials or deployment are requested/claimed here. Graph MCP remains unavailable; bounded source/document reads are the fallback, not a claim of complete structural graph analysis. Manual/offline source `ae5822c` passed181 units/66 real SQL/all six Chromium cases together and all mandatory gates on both actual PR/push CI, zero retries. Successful CI does not change provider permissions, verify human input or approve V2D publication decisions.
+
+## Current A–D scope qualification
+
+A–D implemented scope is locally and actual-CI accepted at verified2500c5d; separate D human publication/link and limited six-scalar corrections do not change any provider permission/default or turn the C manual processor into a live adapter. Detailed [PR review scope and remaining work](<V2_PR_REVIEW.md>) are explicit. Existing review dates/source observations above remain unchanged; no new provider investigation, agreement, credential, executable retrieval method or live acceptance is claimed by this documentation follow-up.
