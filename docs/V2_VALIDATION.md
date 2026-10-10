@@ -69,7 +69,7 @@ Verified implementation commit: **`147d1b3a6699ce979e1c9444d073bf34ab71f28d`** (
 
 Artifact upload was correctly skipped on successful workflows; it is not a failed mandatory gate. Existing runner action/Ubuntu-transition annotations are nonfatal platform notices, not application acceptance failures. The initial failed CI and combined local OOM remain recorded above. Local full browser coverage was isolated across sessions; actual fresh GitHub CI now independently verifies all5 cases together in each workflow. PR2 remains open/unmerged. Provider live use remains disabled/PENDING and hosted TLS/SMTP/deployment remains unverified. V2C and V2D are still unimplemented; V2B acceptance does not claim whole-V2 completion.
 
-## V2C — implementation under validation; not accepted yet
+## V2C — complete: local and actual GitHub CI verified
 
 Starts from verified clean `3db4932659e129e12400b69a7d41ee9737ba13fe` on the existing V2 branch. Current official-provider review does not establish exact searchable-catalog storage permission; all production providers remain disabled/PENDING/storage=false. Offline Open Library/MangaDex-shaped decoders use clearly synthetic fixtures, not fetched or provider-verified metadata. Submitted facts retain REQUEST_INPUT provenance and remain unverified; no Work is created, merged or published by processing.
 
@@ -91,10 +91,19 @@ Fresh generated-runtime verification (`pwsh-18`) progressed through genuine veri
 
 Completed `pwsh-21` revalidated all4 original V0/V1 browser cases together (4.3m total; catalog3.4m), then B separately1/1 (3.7m;4.0m total), both zero retries with unchanged original scenarios/assertions. The optimized production build ran only after owned browser servers stopped and succeeded, including the dynamic private ingestion page and two APIs; post-build full TypeScript and zero-known production audit passed. Local acceptance is therefore181 units/66 real PostgreSQL cases/all6 distinct browser cases across isolated sessions, not a claimed combined local6/6 run. Immutable baseline ledgers/lockfile/applied0000–0005 and both reference worktrees were checked unchanged; only forward0006 and its journal/snapshot were added.
 
-Publication and actual successful GitHub CI remain pending. C is not marked complete and V2D has not started. Hosted production/TLS/real-provider permission evidence remains separately unverified. Provider policy review is evidence-based default deny, not a blanket legal prohibition on factual reuse or a claim of live integration.
+### Actual CI acceptance
+
+Verified implementation commit **`ae5822c757a1f01aa30ba489242d0e36db34c2e7`** (`feat(ingestion): add private metadata candidate processing`) was committed and normally pushed to the existing V2 branch. Both actual workflows completed SUCCESS with that exact head SHA:
+
+- [PR38014323645](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38014323645):181 unit cases across16 files,66 real PostgreSQL cases across8 files, complete6/6 Chromium suite together in4.4m, zero retries, all mandatory frozen-install/type/lint/migration/build/audit steps SUCCESS and zero-known production vulnerabilities.
+- [Push38014320156](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38014320156): the same actual181/66/6 counts, browser4.4m, zero retries, every mandatory step SUCCESS and zero-known production vulnerabilities.
+
+Parent examined actual completed-run JSON step outcomes and filtered full logs; a green check alone was not the count receipt. Failure-only artifact uploads were correctly skipped. Nonblocking runner/action Node deprecation notices were observed; no guards/configuration were weakened to suppress them. PR2 remains OPEN/unmerged.
+
+C acceptance is **manual request-input processing and shared, explicitly offline provider-record normalization**. All live providers remain disabled/PENDING/storage=false, optional descriptor network methods absent. No live discovery, verified-source approval, Work creation/merge/publication, image transfer or hosted production/TLS acceptance is inferred. Hosted production and adequate real-provider intended-use/storage permission remain separately unverified. Provider review is evidence-based default deny, not a blanket legal prohibition on factual reuse. V2D has not started.
 
 ## Remaining sequential milestones
 
 - V2B: accepted locally and in both actual CI workflows at147d1b3; retain the unsuccessful earlier attempts as evidence, not passes.
-- V2C: one shared candidate pipeline, explainable identity retrieval/resolution, source/rights checks, safe network boundaries and bounded authorized processing. Real adapter only if documented intended-use/storage permission is adequate; otherwise deterministic offline fixture acceptance and explicit disabled live discovery.
+- V2C: accepted atae5822c with181/66/6 actual CI; shared candidate pipeline, explainable canonical principal-record/edition identity, provenance, private snapshots and clock-fenced bounded processing. Live adapters/discovery remain explicitly disabled unless separately authorized intended-use/storage permission becomes adequate.
 - V2D: transactional authorized approve/link/reject, human attestation, provenance-safe decisions, editable metadata suggestions as a separately complete workflow, actual catalog Recently Added/verified release sections and complete end-to-end acceptance.
