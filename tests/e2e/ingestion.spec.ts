@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { createDatabase } from "../../packages/database/src/client";
 import { requireTestDatabase } from "../helpers/test-database";
 import { requestDictionary } from "../../apps/web/src/lib/request-i18n";
+import { dictionary } from "../../apps/web/src/lib/i18n";
 import { ingestionCopy } from "../../apps/web/src/components/ingestion/copy";
 
 // Real isolated PostgreSQL, SMTP verification, browser sessions and native UI.
@@ -113,6 +114,28 @@ test("private submitted-metadata processing through the admin browser", async ({
     await target.getByRole("button", { name: "Sign in", exact: true }).click();
     expect((await signedIn).status()).toBe(200);
     await expect(target).toHaveURL(/\/en\/settings$/, { timeout: 15_000 });
+    // A URL alone does not prove the authenticated Settings render completed.
+    // Require the loaded private identity before navigating elsewhere.
+    await target.waitForLoadState("load", { timeout: 15_000 });
+    const settings = dictionary("en");
+    await expect(
+      target.getByRole("heading", {
+        name: settings.settings,
+        level: 1,
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      target.locator("main").getByText(account.email, { exact: true }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      target
+        .locator("main dl > div")
+        .filter({
+          has: target.getByText(settings.verifiedLabel, { exact: true }),
+        })
+        .locator("dd"),
+    ).toHaveText(settings.yes, { timeout: 15_000 });
     requireTestDatabase();
     const [row] =
       await sql`select id, role, email_verified from users where email = ${account.email}`;
@@ -129,6 +152,49 @@ test("private submitted-metadata processing through the admin browser", async ({
     ).toBe(true);
   }
   try {
+    // Compile public auth destinations through actual anonymous documents before
+    // timing authenticated transitions. No retries, sleeps or session fabrication.
+    const auth = dictionary("en");
+    for (const [path, heading] of [
+      ["/en/verify-email", auth.verifyTitle],
+      ["/en/login", auth.login],
+      // The real server guard redirects anonymous Settings visits to Sign in.
+      ["/en/settings", auth.login],
+    ] as const) {
+      const response = await page.goto(path);
+      expect(response?.status()).toBe(200);
+      await expect(
+        page.getByRole("heading", { name: heading, level: 1, exact: true }),
+      ).toBeVisible({ timeout: 15_000 });
+      if (path === "/en/settings") {
+        await expect(page).toHaveURL(/\/en\/login$/, { timeout: 15_000 });
+        await expect(
+          page.getByRole("button", { name: auth.login, exact: true }),
+        ).toBeVisible({ timeout: 15_000 });
+        await expect(page.locator("main dd")).toHaveCount(0, {
+          timeout: 15_000,
+        });
+        await expect(
+          page.locator("main").getByText(auth.verifiedLabel, { exact: true }),
+        ).toHaveCount(0, { timeout: 15_000 });
+      }
+      await expect(
+        page.locator('[data-testid="ingestion-candidate"]'),
+      ).toHaveCount(0, { timeout: 15_000 });
+      await expect(page.locator("main")).not.toContainText(title, {
+        timeout: 15_000,
+      });
+      await expect(page.locator("main")).not.toContainText(author, {
+        timeout: 15_000,
+      });
+      await expect(
+        page.getByRole("heading", {
+          name: auth.settings,
+          level: 1,
+          exact: true,
+        }),
+      ).toHaveCount(0, { timeout: 15_000 });
+    }
     const owner = await signup(page);
     const administrator = await signup(admin);
     requireTestDatabase();
@@ -145,6 +211,14 @@ test("private submitted-metadata processing through the admin browser", async ({
     await page.locator('[name="alternativeTitles"]').fill(aliases.join("\n"));
     await page.locator('[name="author"]').fill(author);
     await page.getByLabel(en.disclaimer, { exact: true }).check();
+    // Register the bounded real destination transport before the native submit,
+    // as in the accepted B scenario; keep subsequent URL/DOM assertions at 15s.
+    const detailNavigation = page.waitForResponse(
+      (r) =>
+        /^\/en\/requests\/[0-9a-f-]{36}$/.test(new URL(r.url()).pathname) &&
+        r.request().method() === "GET",
+      { timeout: 45_000 },
+    );
     const submitted = page.waitForResponse(
       (r) =>
         new URL(r.url()).pathname === "/api/requests" &&
@@ -160,11 +234,16 @@ test("private submitted-metadata processing through the admin browser", async ({
       alternativeTitles: aliases,
       author,
     });
-    await expect(page).toHaveURL(/\/en\/requests\/[0-9a-f-]{36}$/, {
+    const detailResponse = await detailNavigation;
+    expect(detailResponse.status()).toBe(200);
+    const id = new URL(detailResponse.url()).pathname.split("/").at(-1)!;
+    expect(id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
+    );
+    ids.add(id);
+    await expect(page).toHaveURL(new RegExp(`/en/requests/${id}$`), {
       timeout: 15_000,
     });
-    const id = new URL(page.url()).pathname.split("/").at(-1)!;
-    ids.add(id);
     await expect(page.getByRole("heading", { level: 1 })).toHaveText(title, {
       timeout: 15_000,
     });
@@ -188,7 +267,13 @@ test("private submitted-metadata processing through the admin browser", async ({
         target.locator('[data-testid="ingestion-candidate"]'),
       ).toHaveCount(0, { timeout: 15_000 });
     }
-    expect((await admin.request.get(`/api/requests/${id}`)).status()).toBe(404);
+    // API transport retains Playwright's normal 30s bound independently of the
+    // tightened 15s UI actions/assertions; still require the exact private 404.
+    expect(
+      (
+        await admin.request.get(`/api/requests/${id}`, { timeout: 30_000 })
+      ).status(),
+    ).toBe(404);
     await admin.setViewportSize({ width: 390, height: 844 });
     const imageRequests: string[] = [];
     admin.on("request", (r) => {

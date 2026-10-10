@@ -73,7 +73,8 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
         result = await authClient.signIn.email({
           email,
           password,
-          callbackURL: requestSignInReturn(search.get("callbackURL"), locale),
+          // The validated Next navigation below is the sole login redirect owner.
+          // A callbackURL also activates Better Auth's native redirect plugin.
         });
       else if (mode === "register")
         result = await authClient.signUp.email({
