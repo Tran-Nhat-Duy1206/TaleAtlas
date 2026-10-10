@@ -7,6 +7,7 @@ import * as ingestionSchema from "./ingestion-schema";
 
 import * as editSuggestionSchema from "./edit-suggestion-schema";
 import * as releaseSchema from "./release-schema";
+import * as librarySchema from "./library-schema";
 
 const schema = {
   ...authSchema,
@@ -14,6 +15,7 @@ const schema = {
   ...ingestionSchema,
   ...editSuggestionSchema,
   ...releaseSchema,
+  ...librarySchema,
 };
 
 export function createDatabase(url: string) {
