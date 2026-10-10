@@ -38,7 +38,16 @@ export async function checkDatabaseHealth(
         (select genre_slug from work_genres limit 0), (select asset_path from work_covers limit 0),
         (select value from work_identifiers limit 0), (select type from work_relations limit 0),
         (select actor_id_snapshot from catalog_audit_events limit 0),
-        (select concat(field_path, revision::text, value::text, source_id::text) from catalog_field_evidence limit 0)
+        (select concat(field_path, revision::text, value::text, source_id::text) from catalog_field_evidence limit 0),
+        (select concat(id::text, state::text, revision::text, input_revision::text, public_search_text) from work_requests limit 0),
+        (select concat(user_id, request_id::text) from work_request_supporters limit 0),
+        (select concat(request_id::text, revision::text) from request_events limit 0),
+        (select concat(id, enabled::text, requests_in_window::text) from provider_registry limit 0),
+        (select concat(id::text, state::text, lease_token::text, attempts::text) from ingestion_jobs limit 0),
+        (select concat(request_id::text, input_revision::text, job_id::text, candidate::text, matches::text) from ingestion_candidates limit 0),
+        (select concat(work_id::text, revision::text, base_work_revision::text, proposed::text, citation::text) from edit_suggestions limit 0),
+        (select concat(suggestion_id::text, revision::text, payload::text) from edit_suggestion_events limit 0),
+        (select concat(work_id::text, release_date::text, source_id::text, reviewed_work_revision::text) from catalog_releases limit 0)
     `;
     await Promise.race([
       query,

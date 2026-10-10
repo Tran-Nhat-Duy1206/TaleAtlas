@@ -90,6 +90,9 @@ export default async function WorkPage({ params }: Props) {
   return (
     <section className={styles.catalog}>
       <Link href={`/${locale}/works`}>{t.back}</Link>
+      <Link href={`/${locale}/works/${encodeURIComponent(work.slug)}/suggest-edit`}>
+        {locale === "vi" ? "Đề xuất chỉnh sửa" : "Suggest a correction"}
+      </Link>
       <header className={styles.detailHero}>
         <WorkCover work={work} locale={locale} />
         <div>

@@ -1,10 +1,10 @@
 # Metadata providers
 
-**Planned only. V0 contains no provider adapter, catalog search or provider credential.** MangaDex is a candidate based on StoryNest's source audit, not an active integration. No external search results are fabricated.
+**V2A–D passed local and actual CI acceptance for the implemented manual/offline and human-review scope; live adapters remain disabled/PENDING/storagefalse and live external-provider discovery is unimplemented.** The [PR scope review](<V2_PR_REVIEW.md>) distinguishes tested workflows and limited corrections from remaining integration ambitions; successful CI is not intended-use/storage/media permission. V0's lack of providers and V1's local-only catalog are preserved historical scope, not today's full architecture description. MangaDex remains unapproved, not active because a reference repository used it. No external search results are fabricated. See `PROVIDER_POLICIES.md` for current official-source review and `V2_VALIDATION.md` for actual evidence.
 
-V1 is a global manually curated, source-attributed catalog with local catalog search, not remote discovery. Remote provider discovery and requests belong to V2; the private reading library belongs to V3.
+V1 is a global manually curated, source-attributed catalog with local catalog search, not remote discovery. V2 requests/shared manual ingestion and human review are accepted; live remote provider discovery remains conditional future V2 work. The private reading library belongs to V3.
 
-Before implementation approve:
+Before any live adapter is implemented/enabled, separately approve:
 
 - Provider terms, request budget/rate-limit behavior and explicit content-rating policy (safe/suggestive/erotica must not silently share a default).
 - Canonical `(provider, external_id)` uniqueness; locale-tagged original/alternate titles and metadata provenance. Missing VI must stay missing, not fallback English stored as Vietnamese.
@@ -13,4 +13,4 @@ Before implementation approve:
 - HTTPS image-host allowlist, safe redirect handling/egress, streaming byte bounds and timeouts. Never fetch arbitrary image-looking hosts.
 - User-local metadata overrides excluded from shared public search unless explicitly reviewed/published.
 
-Future refresh jobs must be bounded and durable when correctness requires completion, with leases/retries and reconciliation for ambiguous outcomes. No fire-and-forget serverless refresh guarantee and no exactly-once external delivery claim. Review these principles against actual query plans and provider behavior before enabling live calls.
+V2A durable job primitives implement persisted intent, bounded lease claims/recovery and retries/dead letters. V2C refresh execution must reuse these primitives and reconcile ambiguous outcomes. No fire-and-forget serverless refresh guarantee and no exactly-once external delivery claim. Review these principles against actual query plans and provider behavior before enabling live calls.

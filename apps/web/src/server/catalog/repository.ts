@@ -49,7 +49,7 @@ export async function loadWork(
 ) {
   return (await loadWorks(db, [id], locale, admin))[0];
 }
-async function loadWorks(
+export async function loadWorks(
   db: Executor,
   ids: string[],
   locale: string,
@@ -550,99 +550,105 @@ export async function saveWork(
     input.publicationReviewAcknowledged !== true
   )
     throw new CatalogError(400, "VALIDATION_ERROR");
-  return getDatabase().transaction(async (tx) => {
-    let previousVisibility: WorkInput["visibility"] | undefined;
-    let previousRevision: number | null = null;
-    let previousWork: typeof works.$inferSelect | undefined;
-    if (id) {
-      const [current] = await tx
-        .select()
-        .from(works)
-        .where(eq(works.id, id))
-        .for("update");
-      if (!current) throw new CatalogError(404, "NOT_FOUND");
-      if (current.revision !== revision)
-        throw new CatalogError(409, "CONFLICT");
-      previousRevision = current.revision;
-      previousVisibility = current.visibility;
-      previousWork = current;
-    }
-    const workId = id ?? randomUUID();
-    const sourceId = randomUUID();
-    await tx.insert(catalogSources).values({
-      ...input.source,
-      consultedAt: input.source.consultedAt
-        ? new Date(input.source.consultedAt)
-        : null,
-      id: sourceId,
-    });
-    const newRevision = (previousRevision ?? 0) + 1;
-    if (id)
-      await tx
-        .update(works)
-        .set({
-          ...fields(input),
-          sourceId,
-          revision: newRevision,
-          updatedAt: new Date(),
-        })
-        .where(eq(works.id, id));
-    else {
-      const base =
-        normalizeTitle(input.primaryTitle)
-          .replace(/[^a-z0-9]+/g, "-")
-          .slice(0, 100)
-          .replace(/^-|-$/g, "") || "work";
-      await tx.insert(works).values({
+  return getDatabase().transaction((tx) =>
+    saveWorkInTransaction(tx, input, actor, id, revision),
+  );
+}
+export async function saveWorkInTransaction(
+  tx: Tx,
+  input: WorkInput,
+  actor: string,
+  id?: string,
+  revision?: number,
+) {
+  if (
+    input.visibility === "PUBLISHED" &&
+    input.publicationReviewAcknowledged !== true
+  )
+    throw new CatalogError(400, "VALIDATION_ERROR");
+  let previousVisibility: WorkInput["visibility"] | undefined;
+  let previousRevision: number | null = null;
+  let previousWork: typeof works.$inferSelect | undefined;
+  if (id) {
+    const [current] = await tx
+      .select()
+      .from(works)
+      .where(eq(works.id, id))
+      .for("update");
+    if (!current) throw new CatalogError(404, "NOT_FOUND");
+    if (current.revision !== revision) throw new CatalogError(409, "CONFLICT");
+    previousRevision = current.revision;
+    previousVisibility = current.visibility;
+    previousWork = current;
+  }
+  const workId = id ?? randomUUID();
+  const sourceId = randomUUID();
+  await tx.insert(catalogSources).values({
+    ...input.source,
+    consultedAt: input.source.consultedAt
+      ? new Date(input.source.consultedAt)
+      : null,
+    id: sourceId,
+  });
+  const newRevision = (previousRevision ?? 0) + 1;
+  if (id)
+    await tx
+      .update(works)
+      .set({
         ...fields(input),
-        id: workId,
-        slug: `${base}-${workId}`,
         sourceId,
         revision: newRevision,
-        searchText: normalizeTitle(input.primaryTitle) || "work",
-      });
-    }
-    await replaceChildren(
-      tx,
-      workId,
-      input,
+        updatedAt: new Date(),
+      })
+      .where(eq(works.id, id));
+  else {
+    const base =
+      normalizeTitle(input.primaryTitle)
+        .replace(/[^a-z0-9]+/g, "-")
+        .slice(0, 100)
+        .replace(/^-|-$/g, "") || "work";
+    await tx.insert(works).values({
+      ...fields(input),
+      id: workId,
+      slug: `${base}-${workId}`,
       sourceId,
-      newRevision,
-      previousWork,
-    );
-    await tx.insert(catalogAuditEvents).values({
-      workId,
-      actorUserId: actor,
-      actorIdSnapshot: actor,
-      operation: !id
-        ? "CREATE"
-        : input.visibility === "HIDDEN" && previousVisibility !== "HIDDEN"
-          ? "HIDE"
-          : previousVisibility === "HIDDEN" && input.visibility !== "HIDDEN"
-            ? "RESTORE"
-            : "UPDATE",
-      previousRevision,
-      newRevision,
-      changes: {
-        ...fields(input),
-        sourceId,
-        ...(input.visibility === "PUBLISHED"
-          ? { publicationReviewAcknowledged: true }
-          : {}),
-        // Retain the asserted metadata, not only counts: later edits must not erase
-        // earlier original titles/aliases/credits from the privileged history.
-        titles: input.titles,
-        descriptions: input.descriptions,
-        editions: input.editions,
-        creators: input.creators,
-        genres: input.genres,
-        cover: input.cover ?? null,
-        identifiers: input.identifiers,
-        relations: input.relations,
-      },
+      revision: newRevision,
+      searchText: normalizeTitle(input.primaryTitle) || "work",
     });
-    return loadWork(tx, workId, "en", true);
+  }
+  await replaceChildren(tx, workId, input, sourceId, newRevision, previousWork);
+  await tx.insert(catalogAuditEvents).values({
+    workId,
+    actorUserId: actor,
+    actorIdSnapshot: actor,
+    operation: !id
+      ? "CREATE"
+      : input.visibility === "HIDDEN" && previousVisibility !== "HIDDEN"
+        ? "HIDE"
+        : previousVisibility === "HIDDEN" && input.visibility !== "HIDDEN"
+          ? "RESTORE"
+          : "UPDATE",
+    previousRevision,
+    newRevision,
+    changes: {
+      ...fields(input),
+      sourceId,
+      ...(input.visibility === "PUBLISHED"
+        ? { publicationReviewAcknowledged: true }
+        : {}),
+      // Retain the asserted metadata, not only counts: later edits must not erase
+      // earlier original titles/aliases/credits from the privileged history.
+      titles: input.titles,
+      descriptions: input.descriptions,
+      editions: input.editions,
+      creators: input.creators,
+      genres: input.genres,
+      cover: input.cover ?? null,
+      identifiers: input.identifiers,
+      relations: input.relations,
+    },
   });
+  return loadWork(tx, workId, "en", true);
 }
 export async function changeVisibility(
   id: string,

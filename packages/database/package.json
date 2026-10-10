@@ -8,7 +8,11 @@
     "./schema": "./src/schema.ts",
     "./client": "./src/client.ts",
     "./catalog": "./src/catalog-schema.ts",
-    "./catalog-types": "./src/catalog-types.ts"
+    "./catalog-types": "./src/catalog-types.ts",
+    "./ingestion": "./src/ingestion-schema.ts",
+    "./ingestion-types": "./src/ingestion-types.ts",
+    "./edit-suggestions": "./src/edit-suggestion-schema.ts",
+    "./releases": "./src/release-schema.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",
