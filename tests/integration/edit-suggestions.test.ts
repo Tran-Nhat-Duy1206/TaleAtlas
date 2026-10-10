@@ -44,7 +44,7 @@ const citation = () => ({
   label: f.sourceLabel,
   citation: "PRIVATE HUMAN CITATION synthetic only",
 });
-const input = (work: AdminWork) => ({
+const input = (work: Pick<AdminWork, "id" | "revision">) => ({
   submitKey: randomUUID(),
   baseWorkRevision: work.revision,
   patch: { primaryTitle: `Private proposed ${f.runId}`, publicationYear: 2020 },
@@ -74,7 +74,10 @@ async function work(visibility = "PUBLISHED") {
   row.creators.forEach((c) => c.id && creatorIds.add(c.id));
   return row;
 }
-async function submitted(w: AdminWork, value = input(w)) {
+async function submitted(
+  w: Pick<AdminWork, "id" | "revision">,
+  value = input(w),
+) {
   const response = await submit(
     req(`catalog/works/${w.id}/suggestions`, owner, "POST", value),
     { params: Promise.resolve({ slug: w.id }) },
@@ -389,9 +392,27 @@ describe.sequential(
       await expect(
         f.client`update edit_suggestions set work_id = ${randomUUID()} where id = ${row.id}`,
       ).rejects.toMatchObject({ code: "23503" });
+      const [restriction] =
+        await f.client`select confdeltype, confupdtype from pg_constraint where conrelid = 'edit_suggestions'::regclass and conname = 'edit_suggestions_work_id_works_id_fk'`;
+      expect(restriction).toMatchObject({ confdeltype: "r", confupdtype: "a" });
+      // Constraint-only synthetic clone: no legacy children/audits can mask this
+      // FK. This direct SQL fixture is NOT catalog creation/publication proof.
+      const isolatedId = randomUUID();
+      workIds.add(isolatedId);
+      await f.client`insert into works (id, slug, primary_title, primary_title_language, format, visibility, release_status, source_id, revision, search_text) select ${isolatedId}::uuid, ${`restriction-${isolatedId}`}, primary_title, primary_title_language, format, visibility, release_status, source_id, revision, search_text from works where id = ${w.id}`;
+      const isolatedRow = await submitted({
+        id: isolatedId,
+        revision: w.revision,
+      });
+      // Pin the exact blocking FK and retained rows across PostgreSQL versions.
       await expect(
-        f.client`delete from works where id = ${w.id}`,
-      ).rejects.toMatchObject({ code: "23001" });
+        f.client`delete from works where id = ${isolatedId}`,
+      ).rejects.toMatchObject({
+        constraint_name: "edit_suggestions_work_id_works_id_fk",
+      });
+      const [preserved] =
+        await f.client`select exists(select 1 from works where id = ${isolatedId}) as work_exists, exists(select 1 from edit_suggestions where id = ${isolatedRow.id} and work_id = ${isolatedId}) as suggestion_exists`;
+      expect(preserved).toEqual({ work_exists: true, suggestion_exists: true });
       const ephemeral = await f.account("user");
       const response = await submit(
         req(`catalog/works/${w.id}/suggestions`, ephemeral, "POST", input(w)),
