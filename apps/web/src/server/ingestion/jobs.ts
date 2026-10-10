@@ -70,14 +70,16 @@ export async function claimJobs(
   owner: string,
   limit: number,
   leaseSeconds: number,
+  requestId?: string,
 ) {
   const input = z
     .strictObject({
       owner: ownerSchema,
       limit: z.number().int().min(1).max(10),
       leaseSeconds: z.number().int().min(5).max(120),
+      requestId: uuid.optional(),
     })
-    .parse({ owner, limit, leaseSeconds });
+    .parse({ owner, limit, leaseSeconds, requestId });
   return getDatabase().transaction(async (tx) => {
     // Maintenance is deliberately bounded, and locks jobs only (never requests).
     const exhausted = await tx
@@ -85,6 +87,9 @@ export async function claimJobs(
       .from(ingestionJobs)
       .where(
         and(
+          input.requestId
+            ? eq(ingestionJobs.requestId, input.requestId)
+            : undefined,
           eq(ingestionJobs.state, "RUNNING"),
           lte(ingestionJobs.leaseExpiresAt, dbNow),
           sql`${ingestionJobs.attempts} >= ${ingestionJobs.maxAttempts}`,
@@ -114,6 +119,9 @@ export async function claimJobs(
       .from(ingestionJobs)
       .where(
         and(
+          input.requestId
+            ? eq(ingestionJobs.requestId, input.requestId)
+            : undefined,
           lt(ingestionJobs.attempts, ingestionJobs.maxAttempts),
           or(
             and(
@@ -160,33 +168,77 @@ function liveFence(input: z.infer<typeof fenceSchema>) {
     gt(ingestionJobs.leaseExpiresAt, dbNow),
   );
 }
-export async function completeJob(
+// Caller acquiring a request lock must do so BEFORE this job lock.
+export async function lockLiveJobInTransaction(
+  tx: DbTx,
+  jobId: string,
+  leaseToken: string,
+  owner: string,
+) {
+  const input = fenceSchema.parse({ jobId, leaseToken, owner });
+  await tx
+    .select({ id: ingestionJobs.id })
+    .from(ingestionJobs)
+    .where(eq(ingestionJobs.id, input.jobId))
+    .for("update");
+  const [job] = await tx.select().from(ingestionJobs).where(liveFence(input));
+  return job ?? null;
+}
+export async function stopJobInTransaction(
+  tx: DbTx,
+  jobId: string,
+  leaseToken: string,
+  owner: string,
+  outcome: "OBSOLETE" | "PROVIDER_DISABLED",
+): Promise<boolean> {
+  const input = fenceSchema.parse({ jobId, leaseToken, owner });
+  if (!(await lockLiveJobInTransaction(tx, jobId, leaseToken, owner)))
+    return false;
+  const rows = await tx
+    .update(ingestionJobs)
+    .set({
+      state: outcome === "PROVIDER_DISABLED" ? "DEAD_LETTER" : "CANCELLED",
+      ...clearLease,
+      lastErrorCode:
+        outcome === "PROVIDER_DISABLED" ? "PROVIDER_DISABLED" : null,
+      completedAt: dbNow,
+      updatedAt: dbNow,
+    })
+    .where(liveFence(input))
+    .returning({ id: ingestionJobs.id });
+  return rows.length === 1;
+}
+export async function completeJobInTransaction(
+  tx: DbTx,
   jobId: string,
   leaseToken: string,
   owner: string,
 ): Promise<boolean> {
   const input = fenceSchema.parse({ jobId, leaseToken, owner });
-  return getDatabase().transaction(async (tx) => {
-    // Acquire the target lock before evaluating wall-clock lease validity. A
-    // predicate evaluated before a lock wait can otherwise outlive its lease.
-    await tx
-      .select({ id: ingestionJobs.id })
-      .from(ingestionJobs)
-      .where(eq(ingestionJobs.id, input.jobId))
-      .for("update");
-    const rows = await tx
-      .update(ingestionJobs)
-      .set({
-        state: "SUCCEEDED",
-        ...clearLease,
-        lastErrorCode: null,
-        completedAt: dbNow,
-        updatedAt: dbNow,
-      })
-      .where(liveFence(input))
-      .returning({ id: ingestionJobs.id });
-    return rows.length === 1;
-  });
+  if (!(await lockLiveJobInTransaction(tx, jobId, leaseToken, owner)))
+    return false;
+  const rows = await tx
+    .update(ingestionJobs)
+    .set({
+      state: "SUCCEEDED",
+      ...clearLease,
+      lastErrorCode: null,
+      completedAt: dbNow,
+      updatedAt: dbNow,
+    })
+    .where(liveFence(input))
+    .returning({ id: ingestionJobs.id });
+  return rows.length === 1;
+}
+export async function completeJob(
+  jobId: string,
+  leaseToken: string,
+  owner: string,
+): Promise<boolean> {
+  fenceSchema.parse({ jobId, leaseToken, owner });
+  return getDatabase().transaction((tx) =>
+    completeJobInTransaction(tx, jobId, leaseToken, owner),
+  );
 }
 export async function failJob(
   jobId: string,

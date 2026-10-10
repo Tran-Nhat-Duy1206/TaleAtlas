@@ -43,7 +43,8 @@ export async function checkDatabaseHealth(
         (select concat(user_id, request_id::text) from work_request_supporters limit 0),
         (select concat(request_id::text, revision::text) from request_events limit 0),
         (select concat(id, enabled::text, requests_in_window::text) from provider_registry limit 0),
-        (select concat(id::text, state::text, lease_token::text, attempts::text) from ingestion_jobs limit 0)
+        (select concat(id::text, state::text, lease_token::text, attempts::text) from ingestion_jobs limit 0),
+        (select concat(request_id::text, input_revision::text, job_id::text, candidate::text, matches::text) from ingestion_candidates limit 0)
     `;
     await Promise.race([
       query,

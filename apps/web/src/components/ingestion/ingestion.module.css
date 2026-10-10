@@ -1,0 +1,36 @@
+.page {
+  max-width: 64rem;
+  margin: auto;
+  padding: 1rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.page article {
+  border: 1px solid var(--border, #888);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-block: 1rem;
+  min-width: 0;
+}
+.page pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  font-size: 0.85rem;
+  max-width: 100%;
+}
+.page input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.page button {
+  white-space: normal;
+  max-width: 100%;
+}
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}

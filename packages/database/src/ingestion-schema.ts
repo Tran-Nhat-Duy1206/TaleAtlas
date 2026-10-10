@@ -254,3 +254,31 @@ export const ingestionJobs = pgTable(
     index("ingestion_jobs_lease_expiry_idx").on(t.leaseExpiresAt),
   ],
 );
+
+// Private review snapshots: never join into owner/public request projections.
+export const ingestionCandidates = pgTable(
+  "ingestion_candidates",
+  {
+    id: id(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => workRequests.id, { onDelete: "restrict" }),
+    inputRevision: integer("input_revision").notNull(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => ingestionJobs.id, { onDelete: "restrict" }),
+    candidate: jsonb("candidate").$type<Record<string, unknown>>().notNull(),
+    matches: jsonb("matches").$type<Record<string, unknown>>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    unique("ingestion_candidates_request_input_unique").on(
+      t.requestId,
+      t.inputRevision,
+    ),
+    check("ingestion_candidates_revision_check", sql`${t.inputRevision} > 0`),
+    check("ingestion_candidates_candidate_check", object(t.candidate, 32768)),
+    check("ingestion_candidates_matches_check", object(t.matches, 32768)),
+    index("ingestion_candidates_job_idx").on(t.jobId),
+  ],
+);

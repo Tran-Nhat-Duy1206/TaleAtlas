@@ -43,6 +43,13 @@
       "when": 1791552989800,
       "tag": "0005_misty_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791593456692,
+      "tag": "0006_heavy_purifiers",
+      "breakpoints": true
     }
   ]
 }
