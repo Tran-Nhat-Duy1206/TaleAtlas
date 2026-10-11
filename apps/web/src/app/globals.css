@@ -483,7 +483,8 @@ form {
   flex-direction: column;
   gap: 20px;
 }
-form > label {
+form > label,
+.auth-card form > fieldset > label {
   display: flex;
   flex-direction: column;
   gap: 7px;
