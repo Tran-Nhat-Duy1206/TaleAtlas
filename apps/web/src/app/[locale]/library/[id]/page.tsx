@@ -7,6 +7,12 @@ import { libraryGuard } from "@/server/library/guard";
 import { getLibraryEntry } from "@/server/library/service";
 import { libraryCopy } from "@/components/library/copy";
 import { EntryControls } from "@/components/library/EntryControls";
+import { ReadingControls } from "@/components/library/ReadingControls";
+import { ReadingHistory } from "@/components/library/ReadingHistory";
+import {
+  readingHttpEntry,
+  readingSessionResponseSchema,
+} from "@/features/library/reading-http-contracts";
 import { WorkCover } from "@/components/catalog/WorkCover";
 import styles from "@/components/library/library.module.css";
 export const dynamic = "force-dynamic";
@@ -38,6 +44,11 @@ export default async function LibraryEntryPage({
         <Link href={`/${locale}/library`}>{t.back}</Link>
       </section>
     );
+  const reading = readingHttpEntry(entry);
+  const validSession = readingSessionResponseSchema.safeParse(
+    reading.readingSession,
+  );
+  reading.readingSession = validSession.success ? validSession.data : null;
   return (
     <section className={styles.library}>
       <Link href={`/${locale}/library`}>{t.back}</Link>
@@ -69,6 +80,16 @@ export default async function LibraryEntryPage({
             ? { state: entry.currentSession.state }
             : null,
         }}
+      />
+      <ReadingControls
+        key={`reading:${entry.id}:${entry.revision}`}
+        locale={locale}
+        entry={reading}
+      />
+      <ReadingHistory
+        key={`history:${entry.id}:${entry.revision}`}
+        id={entry.id}
+        locale={locale}
       />
     </section>
   );
