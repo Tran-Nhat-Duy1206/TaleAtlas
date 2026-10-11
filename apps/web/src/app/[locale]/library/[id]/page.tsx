@@ -9,6 +9,8 @@ import { libraryCopy } from "@/components/library/copy";
 import { EntryControls } from "@/components/library/EntryControls";
 import { ReadingControls } from "@/components/library/ReadingControls";
 import { ReadingHistory } from "@/components/library/ReadingHistory";
+import { PersonalControls } from "@/components/library/PersonalControls";
+import { personalHttpDetailsSchema } from "@/features/library/personal-http-contracts";
 import {
   readingHttpEntry,
   readingSessionResponseSchema,
@@ -49,6 +51,14 @@ export default async function LibraryEntryPage({
     reading.readingSession,
   );
   reading.readingSession = validSession.success ? validSession.data : null;
+  const personalSeed = personalHttpDetailsSchema
+    .pick({ id: true, workId: true, revision: true, archived: true })
+    .safeParse({
+      id: entry.id,
+      workId: entry.workId,
+      revision: entry.revision,
+      archived: entry.archived,
+    });
   return (
     <section className={styles.library}>
       <Link href={`/${locale}/library`}>{t.back}</Link>
@@ -91,6 +101,13 @@ export default async function LibraryEntryPage({
         id={entry.id}
         locale={locale}
       />
+      {personalSeed.success && (
+        <PersonalControls
+          key={`personal:${entry.id}:${entry.revision}`}
+          seed={personalSeed.data}
+          locale={locale}
+        />
+      )}
     </section>
   );
 }
