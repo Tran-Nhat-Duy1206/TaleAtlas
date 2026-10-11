@@ -1,0 +1,159 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { isLocale } from "@/lib/i18n";
+import { libraryGuard } from "@/server/library/guard";
+import { listLibraryEntries } from "@/server/library/service";
+import { libraryCopy, statuses } from "@/components/library/copy";
+import { libraryPageHref, libraryPageQuery } from "@/components/library/query";
+import { LibraryCover } from "@/components/library/LibraryCover";
+import styles from "@/components/library/library.module.css";
+export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Library",
+  robots: { index: false, follow: false },
+};
+export default async function LibraryPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { locale } = await params;
+  if (!isLocale(locale)) notFound();
+  const t = libraryCopy[locale],
+    raw = await searchParams;
+  const suffix = new URLSearchParams();
+  for (const [key, value] of Object.entries(raw))
+    if (typeof value === "string") suffix.set(key, value);
+  const destination = `/${locale}/library${suffix.size ? `?${suffix}` : ""}`;
+  const h = await libraryGuard(locale, destination);
+  if (!h)
+    return (
+      <section className={styles.library}>
+        <p role="alert">{t.denied}</p>
+      </section>
+    );
+  const query = libraryPageQuery(raw, locale);
+  if (!query)
+    return (
+      <section className={styles.library}>
+        <h1>{t.title}</h1>
+        <p role="alert">{t.invalid}</p>
+        <Link href={`/${locale}/library`}>{t.reset}</Link>
+      </section>
+    );
+  const input = {
+    page: query.page,
+    locale,
+    status: query.status,
+    favorite: query.favorite,
+    sort: query.sort,
+  };
+  const result = await listLibraryEntries(input, h).catch(() => null);
+  return (
+    <section className={styles.library}>
+      <h1>{t.title}</h1>
+      <p>{t.private}</p>
+      <form
+        action={`/${locale}/library`}
+        method="get"
+        className={styles.controls}
+      >
+        <label>
+          {t.status}
+          <select name="status" defaultValue={query.status ?? ""}>
+            <option value="">{t.all}</option>
+            {statuses.map((value) => (
+              <option key={value} value={value}>
+                {t.labels[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {t.favorite}
+          <select
+            name="favorite"
+            defaultValue={
+              query.favorite === undefined ? "" : String(query.favorite)
+            }
+          >
+            <option value="">{t.all}</option>
+            <option value="true">{t.yes}</option>
+            <option value="false">{t.no}</option>
+          </select>
+        </label>
+        <label>
+          {t.sort}
+          <select name="sort" defaultValue={query.sort}>
+            <option value="UPDATED_DESC">{t.updated}</option>
+            <option value="ADDED_DESC">{t.added}</option>
+            <option value="TITLE_ASC">{t.alphabetical}</option>
+            <option value="RATING_DESC">{t.rating}</option>
+          </select>
+        </label>
+        <button>{t.apply}</button>
+        <Link href={`/${locale}/library`}>{t.reset}</Link>
+      </form>
+      {!result ? (
+        <>
+          <p role="alert">{t.error}</p>
+          <Link href={libraryPageHref(locale, query, query.page)}>
+            {t.refresh}
+          </Link>
+        </>
+      ) : (
+        <>
+          {!result.items.length && <p>{t.empty}</p>}
+          <ul className={styles.list}>
+            {result.items.map((entry) => (
+              <li key={entry.id} className={styles.card}>
+                {entry.work.available && (
+                  <div className={styles.cover}>
+                    <LibraryCover work={entry.work} locale={locale} />
+                  </div>
+                )}
+                <h2>
+                  <Link href={`/${locale}/library/${entry.id}`}>
+                    {entry.work.available
+                      ? entry.work.displayTitle
+                      : t.unavailable}
+                  </Link>
+                </h2>
+                <p>
+                  {t.labels[entry.status]}
+                  {entry.favorite ? ` · ${t.favorite}` : ""}
+                </p>
+                <Link href={`/${locale}/library/${entry.id}`}>{t.detail}</Link>
+                {entry.work.available && (
+                  <Link
+                    href={`/${locale}/works/${encodeURIComponent(entry.work.slug)}`}
+                  >
+                    {t.catalog}
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ul>
+          <nav className={styles.actions} aria-label={t.page}>
+            {query.page > 1 && (
+              <Link href={libraryPageHref(locale, query, query.page - 1)}>
+                {t.previous}
+              </Link>
+            )}
+            <span>
+              {t.page} {result.page} · 50 / {t.page.toLowerCase()}
+            </span>
+            {result.hasNext && query.page < 400 && (
+              <Link href={libraryPageHref(locale, query, query.page + 1)}>
+                {t.next}
+              </Link>
+            )}
+          </nav>
+        </>
+      )}
+    </section>
+  );
+}

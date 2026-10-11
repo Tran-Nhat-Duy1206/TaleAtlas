@@ -1,0 +1,80 @@
+.library {
+  max-width: 68rem;
+  margin: 2rem auto;
+  padding: 1rem;
+  overflow-wrap: anywhere;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: end;
+  margin-block: 1.5rem;
+}
+.controls label {
+  display: grid;
+  gap: 0.4rem;
+}
+.controls select {
+  max-width: 100%;
+  min-height: 2.75rem;
+}
+.list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+}
+.card {
+  padding: 1.25rem;
+  border: 1px solid var(--border, #888);
+  border-radius: 0.75rem;
+}
+.card a {
+  display: inline-block;
+  margin: 0.4rem 0.8rem 0.4rem 0;
+}
+.check {
+  display: flex;
+  gap: 0.6rem;
+  align-items: start;
+  margin-block: 1rem;
+}
+.check input {
+  margin-top: 0.25rem;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  margin-block: 1rem;
+}
+.widget {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--border, #888);
+  border-radius: 0.75rem;
+}
+.cover {
+  width: 6rem;
+  float: inline-start;
+  margin-inline-end: 1rem;
+}
+.cover img {
+  width: 100%;
+  height: auto;
+}
+.cover figcaption {
+  font-size: 0.7rem;
+}
+@media (max-width: 40rem) {
+  .controls {
+    align-items: stretch;
+  }
+  .controls label {
+    flex: 1 1 100%;
+  }
+  .library {
+    margin-block: 1rem;
+  }
+}

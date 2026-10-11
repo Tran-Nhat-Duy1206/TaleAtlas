@@ -19,6 +19,11 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [success, setSuccess] = useState("");
+  const continuation = requestSignInReturn(search.get("callbackURL"), locale);
+  const continuationSuffix =
+    continuation === `/${locale}/settings`
+      ? ""
+      : `?callbackURL=${encodeURIComponent(continuation)}`;
   const token = search.get("token");
   const verified =
     mode === "verify-email" &&
@@ -68,7 +73,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
     setBusy(true);
     try {
       let result;
-      const callback = `${window.location.origin}/${locale}/verify-email?verified=1`;
+      const callback = `${window.location.origin}/${locale}/verify-email?verified=1${continuationSuffix ? `&callbackURL=${encodeURIComponent(continuation)}` : ""}`;
       if (mode === "login")
         result = await authClient.signIn.email({
           email,
@@ -86,7 +91,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
       else if (mode === "forgot-password")
         result = await authClient.requestPasswordReset({
           email,
-          redirectTo: `${window.location.origin}/${locale}/reset-password`,
+          redirectTo: `${window.location.origin}/${locale}/reset-password${continuationSuffix}`,
         });
       else if (mode === "reset-password") {
         if (!token) {
@@ -121,7 +126,8 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
         // The destination navigation already fetches fresh authenticated server data.
         // Refreshing before replace commits races/cancels its RSC stream.
         router.replace(requestSignInReturn(search.get("callbackURL"), locale));
-      } else if (mode === "register") router.push(`/${locale}/verify-email`);
+      } else if (mode === "register")
+        router.push(`/${locale}/verify-email${continuationSuffix}`);
       else
         setSuccess(
           mode === "forgot-password"
@@ -156,7 +162,10 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
             <p className="notice success" role="status">
               {t.verified}
             </p>
-            <Link className="button primary" href={`/${locale}/login`}>
+            <Link
+              className="button primary"
+              href={`/${locale}/login${continuationSuffix}`}
+            >
               {t.login}
             </Link>
           </>
@@ -167,7 +176,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
             </p>
             <Link
               className="button primary"
-              href={`/${locale}/forgot-password`}
+              href={`/${locale}/forgot-password${continuationSuffix}`}
             >
               {t.sendReset}
             </Link>
@@ -238,7 +247,10 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
               </label>
             )}
             {mode === "login" && (
-              <Link className="form-link" href={`/${locale}/forgot-password`}>
+              <Link
+                className="form-link"
+                href={`/${locale}/forgot-password${continuationSuffix}`}
+              >
                 {t.forgot}
               </Link>
             )}
@@ -271,7 +283,10 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
               <span aria-hidden="true">↗</span>
             </button>
             {mode === "login" && (
-              <Link className="form-link" href={`/${locale}/verify-email`}>
+              <Link
+                className="form-link"
+                href={`/${locale}/verify-email${continuationSuffix}`}
+              >
                 {t.resend}
               </Link>
             )}
@@ -282,14 +297,21 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
           {mode === "login" ? (
             <>
               {t.noAccount}{" "}
-              <Link href={`/${locale}/register`}>{t.register}</Link>
+              <Link href={`/${locale}/register${continuationSuffix}`}>
+                {t.register}
+              </Link>
             </>
           ) : mode === "register" ? (
             <>
-              {t.hasAccount} <Link href={`/${locale}/login`}>{t.login}</Link>
+              {t.hasAccount}{" "}
+              <Link href={`/${locale}/login${continuationSuffix}`}>
+                {t.login}
+              </Link>
             </>
           ) : (
-            <Link href={`/${locale}/login`}>{t.backLogin}</Link>
+            <Link href={`/${locale}/login${continuationSuffix}`}>
+              {t.backLogin}
+            </Link>
           )}
         </div>
       </div>
