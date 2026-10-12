@@ -6,6 +6,7 @@ import {
   count,
   desc,
   eq,
+  inArray,
   isNull,
   lt,
   ne,
@@ -50,12 +51,15 @@ import {
   communityModerationSchema,
   communityRevealSchema,
   communityQuerySchema,
+  communityOwnedQuerySchema,
+  communityOwnedDetailQuerySchema,
   type CommunityCommand,
 } from "../../features/community/contracts";
 import {
   projectCommunityContent,
   projectCommunityReveal,
   CommunityRevealConflict,
+  type CommunityOwnedDTO,
 } from "../../features/community/projection";
 
 type Tx = Parameters<
@@ -962,12 +966,14 @@ export async function getCommunityContent(
     );
   });
 }
-export async function revealCommunityContent(input: unknown, headers: Headers) {
+export async function revealCommunityContent(input: Input, headers: Headers) {
   return safe(async () => {
     requireCommunityEnabled();
     requireTrustedOrigin(new Request(getAuthEnv().APP_ORIGIN, { headers }));
     await publicReadBudget(headers, true);
-    const value = communityRevealSchema.parse(input);
+    const value = communityRevealSchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
     return getDatabase().transaction(
       async (tx) => {
         await published(tx, value.workId);
@@ -982,7 +988,7 @@ export async function revealCommunityContent(input: unknown, headers: Headers) {
 export async function listCommunityContents(
   workInput: string,
   kind: "THREAD" | "REVIEW",
-  input: unknown,
+  input: Input,
   threadInput?: string,
   headers = new Headers(),
 ) {
@@ -991,7 +997,9 @@ export async function listCommunityContents(
     await publicReadBudget(headers);
     z.enum(["THREAD", "REVIEW"]).parse(kind);
     const workId = communityUuidSchema.parse(workInput);
-    const query = communityQuerySchema.parse(input);
+    const query = communityQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
     const threadId = threadInput
       ? communityUuidSchema.parse(threadInput)
       : null;
@@ -1056,6 +1064,127 @@ export async function listCommunityContents(
       },
       { isolationLevel: "repeatable read", accessMode: "read only" },
     );
+  });
+}
+/** Indexed, fixed-depth eligibility checks; owner reads never select authored text. */
+function ownedMetadataColumns() {
+  const ancestorsVisible = sql<boolean>`case
+    when ${communityContents.kind} = 'THREAD' then true
+    when ${communityContents.kind} = 'REPLY' then
+      exists (select 1 from community_contents t
+        where t.id = ${communityContents.threadId} and t.work_id = ${communityContents.workId}
+          and t.kind = 'THREAD' and t.moderation_state = 'VISIBLE')
+      and (${communityContents.parentId} is null or exists (
+        select 1 from community_contents p
+        where p.id = ${communityContents.parentId} and p.work_id = ${communityContents.workId}
+          and p.thread_id = ${communityContents.threadId} and p.kind = 'REPLY'
+          and p.moderation_state = 'VISIBLE'
+          and (p.parent_id is null or exists (
+            select 1 from community_contents gp
+            where gp.id = p.parent_id and gp.work_id = ${communityContents.workId}
+              and gp.thread_id = ${communityContents.threadId} and gp.kind = 'REPLY'
+              and gp.moderation_state = 'VISIBLE' and gp.parent_id is null))))
+    else false end`;
+  const available = sql<boolean>`(${works.visibility} = 'PUBLISHED')`;
+  return {
+    id: communityContents.id,
+    workId: communityContents.workId,
+    kind: communityContents.kind,
+    threadId: communityContents.threadId,
+    parentId: communityContents.parentId,
+    depth: communityContents.depth,
+    revision: communityContents.revision,
+    authorState: communityContents.authorState,
+    moderationState: communityContents.moderationState,
+    workAvailable: available,
+    canEdit: sql<boolean>`(${available} and ${communityContents.authorState} = 'ACTIVE'
+      and ${communityContents.moderationState} = 'VISIBLE' and ${ancestorsVisible}
+      and ${communityContents.revision} < 2147483647)`,
+    canWithdraw: sql<boolean>`(${communityContents.authorState} = 'ACTIVE'
+      and ${communityContents.revision} < 2147483647)`,
+  };
+}
+function ownedMetadata(
+  row: Omit<CommunityOwnedDTO, "kind"> & { kind: CommunityContentKind },
+): CommunityOwnedDTO {
+  return {
+    id: row.id,
+    workId: row.workId,
+    kind: z.enum(["THREAD", "REPLY"]).parse(row.kind),
+    threadId: row.threadId,
+    parentId: row.parentId,
+    depth: row.depth,
+    revision: row.revision,
+    authorState: row.authorState,
+    moderationState: row.moderationState,
+    workAvailable: row.workAvailable,
+    canEdit: row.canEdit,
+    canWithdraw: row.canWithdraw,
+  };
+}
+export async function listOwnedCommunityContents(
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await verified(headers);
+    await actorBudget(principal, `community.ownread:${principal.user.id}`, 60);
+    const query = communityOwnedQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const rows = await tx
+        .select(ownedMetadataColumns())
+        .from(communityContents)
+        .innerJoin(works, eq(works.id, communityContents.workId))
+        .where(
+          and(
+            eq(communityContents.authorId, actorId),
+            inArray(communityContents.kind, ["THREAD", "REPLY"]),
+            query.cursor
+              ? lt(communityContents.id, query.cursor.id)
+              : undefined,
+          ),
+        )
+        .orderBy(desc(communityContents.id))
+        .limit(L.pageSize)
+        .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+      return { items: rows.map(ownedMetadata), pageSize: L.pageSize };
+    });
+  });
+}
+export async function getOwnedCommunityContent(
+  workInput: string,
+  targetInput: string,
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await verified(headers);
+    await actorBudget(principal, `community.ownread:${principal.user.id}`, 60);
+    const workId = communityUuidSchema.parse(workInput),
+      targetId = communityUuidSchema.parse(targetInput);
+    const query = communityOwnedDetailQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const [row] = await tx
+        .select(ownedMetadataColumns())
+        .from(communityContents)
+        .innerJoin(works, eq(works.id, communityContents.workId))
+        .where(
+          and(
+            eq(communityContents.id, targetId),
+            eq(communityContents.workId, workId),
+            eq(communityContents.authorId, actorId),
+            eq(communityContents.kind, query.contentKind),
+          ),
+        );
+      if (!row) throw missing();
+      return ownedMetadata(row);
+    });
   });
 }
 // Report/context/history remain private, signed and role-rechecked. No catalog title/private-library query.

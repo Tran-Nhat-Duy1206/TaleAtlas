@@ -85,6 +85,13 @@
       "when": 1791779213928,
       "tag": "0011_community_actor_budget_erasure",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1791815712634,
+      "tag": "0012_community_owned_read_erasure",
+      "breakpoints": true
     }
   ]
 }

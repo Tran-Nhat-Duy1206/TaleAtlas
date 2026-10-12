@@ -84,6 +84,21 @@ export function projectCommunityContent(
     lastActivityAt: live ? (row.lastActivityAt?.toISOString() ?? null) : null,
   };
 }
+/** Verified-owner management metadata only: never authored text or unavailable catalog facts. */
+export type CommunityOwnedDTO = {
+  id: string;
+  workId: string;
+  kind: "THREAD" | "REPLY";
+  threadId: string | null;
+  parentId: string | null;
+  depth: number | null;
+  revision: number;
+  authorState: CommunityContentRow["authorState"];
+  moderationState: CommunityContentRow["moderationState"];
+  workAvailable: boolean;
+  canEdit: boolean;
+  canWithdraw: boolean;
+};
 export type CommunityRevealDTO = {
   id: string;
   workId: string;

@@ -17,6 +17,7 @@
     "tests/**/*.tsx",
     "scripts/**/*.ts",
     "vitest*.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.community.config.ts"
   ]
 }

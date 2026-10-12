@@ -275,6 +275,14 @@ export const communityQuerySchema = guarded(
         c.addIssue({ code: "custom", message: "Choose page or keyset" });
     }),
 );
+/** Owner management has no authored dates; its stable keyset is UUID-descending only. */
+export const communityOwnedQuerySchema = communityQuerySchema.refine(
+  (value) => value.cursor === undefined || value.cursor.timestamp === null,
+  "Owner cursor must not contain an authored timestamp",
+);
+export const communityOwnedDetailQuerySchema = guarded(
+  z.object({ contentKind: z.enum(["THREAD", "REPLY"]) }).strict(),
+);
 const commandSchemas = [
   z.object({ kind: z.literal("CREATE_THREAD"), input: threadCreate }).strict(),
   z.object({ kind: z.literal("CREATE_REPLY"), input: replyCreate }).strict(),
