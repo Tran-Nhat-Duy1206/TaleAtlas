@@ -392,7 +392,12 @@ test("private UUID-only withdrawal after unpublication never reveals catalog fac
       { timeout: 30_000 },
     );
     expect(meta.status()).toBe(200);
-    expect(meta.headers()["cache-control"]).toBe("no-store");
+    const cacheDirectives = meta
+      .headers()
+      ["cache-control"]!.split(",")
+      .map((value) => value.trim().toLowerCase());
+    expect(cacheDirectives).toContain("no-store");
+    expect(cacheDirectives).not.toContain("public");
     expect(meta.headers()["x-robots-tag"]).toBe("noindex");
     await page.getByLabel(t.withdrawAck, { exact: true }).check();
     const withdrawn = await mutation(

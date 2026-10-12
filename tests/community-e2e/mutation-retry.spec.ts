@@ -46,14 +46,16 @@ test("actual committed lost response replays one frozen payload, and stale repla
       title = `Explicit frozen public title ${f.run}`,
       body = `Explicit synthetic public submission ${f.run}`;
     await create.getByLabel(t.title, { exact: true }).fill(title);
-    await create.getByLabel(t.body, { exact: true }).fill(body);
+    await create.getByRole("textbox", { name: t.body, exact: true }).fill(body);
     await create.getByLabel(t.intent, { exact: true }).check();
     await create.getByRole("button", { name: t.submit, exact: true }).click();
     await expect(
       create.getByRole("button", { name: t.retry, exact: true }),
     ).toBeVisible();
     await expect(create.getByLabel(t.title, { exact: true })).toBeDisabled();
-    await expect(create.getByLabel(t.body, { exact: true })).toBeDisabled();
+    await expect(
+      create.getByRole("textbox", { name: t.body, exact: true }),
+    ).toBeDisabled();
     expect(committedId).toBeTruthy();
     expect(bodies).toHaveLength(1);
     expect(
@@ -98,7 +100,9 @@ test("actual committed lost response replays one frozen payload, and stale repla
     await card.getByRole("button", { name: t.edit, exact: true }).click();
     const editor = card.getByRole("form", { name: t.replacement, exact: true });
     await expect(editor.getByLabel(t.title, { exact: true })).toHaveValue("");
-    await expect(editor.getByLabel(t.body, { exact: true })).toHaveValue("");
+    await expect(
+      editor.getByRole("textbox", { name: t.body, exact: true }),
+    ).toHaveValue("");
     const currentTitle = `Concurrent current revision ${f.run}`,
       currentBody = `Synthetic current public body ${f.run}`;
     const changed = await page.request.patch(
