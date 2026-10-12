@@ -10,6 +10,7 @@ export default defineConfig({
     "./src/edit-suggestion-schema.ts",
     "./src/release-schema.ts",
     "./src/library-schema.ts",
+    "./src/community-schema.ts",
   ],
   out: "./drizzle",
   ...((process.env.DATABASE_URL_DIRECT ?? process.env.DATABASE_URL)

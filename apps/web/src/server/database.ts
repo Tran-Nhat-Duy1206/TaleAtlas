@@ -5,6 +5,7 @@ import {
 } from "@taleatlas/database/client";
 import { getDatabaseEnv } from "./env";
 import { logServerError } from "./logger";
+import { isCommunityEnabled } from "./community/gate";
 
 let connection: DatabaseConnection | undefined;
 export function getDatabaseConnection() {
@@ -67,12 +68,33 @@ export async function checkDatabaseHealth(
             and not p.prosecdef and p.proconfig is null
         )) as library_erasure_ready
     `;
-    const rows = await Promise.race([
-      query,
+    // Disabled V4 has no schema dependency; enabled readiness must verify privacy infrastructure too.
+    const communityQuery = isCommunityEnabled()
+      ? getDatabaseConnection().client`
+      select
+        (select concat(id::text,work_id::text,kind::text,author_state::text,moderation_state::text,revision::text,body_spoiler::text) from community_contents limit 0),
+        (select concat(content_id::text,actor_id,content_revision::text,command::text) from community_content_events limit 0),
+        (select concat(content_id::text,work_id::text,target_kind::text,reporter_id,state::text,revision::text,evidence_redacted::text) from community_reports limit 0),
+        (select concat(content_id::text,work_id::text,target_kind::text,actor_id,report_id::text,evidence_redacted::text) from community_moderation_actions limit 0),
+        (select concat(content_id::text,work_id::text,target_kind::text,actor_id,mutation_key::text,request_hash,report_id::text) from community_mutation_receipts limit 0),
+        (select count(*)=5 from pg_catalog.pg_trigger t join pg_catalog.pg_proc p on p.oid=t.tgfoid
+          where not t.tgisinternal and t.tgenabled in ('O','A') and not p.prosecdef
+          and (t.tgname,t.tgrelid,p.proname) in (
+            ('community_content_scope_and_erasure','public.community_contents'::regclass,'community_content_scope_and_erasure'),
+            ('community_report_erasure_redact_actions','public.community_reports'::regclass,'community_report_erasure_redact_actions'),
+            ('community_reports_erased_target_evidence','public.community_reports'::regclass,'community_erased_target_evidence'),
+            ('community_actions_erased_target_evidence','public.community_moderation_actions'::regclass,'community_erased_target_evidence'),
+            ('community_user_erasure_budgets','public.users'::regclass,'community_user_erasure_budgets')
+          )) as community_erasure_ready
+    `
+      : null;
+    const [rows, communityRows] = await Promise.race([
+      Promise.all([query, communityQuery ?? Promise.resolve(null)]),
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           try {
             query.cancel();
+            communityQuery?.cancel();
           } catch {
             /* Cancellation must not bypass timeout handling. */
           }
@@ -82,6 +104,12 @@ export async function checkDatabaseHealth(
     ]);
     if (rows[0]?.library_erasure_ready !== true) {
       throw new Error("Required private-library erasure migration unavailable");
+    }
+    if (
+      communityQuery &&
+      communityRows?.[0]?.community_erasure_ready !== true
+    ) {
+      throw new Error("Required community privacy migration unavailable");
     }
     return { status: "ok" };
   } catch (error) {

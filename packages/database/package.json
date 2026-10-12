@@ -14,7 +14,9 @@
     "./edit-suggestions": "./src/edit-suggestion-schema.ts",
     "./releases": "./src/release-schema.ts",
     "./library": "./src/library-schema.ts",
-    "./library-types": "./src/library-types.ts"
+    "./library-types": "./src/library-types.ts",
+    "./community": "./src/community-schema.ts",
+    "./community-types": "./src/community-types.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",

@@ -5,6 +5,9 @@ const port = Number(process.env.E2E_PORT ?? "3000");
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
   throw new Error("Invalid isolated E2E port");
 const origin = `http://127.0.0.1:${port}`;
+const smtpPort = Number(process.env.TEST_SMTP_PORT ?? "1025");
+if (!Number.isInteger(smtpPort) || smtpPort < 1024 || smtpPort > 65535)
+  throw new Error("Invalid isolated E2E SMTP port");
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -33,7 +36,7 @@ export default defineConfig({
         BETTER_AUTH_SECRET: "synthetic-e2e-secret-not-production-123456789",
         APP_ORIGIN: origin,
         SMTP_HOST: "127.0.0.1",
-        SMTP_PORT: "1025",
+        SMTP_PORT: String(smtpPort),
         SMTP_FROM: "TaleAtlas <test@example.invalid>",
         SMTP_SECURE: "false",
       },
