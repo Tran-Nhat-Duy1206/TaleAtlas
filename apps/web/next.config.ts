@@ -7,7 +7,9 @@ const config: NextConfig = {
   // Multi-page workflows should not continuously evict/recompile inactive dev routes.
   // This affects development compilation only, not data caching or production behavior.
   onDemandEntries: { maxInactiveAge: 300_000, pagesBufferLength: 32 },
-  serverExternalPackages: ["pino", "postgres", "nodemailer"],
+  // Keep the server-only ORM and its subpaths in Node, alongside the SQL driver.
+  // Database workspace TypeScript and complete schema registration still transpile.
+  serverExternalPackages: ["pino", "postgres", "nodemailer", "drizzle-orm"],
   async headers() {
     return [
       {
