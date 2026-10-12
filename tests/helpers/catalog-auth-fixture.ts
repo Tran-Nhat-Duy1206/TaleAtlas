@@ -37,6 +37,10 @@ export function catalogAuthFixture() {
     sourceLabel,
     origin,
     users,
+    // Read-only copy of actual local SMTP captures for verified account-deletion tests.
+    get messages(): readonly string[] {
+      return [...messages];
+    },
     async start() {
       requireTestDatabase();
       await new Promise<void>((resolve) =>

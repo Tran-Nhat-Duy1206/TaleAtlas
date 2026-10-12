@@ -12,6 +12,7 @@ import { informationalUrlSchema } from "../../../../features/catalog/contracts";
 import { getWorkBySlug } from "../../../../server/catalog/service";
 import { CatalogError } from "../../../../server/catalog/errors";
 import { WorkCover } from "../../../../components/catalog/WorkCover";
+import { OwnWorkLibrary } from "../../../../components/library/OwnWorkLibrary";
 import { publicCopy } from "../../../../components/catalog/query";
 import styles from "../../../../components/catalog/catalog.module.css";
 export const dynamic = "force-dynamic";
@@ -90,7 +91,9 @@ export default async function WorkPage({ params }: Props) {
   return (
     <section className={styles.catalog}>
       <Link href={`/${locale}/works`}>{t.back}</Link>
-      <Link href={`/${locale}/works/${encodeURIComponent(work.slug)}/suggest-edit`}>
+      <Link
+        href={`/${locale}/works/${encodeURIComponent(work.slug)}/suggest-edit`}
+      >
         {locale === "vi" ? "Đề xuất chỉnh sửa" : "Suggest a correction"}
       </Link>
       <header className={styles.detailHero}>
@@ -124,6 +127,12 @@ export default async function WorkPage({ params }: Props) {
           </dl>
         </div>
       </header>
+      <OwnWorkLibrary
+        key={work.id}
+        workId={work.id}
+        locale={locale}
+        slug={work.slug}
+      />
       <div className={styles.detailSections}>
         <section className={`feature ${styles.section}`}>
           <h2>{t.descriptions}</h2>

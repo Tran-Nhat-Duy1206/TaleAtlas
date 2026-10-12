@@ -1,0 +1,81 @@
+.reading {
+  margin-block: 1.5rem;
+  min-width: 0;
+}
+.reading fieldset {
+  margin-block: 1rem;
+  padding: 1rem;
+  border: 1px solid #888;
+  border-radius: 0.5rem;
+  min-width: 0;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: 1rem;
+}
+.grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.grid input,
+.grid select,
+.grid textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  font: inherit;
+}
+.grid textarea {
+  min-height: 6rem;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.reading button {
+  min-height: 2.75rem;
+  padding: 0.5rem 1rem;
+  margin: 0.25rem;
+  font: inherit;
+}
+.reading input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-inline-end: 0.5rem;
+}
+.reading :focus-visible {
+  outline: 3px solid #427bd1;
+  outline-offset: 3px;
+}
+.reading li {
+  margin-block: 1rem;
+  overflow-wrap: anywhere;
+}
+.reading dt {
+  font-weight: 600;
+}
+.reading dd {
+  margin-inline-start: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 32rem) {
+  .reading fieldset {
+    padding: 0.65rem;
+  }
+  .actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .reading button {
+    max-width: 100%;
+  }
+}

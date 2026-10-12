@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useState, useSyncExternalStore, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
@@ -12,13 +12,28 @@ export type AuthMode =
   | "forgot-password"
   | "reset-password"
   | "verify-email";
+// SSR controls stay disabled until React has installed the submit handler.
+// Stable external-store snapshots avoid effect-driven readiness or fabricated auth.
+const subscribeToHydration = () => () => {};
+const clientHydrated = () => true;
+const serverHydrated = () => false;
 export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    clientHydrated,
+    serverHydrated,
+  );
   const t = dictionary(locale),
     router = useRouter(),
     search = useSearchParams();
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [success, setSuccess] = useState("");
+  const continuation = requestSignInReturn(search.get("callbackURL"), locale);
+  const continuationSuffix =
+    continuation === `/${locale}/settings`
+      ? ""
+      : `?callbackURL=${encodeURIComponent(continuation)}`;
   const token = search.get("token");
   const verified =
     mode === "verify-email" &&
@@ -46,6 +61,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
             : t.verifyIntro;
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!hydrated || busy) return;
     setError("");
     setSuccess("");
     const data = new FormData(e.currentTarget),
@@ -68,7 +84,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
     setBusy(true);
     try {
       let result;
-      const callback = `${window.location.origin}/${locale}/verify-email?verified=1`;
+      const callback = `${window.location.origin}/${locale}/verify-email?verified=1${continuationSuffix ? `&callbackURL=${encodeURIComponent(continuation)}` : ""}`;
       if (mode === "login")
         result = await authClient.signIn.email({
           email,
@@ -86,7 +102,7 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
       else if (mode === "forgot-password")
         result = await authClient.requestPasswordReset({
           email,
-          redirectTo: `${window.location.origin}/${locale}/reset-password`,
+          redirectTo: `${window.location.origin}/${locale}/reset-password${continuationSuffix}`,
         });
       else if (mode === "reset-password") {
         if (!token) {
@@ -121,7 +137,8 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
         // The destination navigation already fetches fresh authenticated server data.
         // Refreshing before replace commits races/cancels its RSC stream.
         router.replace(requestSignInReturn(search.get("callbackURL"), locale));
-      } else if (mode === "register") router.push(`/${locale}/verify-email`);
+      } else if (mode === "register")
+        router.push(`/${locale}/verify-email${continuationSuffix}`);
       else
         setSuccess(
           mode === "forgot-password"
@@ -156,7 +173,10 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
             <p className="notice success" role="status">
               {t.verified}
             </p>
-            <Link className="button primary" href={`/${locale}/login`}>
+            <Link
+              className="button primary"
+              href={`/${locale}/login${continuationSuffix}`}
+            >
               {t.login}
             </Link>
           </>
@@ -167,129 +187,157 @@ export function AuthForm({ locale, mode }: { locale: Locale; mode: AuthMode }) {
             </p>
             <Link
               className="button primary"
-              href={`/${locale}/forgot-password`}
+              href={`/${locale}/forgot-password${continuationSuffix}`}
             >
               {t.sendReset}
             </Link>
           </>
         ) : (
-          <form onSubmit={submit} aria-busy={busy}>
-            {mode === "verify-email" && search.get("error") && (
-              <p className="notice error" role="alert">
-                {t.verificationFailed}
-              </p>
-            )}
-            {mode === "register" && (
-              <label>
-                {t.name}
-                <input
-                  name="name"
-                  autoComplete="name"
-                  required
-                  maxLength={100}
-                />
-              </label>
-            )}
-            {hasEmail && (
-              <label>
-                {t.email}
-                <input
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  maxLength={254}
-                />
-              </label>
-            )}
-            {hasPassword && (
-              <label>
-                {t.password}
-                <input
-                  name="password"
-                  aria-label={t.password}
-                  aria-describedby={
-                    mode === "login" ? undefined : "password-hint"
-                  }
-                  type="password"
-                  autoComplete={
-                    mode === "login" ? "current-password" : "new-password"
-                  }
-                  required
-                  minLength={mode === "login" ? 1 : 12}
-                  maxLength={128}
-                />
-                {mode !== "login" && (
-                  <small id="password-hint">{t.passwordHint}</small>
-                )}
-              </label>
-            )}
-            {(mode === "register" || mode === "reset-password") && (
-              <label>
-                {t.confirmPassword}
-                <input
-                  name="confirm"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={12}
-                  maxLength={128}
-                />
-              </label>
-            )}
-            {mode === "login" && (
-              <Link className="form-link" href={`/${locale}/forgot-password`}>
-                {t.forgot}
-              </Link>
-            )}
-            {error && (
-              <p className="notice error" role="alert">
-                {error}
-              </p>
-            )}
-            {success && (
-              <p className="notice success" role="status">
-                {success}
-              </p>
-            )}
-            <button
-              className="button primary full"
-              disabled={busy || (mode === "reset-password" && !!success)}
-              type="submit"
+          <form method="post" onSubmit={submit} aria-busy={!hydrated || busy}>
+            <fieldset
+              disabled={!hydrated || busy}
+              style={{
+                border: 0,
+                margin: 0,
+                padding: 0,
+                minWidth: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: "inherit",
+              }}
             >
-              {busy
-                ? t.working
-                : mode === "login"
-                  ? t.login
-                  : mode === "register"
-                    ? t.register
-                    : mode === "forgot-password"
-                      ? t.sendReset
-                      : mode === "reset-password"
-                        ? t.reset
-                        : t.resend}
-              <span aria-hidden="true">↗</span>
-            </button>
-            {mode === "login" && (
-              <Link className="form-link" href={`/${locale}/verify-email`}>
-                {t.resend}
-              </Link>
-            )}
-            {mode === "register" && <p className="form-note">{t.authNote}</p>}
+              {mode === "verify-email" && search.get("error") && (
+                <p className="notice error" role="alert">
+                  {t.verificationFailed}
+                </p>
+              )}
+              {mode === "register" && (
+                <label>
+                  {t.name}
+                  <input
+                    name="name"
+                    autoComplete="name"
+                    required
+                    maxLength={100}
+                  />
+                </label>
+              )}
+              {hasEmail && (
+                <label>
+                  {t.email}
+                  <input
+                    name="email"
+                    type="email"
+                    autoComplete="email"
+                    required
+                    maxLength={254}
+                  />
+                </label>
+              )}
+              {hasPassword && (
+                <label>
+                  {t.password}
+                  <input
+                    name="password"
+                    aria-label={t.password}
+                    aria-describedby={
+                      mode === "login" ? undefined : "password-hint"
+                    }
+                    type="password"
+                    autoComplete={
+                      mode === "login" ? "current-password" : "new-password"
+                    }
+                    required
+                    minLength={mode === "login" ? 1 : 12}
+                    maxLength={128}
+                  />
+                  {mode !== "login" && (
+                    <small id="password-hint">{t.passwordHint}</small>
+                  )}
+                </label>
+              )}
+              {(mode === "register" || mode === "reset-password") && (
+                <label>
+                  {t.confirmPassword}
+                  <input
+                    name="confirm"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={12}
+                    maxLength={128}
+                  />
+                </label>
+              )}
+              {mode === "login" && (
+                <Link
+                  className="form-link"
+                  href={`/${locale}/forgot-password${continuationSuffix}`}
+                >
+                  {t.forgot}
+                </Link>
+              )}
+              {error && (
+                <p className="notice error" role="alert">
+                  {error}
+                </p>
+              )}
+              {success && (
+                <p className="notice success" role="status">
+                  {success}
+                </p>
+              )}
+              <button
+                className="button primary full"
+                disabled={
+                  !hydrated || busy || (mode === "reset-password" && !!success)
+                }
+                type="submit"
+              >
+                {busy
+                  ? t.working
+                  : mode === "login"
+                    ? t.login
+                    : mode === "register"
+                      ? t.register
+                      : mode === "forgot-password"
+                        ? t.sendReset
+                        : mode === "reset-password"
+                          ? t.reset
+                          : t.resend}
+                <span aria-hidden="true">↗</span>
+              </button>
+              {mode === "login" && (
+                <Link
+                  className="form-link"
+                  href={`/${locale}/verify-email${continuationSuffix}`}
+                >
+                  {t.resend}
+                </Link>
+              )}
+              {mode === "register" && <p className="form-note">{t.authNote}</p>}
+            </fieldset>
           </form>
         )}
         <div className="auth-bottom">
           {mode === "login" ? (
             <>
               {t.noAccount}{" "}
-              <Link href={`/${locale}/register`}>{t.register}</Link>
+              <Link href={`/${locale}/register${continuationSuffix}`}>
+                {t.register}
+              </Link>
             </>
           ) : mode === "register" ? (
             <>
-              {t.hasAccount} <Link href={`/${locale}/login`}>{t.login}</Link>
+              {t.hasAccount}{" "}
+              <Link href={`/${locale}/login${continuationSuffix}`}>
+                {t.login}
+              </Link>
             </>
           ) : (
-            <Link href={`/${locale}/login`}>{t.backLogin}</Link>
+            <Link href={`/${locale}/login${continuationSuffix}`}>
+              {t.backLogin}
+            </Link>
           )}
         </div>
       </div>

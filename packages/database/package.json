@@ -12,7 +12,9 @@
     "./ingestion": "./src/ingestion-schema.ts",
     "./ingestion-types": "./src/ingestion-types.ts",
     "./edit-suggestions": "./src/edit-suggestion-schema.ts",
-    "./releases": "./src/release-schema.ts"
+    "./releases": "./src/release-schema.ts",
+    "./library": "./src/library-schema.ts",
+    "./library-types": "./src/library-types.ts"
   },
   "scripts": {
     "generate": "drizzle-kit generate",
