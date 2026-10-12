@@ -17,6 +17,11 @@ test("actual committed lost response replays one frozen payload, and stale repla
   const path = `/api/community/works/${f.work.id}/threads`,
     bodies: string[] = [];
   let committedId: string | undefined;
+  const documentStatuses = new Map<string, number>();
+  page.on("response", (response) => {
+    if (response.request().resourceType() === "document")
+      documentStatuses.set(new URL(response.url()).pathname, response.status());
+  });
   try {
     await page.route(`**${path}`, async (route) => {
       if (route.request().method() !== "POST") {
@@ -95,6 +100,11 @@ test("actual committed lost response replays one frozen payload, and stale repla
     await page
       .getByRole("link", { name: t.openDiscussion, exact: true })
       .click();
+    expect(
+      documentStatuses.get(
+        `/en/works/${f.work.slug}/discussions/${committedId!}`,
+      ),
+    ).toBe(200);
     const card = page.locator("article").first();
     await card.getByRole("button", { name: t.checkOwner, exact: true }).click();
     await card.getByRole("button", { name: t.edit, exact: true }).click();

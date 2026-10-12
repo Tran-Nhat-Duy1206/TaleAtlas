@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { discussionListResponseSchema } from "../../features/community/http-contracts";
 import { communityUuidSchema } from "../../features/community/contracts";
 import type { Locale } from "../../lib/i18n";
@@ -112,12 +111,13 @@ function ScopedThreadList({
             ownerControls={participation === "VERIFIED"}
             onRefresh={() => reload()}
           />
-          <Link
-            prefetch={false}
+          {/* Cross a fresh document/SSR boundary before interaction. No prefetch,
+              reused reveal cache or intermediate client-transition owner state. */}
+          <a
             href={`/${locale}/works/${encodeURIComponent(workSlug)}/discussions/${content.id}`}
           >
             {t.openDiscussion}
-          </Link>
+          </a>
         </div>
       ))}
       <Pagination

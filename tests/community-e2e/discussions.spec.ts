@@ -42,6 +42,14 @@ for (const locale of ["en", "vi"] as const) {
       contextMarker = `hidden-context-${f.run}`;
     const title = `<img src=x> ${titleMarker}`,
       body = `<script>window.__COMMUNITY_UNSAFE__=true</script> ${bodyMarker}`;
+    const documentStatuses = new Map<string, number>();
+    page.on("response", (response) => {
+      if (response.request().resourceType() === "document")
+        documentStatuses.set(
+          new URL(response.url()).pathname,
+          response.status(),
+        );
+    });
     let revealRequests = 0;
     page.on("request", (r) => {
       if (new URL(r.url()).pathname.endsWith("/reveal")) revealRequests++;
@@ -63,6 +71,9 @@ for (const locale of ["en", "vi"] as const) {
           exact: true,
         }),
       ).toBeVisible();
+      expect(
+        documentStatuses.get(`/${locale}/works/${f.work.slug}/discussions`),
+      ).toBe(200);
       await page
         .getByRole("button", { name: t.newThread, exact: true })
         .click();
@@ -109,6 +120,11 @@ for (const locale of ["en", "vi"] as const) {
           exact: true,
         }),
       ).toBeVisible();
+      expect(
+        documentStatuses.get(
+          `/${locale}/works/${f.work.slug}/discussions/${id}`,
+        ),
+      ).toBe(200);
       const ssr = await f.anonymous.request.get(
         `/${locale}/works/${f.work.slug}/discussions/${id}`,
         { timeout: 30_000 },
