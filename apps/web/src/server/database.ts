@@ -5,7 +5,7 @@ import {
 } from "@taleatlas/database/client";
 import { getDatabaseEnv } from "./env";
 import { logServerError } from "./logger";
-import { isCommunityEnabled } from "./community/gate";
+import { isCommunityEnabled } from "./community/availability";
 
 let connection: DatabaseConnection | undefined;
 export function getDatabaseConnection() {

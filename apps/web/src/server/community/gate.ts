@@ -1,12 +1,8 @@
 import "server-only";
 import { HttpError } from "../http";
 
-/** Server authority only. Never infer enablement from a client flag. */
-export function isCommunityEnabled(
-  environment: Readonly<Record<string, string | undefined>> = process.env,
-): boolean {
-  return environment.V4_COMMUNITIES_ENABLED === "true";
-}
+import { isCommunityEnabled } from "./availability";
+export { isCommunityEnabled } from "./availability";
 
 /** Call before reading a payload, authenticating, or accessing community storage. */
 export function requireCommunityEnabled(
