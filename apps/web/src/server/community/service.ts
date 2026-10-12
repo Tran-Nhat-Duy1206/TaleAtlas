@@ -109,11 +109,42 @@ async function verified(
   return principal;
 }
 // Additional atomic DB-clock buckets never replace/reset the frozen shared30/min.
-async function narrowBudget(actor: string, bucket: Bucket) {
-  await rateBudget(
-    `community.${bucket}:${actor}`,
+async function narrowBudget(
+  principal: Principal,
+  bucket: Bucket,
+  moderation: boolean,
+) {
+  await actorBudget(
+    principal,
+    `community.${bucket}:${principal.user.id}`,
     bucket === "post" ? 5 : bucket === "report" ? 3 : 10,
+    moderation,
   );
+}
+async function actorBudget(
+  principal: Principal,
+  key: string,
+  ceiling: number,
+  moderation = false,
+) {
+  // Serialize identity-bearing keys with root users deletion; a stale session cannot recreate them.
+  const count = await getDatabase().transaction(async (tx) => {
+    await lockPrincipal(tx, principal, moderation);
+    const rows = await tx.execute(sql`
+      with budget_clock as materialized (select (extract(epoch from clock_timestamp()) * 1000)::bigint as at)
+      insert into rate_limits (id, key, count, last_request)
+      select ${crypto.randomUUID()}, ${key}, 1, at from budget_clock where true
+      on conflict (key) do update set
+        count = case when rate_limits.last_request < (select at from budget_clock) - 60000 then 1 else rate_limits.count + 1 end,
+        last_request = case when rate_limits.last_request < (select at from budget_clock) - 60000 then (select at from budget_clock) else rate_limits.last_request end
+      returning count`);
+    const value = Number(rows[0]?.count);
+    if (!Number.isSafeInteger(value) || value < 1)
+      throw new Error("Invalid actor budget result");
+    return value;
+  });
+  // Rejection must not roll back the charged attempt or weaken additional buckets.
+  if (count > ceiling) throw new HttpError(429, "RATE_LIMITED");
 }
 async function rateBudget(key: string, ceiling: number) {
   const rows = await getDatabaseConnection().client<{ count: number }[]>`
@@ -155,7 +186,7 @@ async function command<T>(
 ) {
   const principal = await verified(headers, moderation);
   await limitCatalogMutation(principal.user.id);
-  await narrowBudget(principal.user.id, bucket);
+  await narrowBudget(principal, bucket, moderation);
   // Direct service calls cannot skip Origin even when the route uses a lazy parser.
   requireTrustedOrigin(new Request(getAuthEnv().APP_ORIGIN, { headers }));
   return {
@@ -1035,7 +1066,12 @@ export async function communityModerationContext(
 ) {
   return safe(async () => {
     const principal = await verified(headers, true);
-    await rateBudget(`community.modread:${principal.user.id}`, 60);
+    await actorBudget(
+      principal,
+      `community.modread:${principal.user.id}`,
+      60,
+      true,
+    );
     const workId = communityUuidSchema.parse(workInput),
       targetId = communityUuidSchema.parse(targetInput);
     return getDatabase().transaction(async (tx) => {
