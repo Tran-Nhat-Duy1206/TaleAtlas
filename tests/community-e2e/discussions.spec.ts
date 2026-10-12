@@ -179,15 +179,22 @@ for (const locale of ["en", "vi"] as const) {
       async function reply(
         text: string,
         nested: boolean,
-        last = false,
         spoiler = false,
+        parentText?: string,
       ) {
-        await page
+        // Replies are newest-first: bind the chosen ancestor, never a visual order.
+        const scope = parentText
+          ? page
+              .locator("article")
+              .filter({ has: page.getByText(parentText, { exact: true }) })
+              .locator("..")
+          : page;
+        await scope
           .getByRole("button", {
             name: nested ? t.nestedReply : t.reply,
             exact: true,
           })
-          [last ? "last" : "first"]()
+          .first()
           .click();
         const replyForm = page.getByRole("form", {
           name: t.reply,
@@ -208,7 +215,7 @@ for (const locale of ["en", "vi"] as const) {
         );
       }
       const childMarker = `independent-child-${f.run}`;
-      const root = await reply(childMarker, false, false, true);
+      const root = await reply(childMarker, false, true);
       expect(root.content.depth).toBe(0);
       const nested = await reply(
         `Visible synthetic nested reply ${f.run}`,
@@ -221,7 +228,8 @@ for (const locale of ["en", "vi"] as const) {
       const deepest = await reply(
         `Visible synthetic deepest reply ${f.run}`,
         true,
-        true,
+        false,
+        `Visible synthetic nested reply ${f.run}`,
       );
       expect(deepest.content).toMatchObject({
         depth: 2,

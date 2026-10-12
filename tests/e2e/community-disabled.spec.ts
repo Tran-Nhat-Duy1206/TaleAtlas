@@ -28,7 +28,12 @@ test("default-off EN/VI canonical works have no community link and every dedicat
         `/${locale}/works/${fixture.work.slug}/discussions/${randomUUID()}`,
         `/${locale}/community/manage`,
       ]) {
-        expect((await page.goto(path))?.status()).toBe(404);
+        // Assert the actual HTTP/SSR boundary independently of client navigation.
+        // The rejected document probe aborted; a separate real HTTP probe stayed404.
+        const blocked = await page.request.get(path, { timeout: 30_000 });
+        expect(blocked.status()).toBe(404);
+        expect(blocked.headers()["content-type"]).toContain("text/html");
+        expect(await blocked.text()).toContain("404");
       }
     }
     const denied = await fixture.admin.request.post(
