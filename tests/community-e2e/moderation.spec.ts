@@ -97,16 +97,28 @@ for (const locale of ["en", "vi"] as const) {
       title,
       context,
     ];
+    const publicAuthorDisplayName = `Synthetic ${f.run}`;
+    const publishedCatalogTitle = `Synthetic public work ${f.run}`;
     const privateMarkers = [
       ...authoredMarkers,
       explanation,
       hideReason,
       privateNote,
-      `Synthetic ${f.run}`,
+      publicAuthorDisplayName,
       f.owner!.email,
       f.work.slug,
-      `Synthetic public work ${f.run}`,
+      publishedCatalogTitle,
     ];
+    // Accepted public DTOs deliberately expose the live author's display name,
+    // even while title/body/context are masked. Email and private narratives do not.
+    const publicMaskedMarkers = privateMarkers.filter(
+      (marker) => marker !== publicAuthorDisplayName,
+    );
+    // Published document ingress may also contain catalog titles and same-origin
+    // catalog links. These are not private target-evidence or library values.
+    const publicDocumentMarkers = publicMaskedMarkers.filter(
+      (marker) => marker !== f.work.slug && marker !== publishedCatalogTitle,
+    );
     const contentsRoot = `/api/community/works/${f.work.id}/contents`;
     const reviewRoot = `/api/community/works/${f.work.id}/reviews`;
     const threadRoot = `/api/community/works/${f.work.id}/threads`;
@@ -145,8 +157,14 @@ for (const locale of ["en", "vi"] as const) {
         if (path.endsWith("/reveal")) publicReveals++;
       });
     }
-    function absent(text: string, markers = privateMarkers) {
+    function assertNoMarkers(text: string, markers: readonly string[]) {
       for (const marker of markers) expect(text).not.toContain(marker);
+    }
+    function assertPrivateMetadata(text: string) {
+      assertNoMarkers(text, privateMarkers);
+    }
+    function assertPublicMaskedDocument(text: string) {
+      assertNoMarkers(text, publicDocumentMarkers);
     }
     async function targetMetadata(target: Target) {
       const response = await f.admin.request.get(
@@ -154,7 +172,7 @@ for (const locale of ["en", "vi"] as const) {
         { timeout: 30_000 },
       );
       expect(response.status()).toBe(200);
-      absent(await response.text());
+      assertPrivateMetadata(await response.text());
       const result = moderationTargetSchema.parse(await response.json());
       expect(result).toMatchObject({
         id: target.id,
@@ -169,8 +187,18 @@ for (const locale of ["en", "vi"] as const) {
         { timeout: 30_000 },
       );
       expect(response.status()).toBe(200);
-      absent(await response.text());
-      return reviewListResponseSchema.parse(await response.json());
+      assertNoMarkers(await response.text(), publicMaskedMarkers);
+      const result = reviewListResponseSchema.parse(await response.json());
+      for (const item of result.items) {
+        expect(item).toMatchObject({
+          state: "ACTIVE",
+          body: { state: "MASKED", text: null },
+          spoilerContext: null,
+          ratingHalfStars: 8,
+        });
+        expect(item.author).toEqual({ displayName: publicAuthorDisplayName });
+      }
+      return result;
     }
     async function queue(state: "OPEN" | "DISMISSED" | "UPHELD") {
       const response = await f.admin.request.get(
@@ -180,7 +208,7 @@ for (const locale of ["en", "vi"] as const) {
       expect(response.status()).toBe(200);
       expect(response.headers()["cache-control"]).toContain("no-store");
       expect(response.headers()["x-robots-tag"]).toBe("noindex");
-      absent(await response.text());
+      assertPrivateMetadata(await response.text());
       return moderationQueueResponseSchema.parse(await response.json());
     }
     async function selectReport(
@@ -199,7 +227,7 @@ for (const locale of ["en", "vi"] as const) {
               .getByRole("button", { name: t.refresh, exact: true })
               .click(),
         );
-        absent(await response.text());
+        assertPrivateMetadata(await response.text());
         const data = moderationQueueResponseSchema.parse(await response.json());
         expect(
           data.items.some(
@@ -287,6 +315,33 @@ for (const locale of ["en", "vi"] as const) {
         revision: input.expectedRevision,
         selection,
       });
+      // Only the deliberately selected fixture field may cross this private
+      // evidence boundary. The marker exclusions are fixed by selection/scope,
+      // never inferred from whatever text the response happened to contain.
+      const selectedMarkers =
+        result.state !== "AVAILABLE"
+          ? []
+          : selection === "TITLE"
+            ? [title]
+            : selection === "BODY"
+              ? [
+                  target.kind === "THREAD"
+                    ? threadMarker
+                    : target.kind === "REPLY"
+                      ? replyMarker
+                      : reviewMarker,
+                ]
+              : selection === "SPOILER_CONTEXT"
+                ? [context]
+                : target.kind === "REVIEW" && selection === "REPORT"
+                  ? [explanation, reviewMarker]
+                  : target.kind === "REVIEW" && selection === "ACTION_REASON"
+                    ? [hideReason, reviewMarker]
+                    : [];
+      const unselectedMarkers = privateMarkers.filter(
+        (marker) => !selectedMarkers.includes(marker),
+      );
+      assertNoMarkers(await response.text(), unselectedMarkers);
       await expect(panel.getByLabel(t.reason, { exact: true })).toHaveValue("");
       await expect(
         panel.getByLabel(t.evidenceAck, { exact: true }),
@@ -294,6 +349,7 @@ for (const locale of ["en", "vi"] as const) {
       await expect(
         panel.getByLabel(t.revealAck, { exact: true }),
       ).not.toBeChecked();
+      assertNoMarkers(await f.admin.content(), unselectedMarkers);
       return result;
     }
     async function uiDecision(
@@ -384,7 +440,7 @@ for (const locale of ["en", "vi"] as const) {
         { timeout: 30_000 },
       );
       expect(response.status()).toBe(200);
-      absent(await response.text());
+      assertPrivateMetadata(await response.text());
       const result = ownedReportSchema.parse(await response.json());
       expect(result).toMatchObject({
         contentId: target.id,
@@ -459,7 +515,7 @@ for (const locale of ["en", "vi"] as const) {
             .getByRole("button", { name: t.refreshReport, exact: true })
             .click(),
       );
-      absent(await statusResponse.text());
+      assertPrivateMetadata(await statusResponse.text());
       expect(
         ownedReportSchema.parse(await statusResponse.json()),
       ).toMatchObject({
@@ -577,7 +633,7 @@ for (const locale of ["en", "vi"] as const) {
       expect(documents.get(`/${locale}/works/${f.work.slug}/discussions`)).toBe(
         200,
       );
-      absent(await page.content(), [...authoredMarkers, privateNote]);
+      assertPublicMaskedDocument(await page.content());
       await reportThroughUI(thread, page.locator("article").first(), "SPAM");
       await page
         .getByRole("link", { name: b.openDiscussion, exact: true })
@@ -601,7 +657,7 @@ for (const locale of ["en", "vi"] as const) {
         }),
         "HARASSMENT",
       );
-      absent(await page.content(), [...authoredMarkers, privateNote]);
+      assertPublicMaskedDocument(await page.content());
       await page.goto(`/${locale}/works/${f.work.slug}`);
       await page
         .getByRole("link", {
@@ -621,6 +677,7 @@ for (const locale of ["en", "vi"] as const) {
         "OTHER",
         explanation,
       );
+      assertPublicMaskedDocument(await page.content());
       expect(
         (
           await f.sql`select count(*)::int as count from library_entries where user_id=${f.owner!.id!}`
@@ -638,13 +695,13 @@ for (const locale of ["en", "vi"] as const) {
         "content",
         /noindex/,
       );
-      absent(await page.content());
+      assertPrivateMetadata(await page.content());
       const own = await page.request.get(
         `/api/community/reports/owned?locale=${locale}`,
         { timeout: 30_000 },
       );
       expect(own.status()).toBe(200);
-      absent(await own.text());
+      assertPrivateMetadata(await own.text());
       const ownReports = ownedReportListResponseSchema.parse(await own.json());
       expect(ownReports.items).toHaveLength(3);
       for (const target of [thread, reply, review])
@@ -690,7 +747,7 @@ for (const locale of ["en", "vi"] as const) {
         { timeout: 30_000 },
       );
       expect(initialSSR.status()).toBe(200);
-      absent(await initialSSR.text());
+      assertPrivateMetadata(await initialSSR.text());
       expect(await initialSSR.text()).not.toContain(f.work.slug);
       await f.admin.goto(`/${locale}/settings`);
       await f.admin
@@ -708,7 +765,7 @@ for (const locale of ["en", "vi"] as const) {
         "content",
         /noindex/,
       );
-      absent(await f.admin.content());
+      assertPrivateMetadata(await f.admin.content());
       expect(evidenceRequests).toBe(0);
       expect(privateReadRequests).toBe(0);
       expect(
@@ -753,7 +810,7 @@ for (const locale of ["en", "vi"] as const) {
         () =>
           panel.getByRole("button", { name: t.events, exact: true }).click(),
       );
-      absent(await eventsResponse.text());
+      assertPrivateMetadata(await eventsResponse.text());
       const events = moderationHistoryResponseSchema.parse(
         await eventsResponse.json(),
       );
@@ -985,7 +1042,7 @@ for (const locale of ["en", "vi"] as const) {
       await expect(
         page.getByRole("heading", { name: r.manage, level: 1, exact: true }),
       ).toBeVisible();
-      absent(await page.content());
+      assertPrivateMetadata(await page.content());
       await page.getByLabel(r.withdrawAck, { exact: true }).check();
       const withdrawal = await browserResponse(
         page,
@@ -1072,7 +1129,7 @@ for (const locale of ["en", "vi"] as const) {
         () =>
           panel.getByRole("button", { name: t.actions, exact: true }).click(),
       );
-      absent(await actionResponse.text());
+      assertPrivateMetadata(await actionResponse.text());
       const history = moderationHistoryResponseSchema.parse(
         await actionResponse.json(),
       );
@@ -1117,7 +1174,7 @@ for (const locale of ["en", "vi"] as const) {
         { timeout: 30_000 },
       );
       expect(erasedHistoryResponse.status()).toBe(200);
-      absent(await erasedHistoryResponse.text());
+      assertPrivateMetadata(await erasedHistoryResponse.text());
       const erasedHistory = moderationHistoryResponseSchema.parse(
         await erasedHistoryResponse.json(),
       );
@@ -1152,7 +1209,7 @@ for (const locale of ["en", "vi"] as const) {
           },
         );
         expect(response.status()).toBe(200);
-        absent(await response.text());
+        assertPrivateMetadata(await response.text());
         expect(
           moderationEvidenceResponseSchema.parse(await response.json()),
         ).toMatchObject({
@@ -1221,7 +1278,7 @@ for (const locale of ["en", "vi"] as const) {
       await expect(
         f.admin.getByText(t.deniedModeration, { exact: true }),
       ).toBeVisible();
-      absent(await f.admin.content());
+      assertPrivateMetadata(await f.admin.content());
       expect(publicReveals).toBe(0);
       expect(
         moderatorDiagnostics,
