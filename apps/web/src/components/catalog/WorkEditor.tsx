@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useClientReady } from "../useClientReady";
 import {
   WORK_FORMATS,
   WORK_VISIBILITIES,
@@ -50,6 +51,7 @@ export function WorkEditor({
   id?: string;
   revision?: number;
 }) {
+  const ready = useClientReady();
   const d = catalogDictionary(locale);
   const router = useRouter();
   const lock = useRef(false);
@@ -73,7 +75,7 @@ export function WorkEditor({
     relations: [],
   };
   async function submit(form: HTMLFormElement, visibilityOnly = false) {
-    if (lock.current || conflict) return;
+    if (!ready || lock.current || conflict) return;
     setMessage("");
     const data = new FormData(form);
     const value = (key: string) => String(data.get(key) ?? "");
@@ -196,7 +198,7 @@ export function WorkEditor({
         void submit(event.currentTarget);
       }}
     >
-      <fieldset disabled={busy || conflict}>
+      <fieldset disabled={!ready || busy || conflict}>
         <legend>{d.edit}</legend>
         <div className={styles.grid}>
           {field("primaryTitle", d.primaryTitle, defaults.primaryTitle, true)}
@@ -340,7 +342,10 @@ export function WorkEditor({
         <button
           type="button"
           className="button button-secondary"
-          onClick={() => window.location.reload()}
+          disabled={!ready}
+          onClick={() => {
+            if (ready) window.location.reload();
+          }}
         >
           {d.reload}
         </button>

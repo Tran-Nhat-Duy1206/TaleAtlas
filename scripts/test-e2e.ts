@@ -1,11 +1,24 @@
 import { spawn } from "node:child_process";
 import { requireTestDatabase } from "../tests/helpers/test-database";
 import { nativeChildNodeOptions } from "./native-child-options";
+import { nativeServerMode } from "./native-server-mode";
 
 // Every native phase uses the same explicitly guarded synthetic loopback DB.
 // No operator/hosted flag is changed: opt-in exists only in the child test server.
 requireTestDatabase();
 const nativeNodeOptions = nativeChildNodeOptions(process.env);
+const serverMode = nativeServerMode(process.env);
+const defaultConfig =
+  serverMode === "production"
+    ? "playwright.production.config.ts"
+    : "playwright.config.ts";
+const communityConfig =
+  serverMode === "production"
+    ? "playwright.community.production.config.ts"
+    : "playwright.community.config.ts";
+console.info(
+  `NATIVE SERVER MODE: ${serverMode}; original tests and deadlines unchanged`,
+);
 const args = process.argv.slice(2);
 async function phase(
   label: string,
@@ -29,7 +42,7 @@ async function phase(
       stdio: "inherit",
       env: {
         ...process.env,
-        NODE_ENV: "development",
+        NODE_ENV: serverMode,
         V4_COMMUNITIES_ENABLED: enabled ? "true" : "false",
         ...(nativeNodeOptions === undefined
           ? {}
@@ -52,22 +65,17 @@ if (args.length) {
   console.info(
     "Explicit CLI selection is diagnostic only; it does not run every mandatory native phase.",
   );
-  await phase(
-    "selected default-off diagnostic",
-    "playwright.config.ts",
-    false,
-    args,
-  );
+  await phase("selected default-off diagnostic", defaultConfig, false, args);
 } else if (
   await phase(
     "all original V0-V3 plus V4 disabled routes",
-    "playwright.config.ts",
+    defaultConfig,
     false,
   )
 ) {
   await phase(
     "all additive explicitly enabled V4 scenarios, retry0",
-    "playwright.community.config.ts",
+    communityConfig,
     true,
   );
 }
