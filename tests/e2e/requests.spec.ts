@@ -18,7 +18,7 @@ test("verified request ownership, reviewed equivalence, following and private li
   test.setTimeout(360_000);
   // Match the isolated port selected by the shared config: local 3010, CI 3000.
   expect(baseURL).toBe(
-    `http://127.0.0.1:${Number(process.env.E2E_PORT ?? "3000")}`,
+    `${process.env.TALEATLAS_TEST_NATIVE_SERVER_MODE === "production" ? "https" : "http"}://127.0.0.1:${Number(process.env.E2E_PORT ?? "3000")}`,
   );
   const { client: sql } = createDatabase(requireTestDatabase());
   const run = randomUUID();

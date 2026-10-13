@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import base from "./playwright.community.config";
-import { productionWebServers } from "./scripts/native-server-mode";
+import { productionNativeConfig } from "./scripts/native-server-mode";
 
-// Same complete enabled suite, masks, assertions and retry0; prebuilt server only.
-export default defineConfig({ ...base, webServer: productionWebServers(base) });
+// Same enabled suite and retry0, with only the owned web listener using HTTPS.
+export default defineConfig(productionNativeConfig(base));

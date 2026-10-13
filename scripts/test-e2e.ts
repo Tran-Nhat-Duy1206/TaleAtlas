@@ -2,12 +2,16 @@ import { spawn } from "node:child_process";
 import { requireTestDatabase } from "../tests/helpers/test-database";
 import { nativeChildNodeOptions } from "./native-child-options";
 import { nativeServerMode } from "./native-server-mode";
+import { prepareNativeProductionTls } from "./native-production-tls";
+import { dirname } from "node:path";
 
 // Every native phase uses the same explicitly guarded synthetic loopback DB.
 // No operator/hosted flag is changed: opt-in exists only in the child test server.
 requireTestDatabase();
 const nativeNodeOptions = nativeChildNodeOptions(process.env);
 const serverMode = nativeServerMode(process.env);
+const tls =
+  serverMode === "production" ? await prepareNativeProductionTls() : undefined;
 const defaultConfig =
   serverMode === "production"
     ? "playwright.production.config.ts"
@@ -17,7 +21,7 @@ const communityConfig =
     ? "playwright.community.production.config.ts"
     : "playwright.community.config.ts";
 console.info(
-  `NATIVE SERVER MODE: ${serverMode}; original tests and deadlines unchanged`,
+  `NATIVE SERVER MODE: ${serverMode}; complete suites and deadlines unchanged`,
 );
 const args = process.argv.slice(2);
 async function phase(
@@ -42,7 +46,15 @@ async function phase(
       stdio: "inherit",
       env: {
         ...process.env,
-        NODE_ENV: serverMode,
+        // SMTP/test fixtures retain the original environment; only web is production.
+        NODE_ENV: "development",
+        ...(tls
+          ? {
+              TALEATLAS_TEST_TLS_DIRECTORY: dirname(tls.certificatePath),
+              TALEATLAS_TEST_TLS_SPKI: tls.spki,
+              NODE_EXTRA_CA_CERTS: tls.caPath,
+            }
+          : {}),
         V4_COMMUNITIES_ENABLED: enabled ? "true" : "false",
         ...(nativeNodeOptions === undefined
           ? {}

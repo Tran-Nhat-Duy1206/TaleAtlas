@@ -1,6 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import base from "./playwright.config";
-import { productionWebServers } from "./scripts/native-server-mode";
+import { productionNativeConfig } from "./scripts/native-server-mode";
 
-// Maintainer-approved local production verification; original config untouched.
-export default defineConfig({ ...base, webServer: productionWebServers(base) });
+// Additive HTTPS verification; all original suite and fixture limits remain.
+export default defineConfig(productionNativeConfig(base));
