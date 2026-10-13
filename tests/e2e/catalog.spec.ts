@@ -75,7 +75,7 @@ test("real verified catalog administrator lifecycle, localization, guards and op
           .reverse()
           .find((m) => m.recipients.includes(account.email))
           ?.text.match(
-            /http:\/\/127\.0\.0\.1:\d+\/api\/auth\/verify-email[^\s<>]+/,
+            /https?:\/\/127\.0\.0\.1:\d+\/api\/auth\/verify-email[^\s<>]+/,
           )?.[0];
         return Boolean(link);
       })

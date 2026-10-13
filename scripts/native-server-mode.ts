@@ -10,7 +10,7 @@ export function nativeServerMode(
   throw new Error("Invalid isolated native server mode");
 }
 
-/** Preserve the original suites and fixtures; only the owned web listener changes. */
+/** Preserve suite limits; approved HTTPS web and STARTTLS inbox exceptions only. */
 export function productionNativeConfig(
   base: PlaywrightTestConfig,
   environment: Readonly<Record<string, string | undefined>> = process.env,
@@ -32,11 +32,26 @@ export function productionNativeConfig(
     ? base.webServer
     : [base.webServer];
   let replaced = 0;
+  let mailReplaced = 0;
   const webServer = servers.map((server) => {
     if (!server || typeof server.command !== "string")
       throw new Error("Original fixture server configuration required");
+    if (server.command === "node --import tsx scripts/test-mail.ts") {
+      if (
+        server.url !== "http://127.0.0.1:1026/health" ||
+        server.timeout !== 30000 ||
+        server.reuseExistingServer !== false
+      )
+        throw new Error("Original isolated mail fixture required");
+      mailReplaced++;
+      return {
+        ...server,
+        command: "node --import tsx scripts/test-production-mail.ts",
+        env: { ...server.env, NODE_ENV: "development" },
+      };
+    }
     if (!server.command.startsWith("pnpm --filter @taleatlas/web dev"))
-      return server;
+      throw new Error("Original isolated fixture commands required");
     if (
       server.command !==
       `pnpm --filter @taleatlas/web dev --hostname 127.0.0.1 --port ${port}`
@@ -52,6 +67,8 @@ export function productionNativeConfig(
   });
   if (replaced !== 1)
     throw new Error("Exactly one original isolated web server required");
+  if (mailReplaced !== 1)
+    throw new Error("Exactly one original isolated mail server required");
   return {
     ...base,
     use: {

@@ -110,14 +110,19 @@ describe("isolated native server mode", () => {
     ).toThrow("Invalid isolated native server mode");
   });
   it.each([false, true])(
-    "preserves every inherited setting and SMTP object, enabled=%s",
+    "preserves every inherited setting except approved STARTTLS inbox, enabled=%s",
     (enabled) => {
       const base = fixture(enabled);
       const before = structuredClone(base);
       const result = productionNativeConfig(base, environment);
       const originalServers = servers(base);
       const resultServers = servers(result);
-      expect(resultServers[0]).toBe(originalServers[0]);
+      expect(resultServers[0]).not.toBe(originalServers[0]);
+      expect(resultServers[0]).toEqual({
+        ...originalServers[0],
+        command: "node --import tsx scripts/test-production-mail.ts",
+        env: { ...originalServers[0].env, NODE_ENV: "development" },
+      });
       expect(resultServers[0].env?.NODE_ENV).toBe("development");
       expect(resultServers[1]).toEqual({
         ...originalServers[1],
@@ -236,11 +241,39 @@ describe("isolated native server mode", () => {
       "Exactly one original isolated web server required",
     );
   });
-  it("supports a single original web server object without mutation", () => {
+  it("rejects missing original mail fixture without mutation", () => {
     const base = fixture();
     base.webServer = servers(base)[1];
     const before = structuredClone(base);
-    expect(servers(productionNativeConfig(base, environment))).toHaveLength(1);
+    expect(() => productionNativeConfig(base, environment)).toThrow(
+      "Exactly one original isolated mail server required",
+    );
+    expect(base).toEqual(before);
+  });
+  it("rejects duplicate original mail fixtures", () => {
+    const base = fixture();
+    servers(base).push(servers(base)[0]);
+    expect(() => productionNativeConfig(base, environment)).toThrow(
+      "Exactly one original isolated mail server required",
+    );
+  });
+  it.each([
+    { command: "node --import tsx scripts/test-mail.ts --synthetic-secret" },
+    { command: "node --import tsx scripts/test-production-mail.ts" },
+    { url: "http://synthetic-secret@127.0.0.1:1026/health" },
+    { url: "http://127.0.0.1:1027/health" },
+    { timeout: 30001 },
+    { reuseExistingServer: true },
+  ])("rejects modified original mail fixtures", (changed) => {
+    const base = fixture();
+    Object.assign(servers(base)[0], changed);
+    rejectConfig(base);
+  });
+  it("rejects unknown extra fixture without changing base", () => {
+    const base = fixture();
+    servers(base).push({ command: "node synthetic-secret-extra-server" });
+    const before = structuredClone(base);
+    rejectConfig(base);
     expect(base).toEqual(before);
   });
   it("derives certificate paths within the owned metadata scope only", () => {
