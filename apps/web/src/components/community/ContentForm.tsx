@@ -18,6 +18,7 @@ import {
   mutationOptions,
   type FrozenMutation,
 } from "./client";
+import { useCommunityReady } from "./useCommunityReady";
 import styles from "./community.module.css";
 
 type Props = {
@@ -42,6 +43,7 @@ export function ContentForm({
   onComplete,
   onCancel,
 }: Props) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale],
     prefix = useId();
   // Intentionally blank, including when editing flagged content. No reveal cache/private data is consulted.
@@ -66,7 +68,7 @@ export function ContentForm({
     };
   }, []);
   async function send(attempt: FrozenMutation) {
-    if (inFlight.current) return;
+    if (!ready || inFlight.current) return;
     inFlight.current = true;
     setBusy(true);
     setMessage("");
@@ -131,7 +133,7 @@ export function ContentForm({
   }
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (inFlight.current || attemptRef.current) return;
+    if (!ready || inFlight.current || attemptRef.current) return;
     if (!intent || (editing && !replaceIntent)) {
       setMessage(t.invalid);
       return;
@@ -187,7 +189,10 @@ export function ContentForm({
       <h2>
         {editing ? t.replacement : kind === "THREAD" ? t.newThread : t.reply}
       </h2>
-      <fieldset disabled={busy || frozen !== null} className={styles.form}>
+      <fieldset
+        disabled={!ready || busy || frozen !== null}
+        className={styles.form}
+      >
         {kind === "THREAD" && (
           <>
             <label htmlFor={`${prefix}-title`}>
@@ -197,14 +202,18 @@ export function ContentForm({
                 value={title}
                 required
                 maxLength={160}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  if (ready) setTitle(e.target.value);
+                }}
               />
             </label>
             <label className={styles.check}>
               <input
                 type="checkbox"
                 checked={titleSpoiler}
-                onChange={(e) => setTitleSpoiler(e.target.checked)}
+                onChange={(e) => {
+                  if (ready) setTitleSpoiler(e.target.checked);
+                }}
               />
               {t.titleSpoiler}
             </label>
@@ -217,14 +226,18 @@ export function ContentForm({
             required
             maxLength={kind === "REPLY" ? 4000 : 8000}
             value={body}
-            onChange={(e) => setBody(e.target.value)}
+            onChange={(e) => {
+              if (ready) setBody(e.target.value);
+            }}
           />
         </label>
         <label className={styles.check}>
           <input
             type="checkbox"
             checked={bodySpoiler}
-            onChange={(e) => setBodySpoiler(e.target.checked)}
+            onChange={(e) => {
+              if (ready) setBodySpoiler(e.target.checked);
+            }}
           />
           {t.bodySpoiler}
         </label>
@@ -234,7 +247,9 @@ export function ContentForm({
             id={`${prefix}-context`}
             value={context}
             maxLength={80}
-            onChange={(e) => setContext(e.target.value)}
+            onChange={(e) => {
+              if (ready) setContext(e.target.value);
+            }}
           />
         </label>
         {editing && (
@@ -242,7 +257,9 @@ export function ContentForm({
             <input
               type="checkbox"
               checked={replaceIntent}
-              onChange={(e) => setReplaceIntent(e.target.checked)}
+              onChange={(e) => {
+                if (ready) setReplaceIntent(e.target.checked);
+              }}
             />
             {t.replacementIntent}
           </label>
@@ -251,13 +268,15 @@ export function ContentForm({
           <input
             type="checkbox"
             checked={intent}
-            onChange={(e) => setIntent(e.target.checked)}
+            onChange={(e) => {
+              if (ready) setIntent(e.target.checked);
+            }}
           />
           {t.intent}
         </label>
         <button
           type="submit"
-          disabled={!intent || (!!editing && !replaceIntent)}
+          disabled={!ready || !intent || (!!editing && !replaceIntent)}
         >
           {busy ? t.loading : editing ? t.save : t.submit}
         </button>
@@ -268,15 +287,20 @@ export function ContentForm({
         </p>
       )}
       {frozen && failure?.uncertain && (
-        <button type="button" disabled={busy} onClick={() => void send(frozen)}>
+        <button
+          type="button"
+          disabled={!ready || busy}
+          onClick={() => void send(frozen)}
+        >
           {t.retry}
         </button>
       )}
       {frozen && failure && !failure.uncertain && failure.status !== 409 && (
         <button
           type="button"
-          disabled={busy}
+          disabled={!ready || busy}
           onClick={() => {
+            if (!ready) return;
             attemptRef.current = null;
             setFrozen(null);
             setFailure(null);
@@ -287,12 +311,24 @@ export function ContentForm({
         </button>
       )}
       {failure?.status === 409 && (
-        <button type="button" disabled={busy} onClick={onComplete}>
+        <button
+          type="button"
+          disabled={!ready || busy}
+          onClick={() => {
+            if (ready) onComplete();
+          }}
+        >
           {t.refresh}
         </button>
       )}
       {onCancel && !frozen && (
-        <button type="button" onClick={onCancel}>
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={() => {
+            if (ready) onCancel();
+          }}
+        >
           {t.cancel}
         </button>
       )}

@@ -6,6 +6,7 @@ import type { Locale } from "../../lib/i18n";
 import { communityCopy } from "../../lib/community-i18n";
 import { CommunityClientError } from "./client";
 import { useCommunityList } from "./useCommunityList";
+import { useCommunityReady } from "./useCommunityReady";
 import { OwnerActions } from "./OwnerActions";
 import { Pagination } from "./Pagination";
 import styles from "./community.module.css";
@@ -30,6 +31,7 @@ export function OwnerManage(props: OwnerManageProps) {
   );
 }
 function ScopedOwnerManage({ locale, initial }: OwnerManageProps) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale];
   const list = useCommunityList(
     initial,
@@ -45,7 +47,7 @@ function ScopedOwnerManage({ locale, initial }: OwnerManageProps) {
       <p>{t.ownedEditingNotice}</p>
       <button
         type="button"
-        disabled={list.busy}
+        disabled={!ready || list.busy}
         onClick={() => void list.load()}
       >
         {t.refresh}

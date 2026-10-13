@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 import type { Locale } from "../../lib/i18n";
 import { communityListUrl, communityRequest, errorCopy } from "./client";
+import { useCommunityReady } from "./useCommunityReady";
 
 /** No hydration read/prefetch. Every explicit read clears old content and reveal state first. */
 export function useCommunityList<T>(
@@ -12,6 +13,7 @@ export function useCommunityList<T>(
   path: string,
   locale: Locale,
 ) {
+  const ready = useCommunityReady();
   function seed() {
     const data = schema.parse(initial);
     validate(data);
@@ -32,7 +34,7 @@ export function useCommunityList<T>(
   }, []);
   // The owning wrapper remounts this hook on every SSR/RSC initial-object replacement.
   async function load(nextPage = page) {
-    if (lock.current) return;
+    if (!ready || lock.current) return;
     lock.current = true;
     setData(null);
     setRefreshToken((value) => value + 1);

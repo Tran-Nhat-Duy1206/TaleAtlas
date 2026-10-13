@@ -1,3 +1,5 @@
+"use client";
+import { useCommunityReady } from "./useCommunityReady";
 import type { Locale } from "../../lib/i18n";
 import { communityCopy } from "../../lib/community-i18n";
 import styles from "./community.module.css";
@@ -14,13 +16,16 @@ export function Pagination({
   busy: boolean;
   onPage: (page: number) => void;
 }) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale];
   return (
     <nav className={styles.navigation} aria-label={t.pagination}>
       <button
         type="button"
-        disabled={busy || page <= 1}
-        onClick={() => onPage(page - 1)}
+        disabled={!ready || busy || page <= 1}
+        onClick={() => {
+          if (ready) onPage(page - 1);
+        }}
       >
         {t.previous}
       </button>
@@ -29,8 +34,10 @@ export function Pagination({
       </span>
       <button
         type="button"
-        disabled={busy || count < 25 || page >= 200}
-        onClick={() => onPage(page + 1)}
+        disabled={!ready || busy || count < 25 || page >= 200}
+        onClick={() => {
+          if (ready) onPage(page + 1);
+        }}
       >
         {t.next}
       </button>

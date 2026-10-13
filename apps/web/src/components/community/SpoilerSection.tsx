@@ -6,6 +6,7 @@ import type { CommunityPublicDTO } from "../../features/community/projection";
 import { communityRevealSchema } from "../../features/community/contracts";
 import { discussionRevealResponseSchema } from "../../features/community/http-contracts";
 import { assertSelectedReveal, communityRequest, errorCopy } from "./client";
+import { useCommunityReady } from "./useCommunityReady";
 import styles from "./community.module.css";
 
 /** State belongs only to this UUID/revision/section and is never shared with another section or editor. */
@@ -29,6 +30,7 @@ function ScopedSpoilerSection({
   locale,
   refreshToken = 0,
 }: Props) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale],
     id = useId();
   const cacheKey = `${content.id}:${content.workId}:${content.kind}:${content.revision}:${section}:${refreshToken}`;
@@ -61,7 +63,7 @@ function ScopedSpoilerSection({
       </div>
     );
   async function reveal() {
-    if (!ack || busy) return;
+    if (!ready || !ack || busy) return;
     setBusy(true);
     setError("");
     const requestedKey = cacheKey;
@@ -105,14 +107,16 @@ function ScopedSpoilerSection({
           id={id}
           type="checkbox"
           checked={ack}
-          disabled={busy}
-          onChange={(e) => setAck(e.target.checked)}
+          disabled={!ready || busy}
+          onChange={(e) => {
+            if (ready) setAck(e.target.checked);
+          }}
         />
         {t.revealAck}
       </label>
       <button
         type="button"
-        disabled={!ack || busy}
+        disabled={!ready || !ack || busy}
         onClick={() => void reveal()}
       >
         {busy ? t.loading : section === "title" ? t.revealTitle : t.revealBody}

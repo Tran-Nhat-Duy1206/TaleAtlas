@@ -10,6 +10,7 @@ import type { CommunityPublicDTO } from "../../features/community/projection";
 import type { Locale } from "../../lib/i18n";
 import { communityCopy } from "../../lib/community-i18n";
 import { ContentForm } from "./ContentForm";
+import { useCommunityReady } from "./useCommunityReady";
 import {
   assertDiscussionScope,
   communityRequest,
@@ -68,6 +69,7 @@ function ScopedOwnerActions({
   seed,
   onComplete,
 }: Props) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale];
   const parsedSeed = communityOwnedSchema.safeParse(seed);
   const safeSeed =
@@ -110,7 +112,7 @@ function ScopedOwnerActions({
     return result;
   }
   async function check(startEdit = false) {
-    if (lock.current || attemptRef.current) return;
+    if (!ready || lock.current || attemptRef.current) return;
     lock.current = true;
     setBusy(true);
     setMessage("");
@@ -144,6 +146,7 @@ function ScopedOwnerActions({
   }
   async function withdraw(retry = false) {
     if (
+      !ready ||
       lock.current ||
       (!retry && (!ack || !owned?.canWithdraw || attemptRef.current))
     )
@@ -226,7 +229,7 @@ function ScopedOwnerActions({
       {!verified && (
         <button
           type="button"
-          disabled={busy || pending !== null}
+          disabled={!ready || busy || pending !== null}
           onClick={() => void check()}
         >
           {busy ? t.loading : t.checkOwner}
@@ -239,7 +242,7 @@ function ScopedOwnerActions({
         !editing && (
           <button
             type="button"
-            disabled={busy || pending !== null}
+            disabled={!ready || busy || pending !== null}
             onClick={() => void check(true)}
           >
             {t.edit}
@@ -268,14 +271,16 @@ function ScopedOwnerActions({
             <input
               type="checkbox"
               checked={ack}
-              disabled={busy || pending !== null}
-              onChange={(e) => setAck(e.target.checked)}
+              disabled={!ready || busy || pending !== null}
+              onChange={(e) => {
+                if (ready) setAck(e.target.checked);
+              }}
             />
             {t.withdrawAck}
           </label>
           <button
             type="button"
-            disabled={!ack || busy || pending !== null}
+            disabled={!ready || !ack || busy || pending !== null}
             onClick={() => void withdraw()}
           >
             {t.withdraw}
@@ -288,22 +293,29 @@ function ScopedOwnerActions({
       {pending && failure?.uncertain && (
         <button
           type="button"
-          disabled={busy}
+          disabled={!ready || busy}
           onClick={() => void withdraw(true)}
         >
           {t.retry}
         </button>
       )}
       {failure?.status === 409 && (
-        <button type="button" disabled={busy} onClick={onComplete}>
+        <button
+          type="button"
+          disabled={!ready || busy}
+          onClick={() => {
+            if (ready) onComplete();
+          }}
+        >
           {t.refresh}
         </button>
       )}
       {pending && failure && !failure.uncertain && failure.status !== 409 && (
         <button
           type="button"
-          disabled={busy}
+          disabled={!ready || busy}
           onClick={() => {
+            if (!ready) return;
             attemptRef.current = null;
             setPending(null);
             setFailure(null);

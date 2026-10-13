@@ -15,6 +15,7 @@ import {
   CommunityClientError,
   errorCopy,
 } from "./client";
+import { useCommunityReady } from "./useCommunityReady";
 import { CommunityContent } from "./CommunityContent";
 import { ContentForm } from "./ContentForm";
 import { Participation } from "./Participation";
@@ -93,6 +94,7 @@ function ScopedThreadDetail({
   initialReplies,
   participation,
 }: ThreadDetailProps) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale],
     id = initialThread.id,
     path = `/api/community/works/${workId}/threads/${id}`;
@@ -119,7 +121,7 @@ function ScopedThreadDetail({
     };
   }, []);
   async function reload(nextPage = page) {
-    if (lock.current) return;
+    if (!ready || lock.current) return;
     lock.current = true;
     setThread(null);
     setReplies(null);
@@ -160,7 +162,11 @@ function ScopedThreadDetail({
         {t.all}
       </Link>
       <Participation locale={locale} participation={participation} />
-      <button type="button" disabled={busy} onClick={() => void reload()}>
+      <button
+        type="button"
+        disabled={!ready || busy}
+        onClick={() => void reload()}
+      >
         {t.refresh}
       </button>
       {busy && <p role="status">{t.loading}</p>}
@@ -177,7 +183,10 @@ function ScopedThreadDetail({
       {canReply && !target && (
         <button
           type="button"
-          onClick={() => setTarget({ parentId: null, depth: 0 })}
+          disabled={!ready}
+          onClick={() => {
+            if (ready) setTarget({ parentId: null, depth: 0 });
+          }}
         >
           {t.reply}
         </button>
@@ -211,10 +220,14 @@ function ScopedThreadDetail({
             ((content.depth ?? 0) < 2 ? (
               <button
                 type="button"
-                disabled={target !== null}
-                onClick={() =>
-                  setTarget({ parentId: content.id, depth: content.depth! + 1 })
-                }
+                disabled={!ready || target !== null}
+                onClick={() => {
+                  if (ready)
+                    setTarget({
+                      parentId: content.id,
+                      depth: content.depth! + 1,
+                    });
+                }}
               >
                 {t.nestedReply}
               </button>

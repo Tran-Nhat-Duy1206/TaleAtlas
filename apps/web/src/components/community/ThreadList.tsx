@@ -6,6 +6,7 @@ import type { Locale } from "../../lib/i18n";
 import { communityCopy } from "../../lib/community-i18n";
 import { assertDiscussionRead, CommunityClientError } from "./client";
 import { useCommunityList } from "./useCommunityList";
+import { useCommunityReady } from "./useCommunityReady";
 import { CommunityContent } from "./CommunityContent";
 import { ContentForm } from "./ContentForm";
 import { Participation } from "./Participation";
@@ -59,6 +60,7 @@ function ScopedThreadList({
   initial,
   participation,
 }: ThreadListProps) {
+  const ready = useCommunityReady();
   const t = communityCopy[locale],
     [creating, setCreating] = useState(false);
   const list = useCommunityList(
@@ -69,6 +71,7 @@ function ScopedThreadList({
     locale,
   );
   function reload(page = list.page) {
+    if (!ready) return;
     setCreating(false);
     void list.load(page);
   }
@@ -77,14 +80,20 @@ function ScopedThreadList({
       <h1>{t.discussions}</h1>
       <Participation locale={locale} participation={participation} />
       <div className={styles.actions}>
-        <button type="button" disabled={list.busy} onClick={() => reload()}>
+        <button
+          type="button"
+          disabled={!ready || list.busy}
+          onClick={() => reload()}
+        >
           {t.refresh}
         </button>
         {participation === "VERIFIED" && !creating && (
           <button
             type="button"
-            disabled={list.busy || !list.data}
-            onClick={() => setCreating(true)}
+            disabled={!ready || list.busy || !list.data}
+            onClick={() => {
+              if (ready) setCreating(true);
+            }}
           >
             {t.newThread}
           </button>
