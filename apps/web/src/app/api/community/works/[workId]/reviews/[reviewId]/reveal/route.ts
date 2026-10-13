@@ -15,7 +15,7 @@ import {
 type Context = { params: Promise<{ workId: string; reviewId: string }> };
 export const runtime = "nodejs";
 export async function POST(request: Request, context: Context) {
-  return safeJson("community.reviews.reveal", async () => {
+  const response = await safeJson("community.reviews.reveal", async () => {
     requireCommunityEnabled();
     const { workId, reviewId } = await context.params;
     let selection: z.infer<typeof reviewRevealSchema> | undefined;
@@ -31,4 +31,6 @@ export async function POST(request: Request, context: Context) {
     if (!selection) throw new Error("Missing review reveal selection");
     return reviewHttpReveal(result, selection);
   });
+  response.headers.set("X-Robots-Tag", "noindex");
+  return response;
 }

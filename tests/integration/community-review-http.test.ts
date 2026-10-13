@@ -101,6 +101,7 @@ async function error(response: Response, status: number, code?: string) {
   expect(Object.keys(body)).toEqual(["error"]);
   if (code) expect(body).toEqual({ error: code });
   expect(response.headers.get("cache-control")).toContain("no-store");
+  expect(response.headers.get("x-robots-tag")).toBe("noindex");
 }
 async function charge(actor: Actor, key = "catalog.write") {
   return Number(
@@ -115,6 +116,7 @@ async function create(workId: string, body = input()) {
     context(workId),
   );
   expect(response.status).toBe(200);
+  expect(response.headers.get("x-robots-tag")).toBe("noindex");
   expect(response.headers.get("cache-control")).toBe("no-store");
   return reviewMutationResponseSchema.parse(await response.json());
 }
@@ -313,6 +315,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       context(w.id),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
     const result = reviewListResponseSchema.parse(await response.json());
     expect(result.statistics).toEqual({
       reviewCount: 1,
@@ -357,6 +360,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       context(w.id, first.content.id),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
     expect(
       reviewMutationResponseSchema.parse(await response.json()).content,
     ).toMatchObject({
@@ -386,6 +390,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       ctx,
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
     expect(
       reviewRevealResponseSchema.parse(await response.json()),
     ).toMatchObject({ body: body.body, spoilerContext: body.spoilerContext });
@@ -450,6 +455,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       ctx,
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
     const meta = reviewOwnedSchema.parse(await response.json());
     expect(meta.canEdit).toBe(true);
@@ -477,6 +483,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       ctx,
     );
     expect(privateResult.status).toBe(200);
+    expect(privateResult.headers.get("x-robots-tag")).toBe("noindex");
     expect(reviewOwnedSchema.parse(await privateResult.json())).toMatchObject({
       workAvailable: false,
       canEdit: false,
@@ -487,11 +494,13 @@ describe("V4C additive real SQL review HTTP routes", () => {
       ctx,
     );
     expect(slots.status).toBe(200);
+    expect(slots.headers.get("x-robots-tag")).toBe("noindex");
     expect(reviewSlotResponseSchema.parse(await slots.json()).item?.id).toBe(
       created.content.id,
     );
     const all = await owned.GET(request("GET", owner, undefined, "?locale=en"));
     expect(all.status).toBe(200);
+    expect(all.headers.get("x-robots-tag")).toBe("noindex");
     const listed = reviewOwnedListResponseSchema.parse(await all.json());
     expect(listed.items).toHaveLength(1);
     for (const needle of [
@@ -543,16 +552,21 @@ describe("V4C additive real SQL review HTTP routes", () => {
       400,
     );
     const review = await create(w.id);
-    await error(
-      await discussionEdit.PATCH(
-        request(
-          "PATCH",
-          owner,
-          input({ contentKind: "REVIEW", expectedRevision: 1 }),
-        ),
-        context(w.id, review.content.id),
+    // Frozen B response headers are outside C ownership; preserve its rejection assertions.
+    const discussionResponse = await discussionEdit.PATCH(
+      request(
+        "PATCH",
+        owner,
+        input({ contentKind: "REVIEW", expectedRevision: 1 }),
       ),
-      400,
+      context(w.id, review.content.id),
+    );
+    expect(discussionResponse.status).toBe(400);
+    expect(await discussionResponse.json()).toEqual({
+      error: "VALIDATION_ERROR",
+    });
+    expect(discussionResponse.headers.get("cache-control")).toContain(
+      "no-store",
     );
     await error(
       await detail.GET(
@@ -574,6 +588,7 @@ describe("V4C additive real SQL review HTTP routes", () => {
       context(w.id, created.content.id),
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get("x-robots-tag")).toBe("noindex");
     expect(
       reviewMutationResponseSchema.parse(await response.json()).content,
     ).toMatchObject({
@@ -589,10 +604,12 @@ describe("V4C additive real SQL review HTTP routes", () => {
       )[0],
     ).toMatchObject({ body: "", rating_half_stars: null });
     const publicResponse = await reviews.GET(request("GET"), context(w.id));
+    expect(publicResponse.headers.get("x-robots-tag")).toBe("noindex");
     expect(
       reviewListResponseSchema.parse(await publicResponse.json()).statistics,
     ).toEqual({ reviewCount: 0, ratedReviewCount: 0, meanRating: null });
     const slotResponse = await slot.GET(request("GET", owner), context(w.id));
+    expect(slotResponse.headers.get("x-robots-tag")).toBe("noindex");
     expect(
       reviewSlotResponseSchema.parse(await slotResponse.json()).item,
     ).toBeNull();

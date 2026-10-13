@@ -10,7 +10,7 @@ import {
 type Context = { params: Promise<{ workId: string; reviewId: string }> };
 export const runtime = "nodejs";
 export async function POST(request: Request, context: Context) {
-  return safeJson("community.reviews.withdraw", async () => {
+  const response = await safeJson("community.reviews.withdraw", async () => {
     requireCommunityEnabled();
     const { workId, reviewId } = await context.params;
     return reviewHttpMutation(
@@ -29,4 +29,6 @@ export async function POST(request: Request, context: Context) {
       reviewId,
     );
   });
+  response.headers.set("X-Robots-Tag", "noindex");
+  return response;
 }

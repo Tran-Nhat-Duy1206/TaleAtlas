@@ -19,7 +19,7 @@ import {
 type Context = { params: Promise<{ workId: string }> };
 export const runtime = "nodejs";
 export async function GET(request: Request, context: Context) {
-  return safeJson("community.reviews.list", async () => {
+  const response = await safeJson("community.reviews.list", async () => {
     requireCommunityEnabled();
     const { workId } = await context.params;
     const result = validatedCommunityResponse(
@@ -33,9 +33,11 @@ export async function GET(request: Request, context: Context) {
     for (const item of result.items) requireReviewScope(item, workId);
     return result;
   });
+  response.headers.set("X-Robots-Tag", "noindex");
+  return response;
 }
 export async function POST(request: Request, context: Context) {
-  return safeJson("community.reviews.create", async () => {
+  const response = await safeJson("community.reviews.create", async () => {
     requireCommunityEnabled();
     const { workId } = await context.params;
     return reviewHttpMutation(
@@ -51,4 +53,6 @@ export async function POST(request: Request, context: Context) {
       workId,
     );
   });
+  response.headers.set("X-Robots-Tag", "noindex");
+  return response;
 }
