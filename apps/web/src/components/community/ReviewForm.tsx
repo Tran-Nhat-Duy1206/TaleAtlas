@@ -233,31 +233,29 @@ function ScopedReviewForm({
           />
         </label>
         <p id={`${prefix}-body-help`}>{t.reviewBodyHelp}</p>
-        <label htmlFor={`${prefix}-rating`}>
-          {t.rating}
-          <select
-            id={`${prefix}-rating`}
-            required
-            value={rating}
-            aria-describedby={`${prefix}-rating-help`}
-            onChange={(event) => {
-              if (editable && !lock.current) setRating(event.target.value);
-            }}
-          >
-            <option value="" disabled>
-              {t.chooseRating}
+        <label htmlFor={`${prefix}-rating`}>{t.rating}</label>
+        <select
+          id={`${prefix}-rating`}
+          required
+          value={rating}
+          aria-describedby={`${prefix}-rating-help`}
+          onChange={(event) => {
+            if (editable && !lock.current) setRating(event.target.value);
+          }}
+        >
+          <option value="" disabled>
+            {t.chooseRating}
+          </option>
+          <option value="unrated">{t.unrated}</option>
+          {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((halfStars) => (
+            <option key={halfStars} value={halfStars}>
+              {new Intl.NumberFormat(locale, {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              }).format(halfStars / 2)}
             </option>
-            <option value="unrated">{t.unrated}</option>
-            {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((halfStars) => (
-              <option key={halfStars} value={halfStars}>
-                {new Intl.NumberFormat(locale, {
-                  minimumFractionDigits: 1,
-                  maximumFractionDigits: 1,
-                }).format(halfStars / 2)}
-              </option>
-            ))}
-          </select>
-        </label>
+          ))}
+        </select>
         <p id={`${prefix}-rating-help`}>{t.ratingHelp}</p>
         <label className={styles.check}>
           <input
