@@ -5,18 +5,27 @@ import type { Locale } from "../../lib/i18n";
 import { communityCopy } from "../../lib/community-i18n";
 import { SpoilerSection } from "./SpoilerSection";
 import { OwnerActions } from "./OwnerActions";
+import { ReportAction } from "./ReportAction";
 import styles from "./community.module.css";
 export function CommunityContent({
   content,
   locale,
   refreshToken,
   ownerControls = false,
+  participation = "ANONYMOUS",
+  reportDisabled = false,
+  reportLocked = false,
+  onReportLock,
   onRefresh,
 }: {
   content: DiscussionPublic;
   locale: Locale;
   refreshToken: number;
   ownerControls?: boolean;
+  participation?: "VERIFIED" | "ANONYMOUS" | "UNVERIFIED";
+  reportDisabled?: boolean;
+  reportLocked?: boolean;
+  onReportLock?: (locked: boolean) => void;
   onRefresh: () => void;
 }) {
   const t = communityCopy[locale];
@@ -75,14 +84,33 @@ export function CommunityContent({
           )}
         </p>
       )}
-      {ownerControls && (
-        <OwnerActions
-          key={refreshToken}
+      {content.state === "ACTIVE" && (
+        <ReportAction
           locale={locale}
-          scope={content}
-          publicContent={content}
-          onComplete={onRefresh}
+          scope={{
+            id: content.id,
+            workId: content.workId,
+            kind: content.kind,
+            revision: content.revision,
+          }}
+          participation={participation}
+          showParticipationLinks={false}
+          disabled={reportDisabled}
+          onLockChange={onReportLock}
         />
+      )}
+      {ownerControls && (
+        <fieldset disabled={reportLocked} className={styles.form}>
+          <OwnerActions
+            key={refreshToken}
+            locale={locale}
+            scope={content}
+            publicContent={content}
+            onComplete={() => {
+              if (!reportLocked) onRefresh();
+            }}
+          />
+        </fieldset>
       )}
     </article>
   );

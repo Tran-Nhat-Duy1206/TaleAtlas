@@ -16,6 +16,7 @@ import {
   errorCopy,
 } from "./client";
 import { useCommunityReady } from "./useCommunityReady";
+import { useReportLocks } from "./useReportLocks";
 import { CommunityContent } from "./CommunityContent";
 import { ContentForm } from "./ContentForm";
 import { Participation } from "./Participation";
@@ -95,6 +96,7 @@ function ScopedThreadDetail({
   participation,
 }: ThreadDetailProps) {
   const ready = useCommunityReady();
+  const reports = useReportLocks();
   const t = communityCopy[locale],
     id = initialThread.id,
     path = `/api/community/works/${workId}/threads/${id}`;
@@ -121,7 +123,7 @@ function ScopedThreadDetail({
     };
   }, []);
   async function reload(nextPage = page) {
-    if (!ready || lock.current) return;
+    if (!ready || lock.current || reports.blocked()) return;
     lock.current = true;
     setThread(null);
     setReplies(null);
@@ -151,9 +153,26 @@ function ScopedThreadDetail({
     }
   }
   const canReply =
-    participation === "VERIFIED" && thread?.state === "ACTIVE" && !busy;
+    participation === "VERIFIED" &&
+    thread?.state === "ACTIVE" &&
+    !busy &&
+    reports.count === 0;
   return (
-    <section className={styles.community}>
+    <section
+      className={styles.community}
+      onClickCapture={
+        reports.count > 0
+          ? (event) => {
+              if (
+                reports.blocked() &&
+                event.target instanceof Element &&
+                event.target.closest("a")
+              )
+                event.preventDefault();
+            }
+          : undefined
+      }
+    >
       <h1>{t.conversation}</h1>
       <Link
         prefetch={false}
@@ -164,7 +183,7 @@ function ScopedThreadDetail({
       <Participation locale={locale} participation={participation} />
       <button
         type="button"
-        disabled={!ready || busy}
+        disabled={!ready || busy || reports.count > 0}
         onClick={() => void reload()}
       >
         {t.refresh}
@@ -177,6 +196,10 @@ function ScopedThreadDetail({
           locale={locale}
           refreshToken={refreshToken}
           ownerControls={participation === "VERIFIED"}
+          participation={participation}
+          reportDisabled={busy || target !== null || reports.other(thread.id)}
+          reportLocked={reports.count > 0}
+          onReportLock={(locked) => reports.update(thread.id, locked)}
           onRefresh={() => void reload()}
         />
       )}
@@ -213,6 +236,12 @@ function ScopedThreadDetail({
             locale={locale}
             refreshToken={refreshToken}
             ownerControls={participation === "VERIFIED"}
+            participation={participation}
+            reportDisabled={
+              busy || target !== null || reports.other(content.id)
+            }
+            reportLocked={reports.count > 0}
+            onReportLock={(locked) => reports.update(content.id, locked)}
             onRefresh={() => void reload()}
           />
           {canReply &&
@@ -240,7 +269,7 @@ function ScopedThreadDetail({
         locale={locale}
         page={page}
         count={replies?.items.length ?? 0}
-        busy={busy}
+        busy={busy || reports.count > 0}
         onPage={(next) => void reload(next)}
       />
     </section>

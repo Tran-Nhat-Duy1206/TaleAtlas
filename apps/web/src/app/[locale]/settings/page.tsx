@@ -6,6 +6,7 @@ import { getSession } from "@/server/session";
 import { isCommunityEnabled } from "@/server/community/availability";
 import { communityCopy } from "@/lib/community-i18n";
 import { reviewCopy } from "@/lib/review-i18n";
+import { ModerationNavigation } from "@/components/community/ModerationNavigation";
 type Props = { params: Promise<{ locale: string }> };
 export async function generateMetadata({ params }: Props) {
   const { locale } = await params;
@@ -15,7 +16,8 @@ export async function generateMetadata({ params }: Props) {
 export default async function Page({ params }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  if (!(await getSession())) redirect(`/${locale}/login`);
+  const session = await getSession();
+  if (!session) redirect(`/${locale}/login`);
   return (
     <>
       <Settings locale={locale} />
@@ -33,6 +35,13 @@ export default async function Page({ params }: Props) {
           <a href={`/${locale}/community/reviews/manage`}>
             {reviewCopy[locale].manage}
           </a>
+          <ModerationNavigation
+            locale={locale}
+            verified={session.user.emailVerified}
+            moderator={
+              session.user.role === "moderator" || session.user.role === "admin"
+            }
+          />
         </nav>
       )}
     </>

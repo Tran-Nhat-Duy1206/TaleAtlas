@@ -17,6 +17,8 @@ import { reviewCopy } from "../../lib/review-i18n";
 import { CommunityClientError, communityRequest, errorCopy } from "./client";
 import { useCommunityReady } from "./useCommunityReady";
 import { ReviewBody } from "./ReviewBody";
+import { ReportAction } from "./ReportAction";
+import { useReportLocks } from "./useReportLocks";
 import { ReviewForm } from "./ReviewForm";
 import { ReviewOwnerActions } from "./ReviewOwnerActions";
 import { Pagination } from "./Pagination";
@@ -169,6 +171,7 @@ function ScopedReviewList({
     [ownerLocked, setOwnerLocked] = useState(false),
     [message, setMessage] = useState("");
   const [bodyEpoch, setBodyEpoch] = useState(0);
+  const reports = useReportLocks();
   const slotLock = useRef(false),
     mounted = useRef(true);
   useEffect(() => {
@@ -185,7 +188,8 @@ function ScopedReviewList({
     `/api/community/works/${workId}/reviews`,
     locale,
   );
-  const blocked = list.busy || slotBusy || creating || ownerLocked;
+  const blocked =
+    list.busy || slotBusy || creating || ownerLocked || reports.count > 0;
   async function slotMetadata() {
     const result = await communityRequest(
       `/api/community/works/${workId}/reviews/owned?locale=${locale}`,
@@ -199,6 +203,7 @@ function ScopedReviewList({
       !ready ||
       participation !== "VERIFIED" ||
       blocked ||
+      reports.blocked() ||
       slotLock.current ||
       !list.data
     )
@@ -239,7 +244,7 @@ function ScopedReviewList({
     }
   }
   function reload(page = list.page) {
-    if (!ready || blocked || slotLock.current) return;
+    if (!ready || blocked || reports.blocked() || slotLock.current) return;
     setCreating(false);
     setSlot(null);
     setMessage("");
@@ -264,7 +269,21 @@ function ScopedReviewList({
     maximumFractionDigits: 2,
   });
   return (
-    <section className={styles.community}>
+    <section
+      className={styles.community}
+      onClickCapture={
+        reports.count > 0
+          ? (event) => {
+              if (
+                reports.blocked() &&
+                event.target instanceof Element &&
+                event.target.closest("a")
+              )
+                event.preventDefault();
+            }
+          : undefined
+      }
+    >
       <h1>{t.reviews}</h1>
       <p>{t.publicNotice}</p>
       <p>{t.statsNotice}</p>
@@ -345,7 +364,7 @@ function ScopedReviewList({
             locale={locale}
             scope={slot}
             seed={slot}
-            disabled={list.busy || slotBusy}
+            disabled={list.busy || slotBusy || reports.count > 0}
             onLockChange={ownerLock}
             onComplete={complete}
           />
@@ -371,6 +390,15 @@ function ScopedReviewList({
           content={content}
           locale={locale}
           refreshToken={bodyEpoch}
+          participation={participation}
+          reportDisabled={
+            list.busy ||
+            slotBusy ||
+            creating ||
+            ownerLocked ||
+            reports.other(content.id)
+          }
+          onReportLock={(locked) => reports.update(content.id, locked)}
         />
       ))}
       <Pagination
@@ -387,10 +415,16 @@ function ReviewCard({
   locale,
   content,
   refreshToken,
+  participation,
+  reportDisabled,
+  onReportLock,
 }: {
   locale: Locale;
   content: ReviewPublicDTO;
   refreshToken: number;
+  participation: ReviewListProps["participation"];
+  reportDisabled: boolean;
+  onReportLock: (locked: boolean) => void;
 }) {
   const t = reviewCopy[locale];
   return (
@@ -416,6 +450,19 @@ function ReviewCard({
             locale={locale}
             content={content}
             refreshToken={refreshToken}
+          />
+          <ReportAction
+            locale={locale}
+            scope={{
+              id: content.id,
+              workId: content.workId,
+              kind: content.kind,
+              revision: content.revision,
+            }}
+            participation={participation}
+            showParticipationLinks={false}
+            disabled={reportDisabled}
+            onLockChange={onReportLock}
           />
         </>
       ) : (

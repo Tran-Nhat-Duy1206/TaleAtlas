@@ -7,6 +7,7 @@ import { communityCopy } from "../../lib/community-i18n";
 import { assertDiscussionRead, CommunityClientError } from "./client";
 import { useCommunityList } from "./useCommunityList";
 import { useCommunityReady } from "./useCommunityReady";
+import { useReportLocks } from "./useReportLocks";
 import { CommunityContent } from "./CommunityContent";
 import { ContentForm } from "./ContentForm";
 import { Participation } from "./Participation";
@@ -61,6 +62,7 @@ function ScopedThreadList({
   participation,
 }: ThreadListProps) {
   const ready = useCommunityReady();
+  const reports = useReportLocks();
   const t = communityCopy[locale],
     [creating, setCreating] = useState(false);
   const list = useCommunityList(
@@ -71,18 +73,32 @@ function ScopedThreadList({
     locale,
   );
   function reload(page = list.page) {
-    if (!ready) return;
+    if (!ready || reports.blocked()) return;
     setCreating(false);
     void list.load(page);
   }
   return (
-    <section className={styles.community}>
+    <section
+      className={styles.community}
+      onClickCapture={
+        reports.count > 0
+          ? (event) => {
+              if (
+                reports.blocked() &&
+                event.target instanceof Element &&
+                event.target.closest("a")
+              )
+                event.preventDefault();
+            }
+          : undefined
+      }
+    >
       <h1>{t.discussions}</h1>
       <Participation locale={locale} participation={participation} />
       <div className={styles.actions}>
         <button
           type="button"
-          disabled={!ready || list.busy}
+          disabled={!ready || list.busy || reports.count > 0}
           onClick={() => reload()}
         >
           {t.refresh}
@@ -90,9 +106,9 @@ function ScopedThreadList({
         {participation === "VERIFIED" && !creating && (
           <button
             type="button"
-            disabled={!ready || list.busy || !list.data}
+            disabled={!ready || list.busy || !list.data || reports.count > 0}
             onClick={() => {
-              if (ready) setCreating(true);
+              if (ready && !reports.blocked()) setCreating(true);
             }}
           >
             {t.newThread}
@@ -118,12 +134,23 @@ function ScopedThreadList({
             locale={locale}
             refreshToken={list.refreshToken}
             ownerControls={participation === "VERIFIED"}
+            participation={participation}
+            reportDisabled={creating || list.busy || reports.other(content.id)}
+            reportLocked={reports.count > 0}
+            onReportLock={(locked) => reports.update(content.id, locked)}
             onRefresh={() => reload()}
           />
           {/* Cross a fresh document/SSR boundary before interaction. No prefetch,
               reused reveal cache or intermediate client-transition owner state. */}
           <a
             href={`/${locale}/works/${encodeURIComponent(workSlug)}/discussions/${content.id}`}
+            onClick={
+              reports.count > 0
+                ? (event) => {
+                    if (reports.blocked()) event.preventDefault();
+                  }
+                : undefined
+            }
           >
             {t.openDiscussion}
           </a>
@@ -133,7 +160,7 @@ function ScopedThreadList({
         locale={locale}
         page={list.page}
         count={list.data?.items.length ?? 0}
-        busy={list.busy}
+        busy={list.busy || reports.count > 0}
         onPage={reload}
       />
     </section>

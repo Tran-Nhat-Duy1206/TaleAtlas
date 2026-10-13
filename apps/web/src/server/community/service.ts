@@ -71,6 +71,22 @@ import {
   type ReviewOwnedDTO,
 } from "../../features/community/review-http-contracts";
 
+import {
+  ownedReportSchema,
+  ownedReportListResponseSchema,
+  ownedReportDetailQuerySchema,
+  ownedReportQuerySchema,
+  moderationTargetSchema,
+  moderationMetadataQuerySchema,
+  moderationQueueQuerySchema,
+  moderationQueueResponseSchema,
+  moderationEvidenceInputSchema,
+  moderationEvidenceResponseSchema,
+  moderationHistoryQuerySchema,
+  moderationHistoryResponseSchema,
+  type ModerationTargetDTO,
+} from "../../features/community/moderation-http-contracts";
+
 type Tx = Parameters<
   Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]
 >[0];
@@ -1385,6 +1401,486 @@ export async function getOwnedCommunityContent(
       if (!row) throw missing();
       return ownedMetadata(row);
     });
+  });
+}
+// V4D private metadata/evidence readers. The existing raw foundation context below is NEVER routed.
+async function privateCommunityReader(headers: Headers, moderation: boolean) {
+  const principal = await verified(headers, moderation);
+  await actorBudget(
+    principal,
+    `community.${moderation ? "modread" : "ownread"}:${principal.user.id}`,
+    60,
+    moderation,
+  );
+  return principal;
+}
+const privateSnapshot = {
+  isolationLevel: "repeatable read",
+  accessMode: "read write",
+} as const;
+function moderationMetadataColumns() {
+  const available = sql<boolean>`(${works.visibility} = 'PUBLISHED')`;
+  return {
+    id: communityContents.id,
+    workId: communityContents.workId,
+    kind: communityContents.kind,
+    revision: communityContents.revision,
+    authorState: communityContents.authorState,
+    moderationState: communityContents.moderationState,
+    workAvailable: available,
+    canHide: sql<boolean>`(${communityContents.authorState} <> 'ERASED')`,
+    canRestore: sql<boolean>`(${available} and ${communityContents.authorState} <> 'ERASED')`,
+  };
+}
+async function moderationMetadata(
+  tx: Tx,
+  workId: string,
+  targetId: string,
+  kind: CommunityContentKind,
+): Promise<ModerationTargetDTO> {
+  const [row] = await tx
+    .select(moderationMetadataColumns())
+    .from(communityContents)
+    .innerJoin(works, eq(works.id, communityContents.workId))
+    .where(
+      and(
+        eq(communityContents.id, targetId),
+        eq(communityContents.workId, workId),
+        eq(communityContents.kind, kind),
+      ),
+    );
+  if (!row) throw missing();
+  return validatedCommunityResponse(moderationTargetSchema, row);
+}
+function ownedReportColumns() {
+  return {
+    id: communityReports.id,
+    workId: communityReports.workId,
+    contentId: communityReports.contentId,
+    contentKind: communityReports.targetKind,
+    state: communityReports.state,
+    revision: communityReports.revision,
+    targetRevision: communityContents.revision,
+    targetAuthorState: communityContents.authorState,
+    targetModerationState: communityContents.moderationState,
+    workAvailable: sql<boolean>`(${works.visibility} = 'PUBLISHED')`,
+  };
+}
+const reportTargetJoin = () =>
+  and(
+    eq(communityContents.id, communityReports.contentId),
+    eq(communityContents.workId, communityReports.workId),
+    eq(communityContents.kind, communityReports.targetKind),
+  );
+export async function listOwnedCommunityReports(
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, false);
+    const query = ownedReportQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const rows = await tx
+        .select(ownedReportColumns())
+        .from(communityReports)
+        .innerJoin(communityContents, reportTargetJoin())
+        .innerJoin(works, eq(works.id, communityReports.workId))
+        .where(
+          and(
+            eq(communityReports.reporterId, actorId),
+            query.cursor ? lt(communityReports.id, query.cursor.id) : undefined,
+          ),
+        )
+        .orderBy(desc(communityReports.id))
+        .limit(L.pageSize)
+        .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+      return validatedCommunityResponse(ownedReportListResponseSchema, {
+        items: rows,
+        pageSize: L.pageSize,
+      });
+    }, privateSnapshot);
+  });
+}
+export async function getOwnedCommunityReport(
+  reportInput: string,
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, false);
+    const reportId = communityUuidSchema.parse(reportInput);
+    ownedReportDetailQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const [row] = await tx
+        .select(ownedReportColumns())
+        .from(communityReports)
+        .innerJoin(communityContents, reportTargetJoin())
+        .innerJoin(works, eq(works.id, communityReports.workId))
+        .where(
+          and(
+            eq(communityReports.id, reportId),
+            eq(communityReports.reporterId, actorId),
+          ),
+        );
+      if (!row) throw missing();
+      return validatedCommunityResponse(ownedReportSchema, row);
+    }, privateSnapshot);
+  });
+}
+export async function listCommunityModerationReports(
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, true);
+    const query = moderationQueueQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      await lockPrincipal(tx, principal, true);
+      const cursor = query.cursor
+        ? or(
+            sql`${communityReports.createdAt} < ${query.cursor.timestamp}::timestamptz`,
+            and(
+              sql`${communityReports.createdAt} = ${query.cursor.timestamp}::timestamptz`,
+              lt(communityReports.id, query.cursor.id),
+            ),
+          )
+        : undefined;
+      const rows = await tx
+        .select({
+          id: communityReports.id,
+          state: communityReports.state,
+          revision: communityReports.revision,
+          evidenceRedacted: communityReports.evidenceRedacted,
+          canDismiss: sql<boolean>`(${communityReports.state} = 'OPEN')`,
+          target: moderationMetadataColumns(),
+          // Preserve PostgreSQL microseconds for the exclusive comparator; JS Date would lose them.
+          cursorTimestamp: sql<string>`to_char(${communityReports.createdAt} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+        })
+        .from(communityReports)
+        .innerJoin(communityContents, reportTargetJoin())
+        .innerJoin(works, eq(works.id, communityReports.workId))
+        .where(and(eq(communityReports.state, query.state), cursor))
+        .orderBy(desc(communityReports.createdAt), desc(communityReports.id))
+        .limit(L.pageSize)
+        .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+      const last = rows.at(-1);
+      return validatedCommunityResponse(moderationQueueResponseSchema, {
+        items: rows.map((row) => ({
+          id: row.id,
+          state: row.state,
+          revision: row.revision,
+          evidenceRedacted: row.evidenceRedacted,
+          canDismiss: row.canDismiss,
+          target: row.target,
+        })),
+        pageSize: L.pageSize,
+        nextCursor:
+          rows.length === L.pageSize && last
+            ? { id: last.id, timestamp: last.cursorTimestamp }
+            : null,
+      });
+    }, privateSnapshot);
+  });
+}
+export async function getCommunityModerationMetadata(
+  workInput: string,
+  targetInput: string,
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, true);
+    const workId = communityUuidSchema.parse(workInput),
+      targetId = communityUuidSchema.parse(targetInput);
+    const query = moderationMetadataQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      await lockPrincipal(tx, principal, true);
+      return moderationMetadata(tx, workId, targetId, query.kind);
+    }, privateSnapshot);
+  });
+}
+export async function getCommunityModerationEvidence(
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, true);
+    requireTrustedOrigin(new Request(getAuthEnv().APP_ORIGIN, { headers }));
+    const selection = moderationEvidenceInputSchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      await lockPrincipal(tx, principal, true);
+      const meta = await moderationMetadata(
+        tx,
+        selection.workId,
+        selection.targetId,
+        selection.contentKind,
+      );
+      if (meta.revision !== selection.expectedRevision)
+        throw new HttpError(409, "STALE_REVISION");
+      const contentScope = and(
+        eq(communityContents.id, meta.id),
+        eq(communityContents.workId, meta.workId),
+        eq(communityContents.kind, meta.kind),
+      );
+      const base = {
+        id: meta.id,
+        workId: meta.workId,
+        kind: meta.kind,
+        revision: meta.revision,
+        selection: selection.selection,
+      };
+      const reportScope = and(
+        eq(communityReports.id, selection.reportId ?? meta.id),
+        eq(communityReports.contentId, meta.id),
+        eq(communityReports.workId, meta.workId),
+        eq(communityReports.targetKind, meta.kind),
+      );
+      const [report] =
+        selection.reportId === null
+          ? []
+          : await tx
+              .select({
+                id: communityReports.id,
+                state: communityReports.state,
+                revision: communityReports.revision,
+                evidenceRedacted: communityReports.evidenceRedacted,
+              })
+              .from(communityReports)
+              .where(reportScope);
+      if (selection.reportId !== null && !report) throw missing();
+      if (report && report.revision !== selection.expectedReportRevision)
+        throw new HttpError(409, "STALE_REPORT_REVISION");
+      let result: unknown;
+      if (selection.selection === "REPORT") {
+        if (!report) throw missing();
+        const reportDTO = {
+          id: report.id,
+          state: report.state,
+          revision: report.revision,
+        };
+        if (report.evidenceRedacted || meta.authorState === "ERASED")
+          result = {
+            ...base,
+            state: "REDACTED",
+            report: reportDTO,
+            reason: null,
+            explanation: null,
+          };
+        else {
+          const [selected] = await tx
+            .select({
+              reason: communityReports.reason,
+              explanation: communityReports.explanation,
+            })
+            .from(communityReports)
+            .where(reportScope);
+          if (!selected) throw missing();
+          result = {
+            ...base,
+            state: "AVAILABLE",
+            report: reportDTO,
+            ...selected,
+          };
+        }
+      } else if (selection.selection === "ACTION_REASON") {
+        const actionScope = and(
+          eq(communityModerationActions.id, selection.actionId!),
+          eq(communityModerationActions.contentId, meta.id),
+          eq(communityModerationActions.workId, meta.workId),
+          eq(communityModerationActions.targetKind, meta.kind),
+        );
+        const [action] = await tx
+          .select({
+            id: communityModerationActions.id,
+            sequence: communityModerationActions.sequence,
+            evidenceRedacted: communityModerationActions.evidenceRedacted,
+            reportId: communityModerationActions.reportId,
+          })
+          .from(communityModerationActions)
+          .where(actionScope);
+        if (
+          !action ||
+          (selection.reportId !== null &&
+            action.reportId !== selection.reportId)
+        )
+          throw missing();
+        if (action.sequence !== selection.actionSequence)
+          throw new HttpError(409, "STALE_ACTION_SEQUENCE");
+        const actionDTO = { id: action.id, sequence: action.sequence };
+        if (action.evidenceRedacted || meta.authorState === "ERASED")
+          result = {
+            ...base,
+            state: "REDACTED",
+            text: null,
+            action: actionDTO,
+          };
+        else {
+          const [selected] = await tx
+            .select({ text: communityModerationActions.reason })
+            .from(communityModerationActions)
+            .where(actionScope);
+          if (!selected) throw missing();
+          result = {
+            ...base,
+            state: "AVAILABLE",
+            text: selected.text,
+            action: actionDTO,
+          };
+        }
+      } else if (meta.authorState !== "ACTIVE")
+        result = { ...base, state: "UNAVAILABLE", text: null };
+      else if (selection.selection === "SPOILER_CONTEXT") {
+        const [flags] = await tx
+          .select({
+            title: communityContents.titleSpoiler,
+            body: communityContents.bodySpoiler,
+          })
+          .from(communityContents)
+          .where(contentScope);
+        if (!flags) throw missing();
+        if (!flags.title && !flags.body)
+          result = { ...base, state: "UNAVAILABLE", text: null };
+        else {
+          const [selected] = await tx
+            .select({ text: communityContents.spoilerContext })
+            .from(communityContents)
+            .where(contentScope);
+          if (!selected) throw missing();
+          result = {
+            ...base,
+            state: selected.text === null ? "UNAVAILABLE" : "AVAILABLE",
+            text: selected.text,
+          };
+        }
+      } else {
+        const [selected] = await tx
+          .select({
+            text:
+              selection.selection === "TITLE"
+                ? communityContents.title
+                : communityContents.body,
+          })
+          .from(communityContents)
+          .where(contentScope);
+        if (!selected) throw missing();
+        result = { ...base, state: "AVAILABLE", text: selected.text };
+      }
+      return validatedCommunityResponse(
+        moderationEvidenceResponseSchema,
+        result,
+      );
+    }, privateSnapshot);
+  });
+}
+export async function listCommunityModerationHistory(
+  workInput: string,
+  targetInput: string,
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await privateCommunityReader(headers, true);
+    const workId = communityUuidSchema.parse(workInput),
+      targetId = communityUuidSchema.parse(targetInput);
+    const query = moderationHistoryQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      await lockPrincipal(tx, principal, true);
+      const content = await moderationMetadata(
+        tx,
+        workId,
+        targetId,
+        query.kind,
+      );
+      if (content.revision !== query.expectedRevision)
+        throw new HttpError(409, "STALE_REVISION");
+      if (query.stream === "EVENTS") {
+        const rows = await tx
+          .select({
+            id: communityContentEvents.id,
+            command: communityContentEvents.command,
+            contentRevision: communityContentEvents.contentRevision,
+            beforeAuthorState: communityContentEvents.beforeAuthorState,
+            afterAuthorState: communityContentEvents.afterAuthorState,
+            beforeModerationState: communityContentEvents.beforeModerationState,
+            afterModerationState: communityContentEvents.afterModerationState,
+            createdAt: communityContentEvents.createdAt,
+          })
+          .from(communityContentEvents)
+          .where(
+            and(
+              eq(communityContentEvents.contentId, targetId),
+              eq(communityContentEvents.workId, workId),
+              eq(communityContentEvents.targetKind, query.kind),
+              query.cursor
+                ? lt(communityContentEvents.contentRevision, query.cursor)
+                : undefined,
+            ),
+          )
+          .orderBy(desc(communityContentEvents.contentRevision))
+          .limit(L.pageSize)
+          .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+        return validatedCommunityResponse(moderationHistoryResponseSchema, {
+          content,
+          stream: "EVENTS",
+          items: rows.map((row) => ({
+            ...row,
+            createdAt: row.createdAt.toISOString(),
+          })),
+          pageSize: L.pageSize,
+          nextCursor:
+            rows.length === L.pageSize ? rows.at(-1)!.contentRevision : null,
+        });
+      }
+      const rows = await tx
+        .select({
+          id: communityModerationActions.id,
+          action: communityModerationActions.action,
+          sequence: communityModerationActions.sequence,
+          contentRevision: communityModerationActions.contentRevision,
+          reportId: communityModerationActions.reportId,
+          reportRevision: communityModerationActions.reportRevision,
+          evidenceRedacted: communityModerationActions.evidenceRedacted,
+          createdAt: communityModerationActions.createdAt,
+        })
+        .from(communityModerationActions)
+        .where(
+          and(
+            eq(communityModerationActions.contentId, targetId),
+            eq(communityModerationActions.workId, workId),
+            eq(communityModerationActions.targetKind, query.kind),
+            query.cursor
+              ? lt(communityModerationActions.sequence, query.cursor)
+              : undefined,
+          ),
+        )
+        .orderBy(desc(communityModerationActions.sequence))
+        .limit(L.pageSize)
+        .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+      return validatedCommunityResponse(moderationHistoryResponseSchema, {
+        content,
+        stream: "ACTIONS",
+        items: rows.map((row) => ({
+          ...row,
+          createdAt: row.createdAt.toISOString(),
+        })),
+        pageSize: L.pageSize,
+        nextCursor: rows.length === L.pageSize ? rows.at(-1)!.sequence : null,
+      });
+    }, privateSnapshot);
   });
 }
 // Report/context/history remain private, signed and role-rechecked. No catalog title/private-library query.
