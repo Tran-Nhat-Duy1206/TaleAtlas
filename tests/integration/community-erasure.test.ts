@@ -184,33 +184,29 @@ async function bulkWorks(base: AdminWork, n: number) {
   const [source] =
     await sql`select w.source_id from works w join catalog_sources s on s.id=w.source_id where w.id=${base.id} and s.label=${f.sourceLabel}`;
   if (!source) throw new Error("Owned source missing");
-  // Fixture-only commit batching: retain every 500-row statement and guard.
-  // Use an ordinary pool transaction, never the reserved warmed DELETE backend.
-  return sql.begin(async (seed) => {
-    const ids: string[] = [];
-    for (let start = 0; start < n; start += 500) {
-      const size = Math.min(500, n - start);
-      const rows =
-        await seed`insert into works(id,slug,primary_title,primary_title_language,format,visibility,source_id,search_text)
-        select id,'mixed-erasure-' || id::text,'Invented owned bulk Work','en','NOVEL',
-        case when ${start} + seq <= 1998 then 'PUBLISHED'::work_visibility else 'DRAFT'::work_visibility end,
-        ${source.source_id},'Invented owned bulk Work'
-        from (select gen_random_uuid() as id,seq from generate_series(1,${size}) as g(seq)) x returning id`;
-      const chunk = rows.map((r) => String(r.id));
-      ids.push(...chunk);
-      workIds.push(...chunk);
-    }
-    return ids;
-  });
+  const ids: string[] = [];
+  for (let start = 0; start < n; start += 500) {
+    const size = Math.min(500, n - start);
+    const rows =
+      await sql`insert into works(id,slug,primary_title,primary_title_language,format,visibility,source_id,search_text)
+      select id,'mixed-erasure-' || id::text,'Invented owned bulk Work','en','NOVEL',
+      case when ${start} + seq <= 1998 then 'PUBLISHED'::work_visibility else 'DRAFT'::work_visibility end,
+      ${source.source_id},'Invented owned bulk Work'
+      from (select gen_random_uuid() as id,seq from generate_series(1,${size}) as g(seq)) x returning id`;
+    const chunk = rows.map((r) => String(r.id));
+    ids.push(...chunk);
+    workIds.push(...chunk);
+  }
+  return ids;
 }
 async function seedPrivate(actor: Actor, ids: string[]) {
   owned(actor);
   expect(ids.length).toBe(20_000);
   const ownedWorkIds = new Set(workIds);
   expect(ids.every((id) => ownedWorkIds.has(id))).toBe(true);
-  await sql.begin(async (seed) => {
-    for (let start = 0; start < ids.length; start += 500) {
-      const chunk = ids.slice(start, start + 500);
+  for (let start = 0; start < ids.length; start += 500) {
+    const chunk = ids.slice(start, start + 500);
+    await sql.begin(async (seed) => {
       const entries =
         await seed`insert into library_entries(user_id,work_id,notes,event_count)
         select ${actor.id},work_id,'PRIVATE_MIXED_ERASURE_NEEDLE',1 from unnest(${chunk}::uuid[]) w(work_id) returning id`;
@@ -219,33 +215,34 @@ async function seedPrivate(actor: Actor, ids: string[]) {
         select id,user_id,work_id,1,gen_random_uuid(),repeat('a',64),'ADD',
         jsonb_build_object('notes','PRIVATE_MIXED_ERASURE_NEEDLE') from library_entries
         where id=any(${entryIds}::uuid[]) and user_id=${actor.id}`;
-    }
-  });
+    });
+  }
 }
 async function seedReviews(actor: Actor, ids: string[]) {
   owned(actor);
   expect(ids.length).toBe(1998);
   const ownedWorkIds = new Set(workIds);
   expect(ids.every((id) => ownedWorkIds.has(id))).toBe(true);
-  return sql.begin(async (seed) => {
-    const result: string[] = [];
-    for (let start = 0; start < ids.length; start += 500) {
-      const chunk = ids.slice(start, start + 500);
+  const result: string[] = [];
+  for (let start = 0; start < ids.length; start += 500) {
+    const chunk = ids.slice(start, start + 500);
+    const committedIds = await sql.begin(async (seed) => {
       const rows =
         await seed`insert into community_contents(work_id,kind,author_id,body,body_spoiler,spoiler_context,rating_half_stars,event_count,edited_at)
         select work_id,'REVIEW',${actor.id},'PUBLIC_MIXED_ERASURE_NEEDLE synthetic review',true,'Synthetic public context',7,1,now()
         from unnest(${chunk}::uuid[]) w(work_id) returning id`;
       const contentIds = rows.map((r) => String(r.id));
-      result.push(...contentIds);
       await seed`insert into community_content_events(content_id,work_id,target_kind,actor_id,content_revision,command,before_author_state,after_author_state,before_moderation_state,after_moderation_state)
         select id,work_id,kind,${actor.id},1,'CREATE_REVIEW','ACTIVE','ACTIVE','VISIBLE','VISIBLE'
         from community_contents where id=any(${contentIds}::uuid[]) and author_id=${actor.id}`;
       await seed`insert into community_mutation_receipts(content_id,work_id,target_kind,actor_id,mutation_key,request_hash,command,outcome,content_revision)
         select id,work_id,kind,${actor.id},gen_random_uuid(),repeat('b',64),'CREATE_REVIEW','APPLIED',1
         from community_contents where id=any(${contentIds}::uuid[]) and author_id=${actor.id}`;
-    }
-    return result;
-  });
+      return contentIds;
+    });
+    result.push(...committedIds);
+  }
+  return result;
 }
 async function erased(backend: Reader, ids: string[]) {
   expect(ids.every((id) => typeof id === "string")).toBe(true);
