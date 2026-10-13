@@ -100,11 +100,16 @@ export default async function WorkPage({ params }: Props) {
       {isCommunityEnabled() && (
         // Community entry is a document/SSR boundary, not a prefetched or
         // unfinished client transition exposing a temporary interaction surface.
-        <a
-          href={`/${locale}/works/${encodeURIComponent(work.slug)}/discussions`}
-        >
-          {locale === "vi" ? "Thảo luận" : "Discussions"}
-        </a>
+        <>
+          <a
+            href={`/${locale}/works/${encodeURIComponent(work.slug)}/discussions`}
+          >
+            {locale === "vi" ? "Thảo luận" : "Discussions"}
+          </a>
+          <a href={`/${locale}/works/${encodeURIComponent(work.slug)}/reviews`}>
+            {locale === "vi" ? "Đánh giá công khai" : "Public reviews"}
+          </a>
+        </>
       )}
       <header className={styles.detailHero}>
         <WorkCover work={work} locale={locale} />

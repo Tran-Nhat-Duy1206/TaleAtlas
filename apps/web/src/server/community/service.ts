@@ -62,6 +62,15 @@ import {
   type CommunityOwnedDTO,
 } from "../../features/community/projection";
 
+import { validatedCommunityResponse } from "../../features/community/http-contracts";
+import {
+  reviewOwnedSchema,
+  reviewOwnedContextQuerySchema,
+  reviewListResponseSchema,
+  reviewStatisticsFromAggregate,
+  type ReviewOwnedDTO,
+} from "../../features/community/review-http-contracts";
+
 type Tx = Parameters<
   Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]
 >[0];
@@ -1064,6 +1073,197 @@ export async function listCommunityContents(
       },
       { isolationLevel: "repeatable read", accessMode: "read only" },
     );
+  });
+}
+/** V4C reviews and statistics share one published-Work repeatable-read snapshot. */
+export async function listCommunityReviews(
+  workInput: string,
+  input: Input,
+  headers = new Headers(),
+) {
+  return safe(async () => {
+    requireCommunityEnabled();
+    await publicReadBudget(headers);
+    const workId = communityUuidSchema.parse(workInput);
+    const query = communityQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(
+      async (tx) => {
+        await published(tx, workId);
+        const visible = and(
+          eq(communityContents.workId, workId),
+          eq(communityContents.kind, "REVIEW"),
+          eq(communityContents.authorState, "ACTIVE"),
+          eq(communityContents.moderationState, "VISIBLE"),
+        );
+        // Only public community half-star rows; no library query, SQL AVG, rounding or private totals.
+        const [aggregate] = await tx
+          .select({
+            reviewCount: sql<number>`count(*)::integer`,
+            ratedReviewCount: sql<number>`count(${communityContents.ratingHalfStars})::integer`,
+            ratingSum: sql<number>`coalesce(sum(${communityContents.ratingHalfStars}), 0)::integer`,
+          })
+          .from(communityContents)
+          .where(visible);
+        if (!aggregate) throw new Error("Missing review aggregate");
+        const statistics = reviewStatisticsFromAggregate(aggregate);
+        const orderColumn = sql<Date | null>`date_trunc('milliseconds', ${communityContents.lastActivityAt})`;
+        const cursor = query.cursor
+          ? query.cursor.timestamp === null
+            ? and(
+                isNull(orderColumn),
+                lt(communityContents.id, query.cursor.id),
+              )
+            : or(
+                sql`${orderColumn} < ${query.cursor.timestamp}::timestamptz`,
+                and(
+                  sql`${orderColumn} = ${query.cursor.timestamp}::timestamptz`,
+                  lt(communityContents.id, query.cursor.id),
+                ),
+                isNull(orderColumn),
+              )
+          : undefined;
+        const rows = await tx
+          .select()
+          .from(communityContents)
+          .where(and(visible, cursor))
+          .orderBy(
+            sql`${orderColumn} desc nulls last`,
+            desc(communityContents.id),
+          )
+          .limit(L.pageSize)
+          .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+        return validatedCommunityResponse(reviewListResponseSchema, {
+          items: await Promise.all(rows.map((row) => projection(tx, row))),
+          pageSize: L.pageSize,
+          statistics,
+        });
+      },
+      { isolationLevel: "repeatable read", accessMode: "read only" },
+    );
+  });
+}
+/** REVIEW owner reads select only metadata and Work eligibility, never authored/catalog facts. */
+function reviewOwnedColumns() {
+  const available = sql<boolean>`(${works.visibility} = 'PUBLISHED')`;
+  return {
+    id: communityContents.id,
+    workId: communityContents.workId,
+    kind: communityContents.kind,
+    threadId: communityContents.threadId,
+    parentId: communityContents.parentId,
+    depth: communityContents.depth,
+    revision: communityContents.revision,
+    authorState: communityContents.authorState,
+    moderationState: communityContents.moderationState,
+    workAvailable: available,
+    canEdit: sql<boolean>`(${available} and ${communityContents.authorState} = 'ACTIVE' and ${communityContents.moderationState} = 'VISIBLE' and ${communityContents.revision} < 2147483647)`,
+    canWithdraw: sql<boolean>`(${communityContents.authorState} = 'ACTIVE' and ${communityContents.revision} < 2147483647)`,
+  };
+}
+export async function getOwnedCommunityReview(
+  workInput: string,
+  targetInput: string,
+  input: Input,
+  headers: Headers,
+): Promise<ReviewOwnedDTO> {
+  return safe(async () => {
+    const principal = await verified(headers);
+    await actorBudget(principal, `community.ownread:${principal.user.id}`, 60);
+    const workId = communityUuidSchema.parse(workInput),
+      targetId = communityUuidSchema.parse(targetInput);
+    reviewOwnedContextQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const [row] = await tx
+        .select(reviewOwnedColumns())
+        .from(communityContents)
+        .innerJoin(works, eq(works.id, communityContents.workId))
+        .where(
+          and(
+            eq(communityContents.id, targetId),
+            eq(communityContents.workId, workId),
+            eq(communityContents.authorId, actorId),
+            eq(communityContents.kind, "REVIEW"),
+          ),
+        );
+      if (!row) throw missing();
+      return validatedCommunityResponse(reviewOwnedSchema, row);
+    });
+  });
+}
+export async function listOwnedCommunityReviews(
+  input: Input,
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await verified(headers);
+    await actorBudget(principal, `community.ownread:${principal.user.id}`, 60);
+    const query = communityOwnedQuerySchema.parse(
+      typeof input === "function" ? await input() : input,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const rows = await tx
+        .select(reviewOwnedColumns())
+        .from(communityContents)
+        .innerJoin(works, eq(works.id, communityContents.workId))
+        .where(
+          and(
+            eq(communityContents.authorId, actorId),
+            eq(communityContents.kind, "REVIEW"),
+            query.cursor
+              ? lt(communityContents.id, query.cursor.id)
+              : undefined,
+          ),
+        )
+        .orderBy(desc(communityContents.id))
+        .limit(L.pageSize)
+        .offset(query.page ? (query.page - 1) * L.pageSize : 0);
+      return {
+        items: rows.map((row) =>
+          validatedCommunityResponse(reviewOwnedSchema, row),
+        ),
+        pageSize: L.pageSize,
+      };
+    });
+  });
+}
+export async function getCommunityReviewSlot(
+  workInput: string | (() => Promise<string>),
+  headers: Headers,
+) {
+  return safe(async () => {
+    const principal = await verified(headers);
+    await actorBudget(principal, `community.ownread:${principal.user.id}`, 60);
+    const workId = communityUuidSchema.parse(
+      typeof workInput === "function" ? await workInput() : workInput,
+    );
+    return getDatabase().transaction(async (tx) => {
+      const actorId = await lockPrincipal(tx, principal);
+      const [row] = await tx
+        .select(reviewOwnedColumns())
+        .from(communityContents)
+        .innerJoin(works, eq(works.id, communityContents.workId))
+        .where(
+          and(
+            eq(communityContents.workId, workId),
+            eq(communityContents.authorId, actorId),
+            eq(communityContents.kind, "REVIEW"),
+            or(
+              eq(communityContents.authorState, "ACTIVE"),
+              eq(communityContents.moderationState, "HIDDEN"),
+            ),
+          ),
+        )
+        .limit(1);
+      return {
+        item: row ? validatedCommunityResponse(reviewOwnedSchema, row) : null,
+      };
+    });
   });
 }
 /** Indexed, fixed-depth eligibility checks; owner reads never select authored text. */
