@@ -46,9 +46,13 @@ export function WorkCover({
         width={480}
         height={640}
         loading="lazy"
-        onError={() => {
-          if (approved) setFailedPath(approved);
-        }}
+        onError={
+          placeholder
+            ? undefined
+            : () => {
+                if (approved) setFailedPath(approved);
+              }
+        }
       />
       <figcaption>{placeholder ? label : work.cover?.credit}</figcaption>
     </figure>
