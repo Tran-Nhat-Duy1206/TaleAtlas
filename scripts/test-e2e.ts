@@ -1,9 +1,11 @@
 import { spawn } from "node:child_process";
 import { requireTestDatabase } from "../tests/helpers/test-database";
+import { nativeChildNodeOptions } from "./native-child-options";
 
 // Every native phase uses the same explicitly guarded synthetic loopback DB.
 // No operator/hosted flag is changed: opt-in exists only in the child test server.
 requireTestDatabase();
+const nativeNodeOptions = nativeChildNodeOptions(process.env);
 const args = process.argv.slice(2);
 async function phase(
   label: string,
@@ -29,6 +31,9 @@ async function phase(
         ...process.env,
         NODE_ENV: "development",
         V4_COMMUNITIES_ENABLED: enabled ? "true" : "false",
+        ...(nativeNodeOptions === undefined
+          ? {}
+          : { NODE_OPTIONS: nativeNodeOptions }),
       },
     },
   );
