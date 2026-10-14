@@ -14,6 +14,7 @@ import {
 } from "./personal-transport";
 import { personalCopy, personalRatings } from "./personal-copy";
 import styles from "./personal.module.css";
+import { useEntryRevisionFence } from "./EntryRevisionScope";
 const subscribe = () => () => {};
 export type PersonalControlSeed = Pick<
   PersonalHttpDetails,
@@ -46,7 +47,9 @@ export function PersonalControls({
       () => false,
     ),
     t = personalCopy[locale],
-    refresh = useRef<(() => void) | null>(null);
+    refresh = useRef<(() => void) | null>(null),
+    scope = useEntryRevisionFence(seed.revision);
+  const observeRevision = scope.observe;
   const loadIdentity = `${seed.id}:${seed.workId}:${seed.revision}:${seed.archived}:${locale}`;
   const [loadedIdentity, setLoadedIdentity] = useState<string | null>(null),
     [loadBusy, setLoadBusy] = useState(!seed.archived),
@@ -63,7 +66,9 @@ export function PersonalControls({
   const pending = useRef<{ url: string; body: string } | null>(null),
     lock = useRef(false),
     fence = useRef(false);
+  const usableLoaded = loaded && !scope.blocked;
   const disabled =
+    scope.blocked ||
     !hydrated ||
     !loaded ||
     seed.archived ||
@@ -89,6 +94,7 @@ export function PersonalControls({
         )
           throw new PersonalRequestError(0, true);
         if (result.revision > seed.revision) {
+          observeRevision(result.revision);
           fence.current = true;
           setFenced(true);
           refresh.current?.();
@@ -124,6 +130,7 @@ export function PersonalControls({
     locale,
     loadAttempt,
     loadIdentity,
+    observeRevision,
   ]);
   async function execute() {
     if (
@@ -135,6 +142,7 @@ export function PersonalControls({
       error === 409
     )
       return;
+    if (!scope.start()) return;
     if (!pending.current) {
       const input = {
         revision: seed.revision,
@@ -146,6 +154,7 @@ export function PersonalControls({
       };
       const parsed = personalHttpPatchSchema.safeParse(input);
       if (!parsed.success) {
+        scope.fail(false, 400);
         setError(400);
         setSaved(false);
         return;
@@ -171,6 +180,7 @@ export function PersonalControls({
         result.archived
       )
         throw new PersonalRequestError(0, true);
+      scope.commit(result.revision);
       pending.current = null;
       setRetry(false);
       setSaved(true);
@@ -184,6 +194,7 @@ export function PersonalControls({
         cause instanceof PersonalRequestError
           ? cause
           : new PersonalRequestError(0, true);
+      scope.fail(failure.ambiguous, failure.status);
       setError(failure.status || -1);
       setRetry(failure.ambiguous);
       if (!failure.ambiguous) pending.current = null;
@@ -215,14 +226,15 @@ export function PersonalControls({
             <label>
               {t.rating}
               <select
-                value={loaded ? rating : ""}
+                value={usableLoaded ? rating : ""}
                 onChange={(event) => {
+                  if (!scope.canEdit()) return;
                   setRating(event.target.value);
                   changed();
                 }}
               >
                 <option value="">
-                  {loaded
+                  {usableLoaded
                     ? t.none
                     : seed.archived || loadError || fenced
                       ? t.unavailable
@@ -239,9 +251,10 @@ export function PersonalControls({
               {t.notes}
               <textarea
                 maxLength={4000}
-                value={loaded ? notes : ""}
-                placeholder={loaded ? undefined : t.loading}
+                value={usableLoaded ? notes : ""}
+                placeholder={usableLoaded ? undefined : t.loading}
                 onChange={(event) => {
+                  if (!scope.canEdit()) return;
                   setNotes(event.target.value);
                   changed();
                 }}
@@ -249,7 +262,7 @@ export function PersonalControls({
               />
             </label>
           </div>
-          {loaded && (
+          {usableLoaded && (
             <p id={`personal-notes-count-${seed.id}`}>
               {notes.length} / 4000 {t.count}
             </p>

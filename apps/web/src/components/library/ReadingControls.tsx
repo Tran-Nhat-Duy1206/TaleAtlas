@@ -12,6 +12,7 @@ import {
 import { readingCommand, ReadingRequestError } from "./reading-transport";
 import { readingCopy } from "./reading-copy";
 import styles from "./reading.module.css";
+import { useEntryRevisionFence } from "./EntryRevisionScope";
 const subscribe = () => () => {};
 function RefreshBridge({
   targetRef,
@@ -41,7 +42,8 @@ export function ReadingControls({
     ),
     refresh = useRef<(() => void) | null>(null),
     t = readingCopy[locale],
-    session = entry.readingSession;
+    session = entry.readingSession,
+    scope = useEntryRevisionFence(entry.revision);
   const open =
     session && (session.state === "ACTIVE" || session.state === "PAUSED");
   const [fields, setFields] = useState({
@@ -77,6 +79,7 @@ export function ReadingControls({
     : [];
   const selectedKnown = editions.some((e) => e.id === fields.editionId);
   const disabled =
+    scope.blocked ||
     !hydrated ||
     !!(entry.currentSession && !session) ||
     busy ||
@@ -87,20 +90,26 @@ export function ReadingControls({
     action?: "PROGRESS" | "START_READ" | "START_REREAD" | "RESUME" | "COMPLETE",
   ) {
     if (!hydrated || lock.current || fence.current || error === 409) return;
-    if (!pending.current) {
-      if (
-        !action ||
+    if (
+      !pending.current &&
+      (!action ||
+        (action === "PROGRESS" && !open) ||
         (action === "COMPLETE" && !completion) ||
-        (action === "START_REREAD" && !ack)
-      )
-        return;
+        (action === "START_REREAD" && !ack))
+    )
+      return;
+    if (!scope.start()) return;
+    if (!pending.current) {
       const commandFence = {
         revision: entry.revision,
         mutationKey: crypto.randomUUID(),
       };
       let payload: unknown;
       if (action === "PROGRESS") {
-        if (!open) return;
+        if (!open) {
+          scope.fail(false, 400);
+          return;
+        }
         const patch = {
           ...fields,
           chapterNumber:
@@ -122,6 +131,7 @@ export function ReadingControls({
           patch,
         });
         if (!parsed.success) {
+          scope.fail(false, 400);
           setError(400);
           return;
         }
@@ -158,6 +168,7 @@ export function ReadingControls({
           !parsed.success ||
           (action === "COMPLETE" && finishedOn && startedOn > finishedOn)
         ) {
+          scope.fail(false, 400);
           setError(400);
           return;
         }
@@ -188,6 +199,7 @@ export function ReadingControls({
         result.archived
       )
         throw new ReadingRequestError(0, true);
+      scope.commit(result.revision);
       pending.current = null;
       setRetry(false);
       setSaved(true);
@@ -201,6 +213,7 @@ export function ReadingControls({
         cause instanceof ReadingRequestError
           ? cause
           : new ReadingRequestError(0, true);
+      scope.fail(failure.ambiguous, failure.status);
       setError(failure.status || -1);
       setRetry(failure.ambiguous);
       if (!failure.ambiguous) pending.current = null;
@@ -258,20 +271,22 @@ export function ReadingControls({
                           : undefined
                     }
                     maxLength={200}
-                    value={fields[key]}
-                    onChange={(e) =>
-                      setFields({ ...fields, [key]: e.target.value })
-                    }
+                    value={scope.blocked ? "" : fields[key]}
+                    onChange={(e) => {
+                      if (!scope.canEdit()) return;
+                      setFields({ ...fields, [key]: e.target.value });
+                    }}
                   />
                 </label>
               ))}
               <label>
                 {t.editionId}
                 <select
-                  value={fields.editionId}
-                  onChange={(e) =>
-                    setFields({ ...fields, editionId: e.target.value })
-                  }
+                  value={scope.blocked ? "" : fields.editionId}
+                  onChange={(e) => {
+                    if (!scope.canEdit()) return;
+                    setFields({ ...fields, editionId: e.target.value });
+                  }}
                 >
                   <option value="">{t.none}</option>
                   {fields.editionId && !selectedKnown && (
@@ -288,10 +303,11 @@ export function ReadingControls({
                 {t.progressNotes}
                 <textarea
                   maxLength={2000}
-                  value={fields.progressNotes}
-                  onChange={(e) =>
-                    setFields({ ...fields, progressNotes: e.target.value })
-                  }
+                  value={scope.blocked ? "" : fields.progressNotes}
+                  onChange={(e) => {
+                    if (!scope.canEdit()) return;
+                    setFields({ ...fields, progressNotes: e.target.value });
+                  }}
                 />
               </label>
             </div>
@@ -314,8 +330,10 @@ export function ReadingControls({
               {t.startedOn}
               <input
                 type="date"
-                value={startedOn}
-                onChange={(e) => setStartedOn(e.target.value)}
+                value={scope.blocked ? "" : startedOn}
+                onChange={(e) => {
+                  if (scope.canEdit()) setStartedOn(e.target.value);
+                }}
               />
             </label>
             {open && (
@@ -323,8 +341,10 @@ export function ReadingControls({
                 {t.finishedOn}
                 <input
                   type="date"
-                  value={finishedOn}
-                  onChange={(e) => setFinishedOn(e.target.value)}
+                  value={scope.blocked ? "" : finishedOn}
+                  onChange={(e) => {
+                    if (scope.canEdit()) setFinishedOn(e.target.value);
+                  }}
                 />
               </label>
             )}
@@ -332,8 +352,10 @@ export function ReadingControls({
               {t.notes}
               <textarea
                 maxLength={2000}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                value={scope.blocked ? "" : notes}
+                onChange={(e) => {
+                  if (scope.canEdit()) setNotes(e.target.value);
+                }}
               />
             </label>
           </div>
