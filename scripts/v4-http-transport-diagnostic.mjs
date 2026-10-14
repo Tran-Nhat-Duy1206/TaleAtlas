@@ -1,5 +1,7 @@
-// Explicitly authorized TWO-FILE SUBSET DIAGNOSTIC, never mandatory acceptance.
-// Runs the unchanged native wrapper/config/tests with diagnostic-only preload.
+// Explicitly authorized expanded passive diagnostic, never mandatory acceptance.
+// Full original-disabled discovery follows the unchanged build in its own workflow.
+// This development workload is NOT identical first-12-Quality-gate conditioning.
+// CLI arguments intentionally retain the wrapper's single disabled phase.
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
@@ -24,7 +26,11 @@ const summary = {
   diagnosticOnly: true,
   productAcceptance: false,
   reproductionEstablished: false,
-  selectedOriginalFiles: 2,
+  fullOriginalDisabledDiscovery: true,
+  expectedOriginalDisabledScenarios: 17,
+  conditioning: "build-preceded-development-not-identical-full-quality-gates",
+  serverSocketsBeforeFirstHTTPRequestNotObserved: true,
+  numericSocketFactsDoNotEstablishPairingOrWireCause: true,
   workers: 1,
   retries: 0,
   serverMode: "development",
@@ -87,15 +93,7 @@ try {
   const options = `${existingOptions ? existingOptions + " " : ""}--require ${JSON.stringify(observer)}`;
   child = spawn(
     process.execPath,
-    [
-      "--import",
-      "tsx",
-      "scripts/test-e2e.ts",
-      "tests/e2e/library-reading.spec.ts",
-      "tests/e2e/requests.spec.ts",
-      "--workers=1",
-      "--retries=0",
-    ],
+    ["--import", "tsx", "scripts/test-e2e.ts", "--workers=1", "--retries=0"],
     {
       cwd: root,
       // No captured pipes or inline private console/trace output.
@@ -137,13 +135,63 @@ try {
   if (log) await log.close();
   if (output) {
     try {
+      // Read ONLY this invocation's owned child log. Emit numeric footer facts,
+      // never raw lines, test names, traces, URLs, exception messages or bodies.
+      const childText = await readFile(
+        join(output, "private-child-output.log"),
+        "utf8",
+      );
+      const counts = {
+        passed: 0,
+        failed: 0,
+        skipped: 0,
+        flaky: 0,
+        interrupted: 0,
+        didNotRun: 0,
+      };
+      const seen = new Set();
+      let ambiguousFooter = false;
+      for (const rawLine of childText.split(/\r?\n/)) {
+        const line = rawLine.replace(/\u001b\[[0-9;]*m|\^\[\[[0-9;]*m/g, "");
+        const match =
+          /^\s*(\d+) (passed|failed|skipped|flaky|interrupted|did not run)(?:\s+\([0-9.]+(?:ms|s|m|h)\))?\s*$/.exec(
+            line,
+          );
+        if (!match) continue;
+        const key = match[2] === "did not run" ? "didNotRun" : match[2];
+        const value = Number(match[1]);
+        if (seen.has(key) || !Number.isSafeInteger(value))
+          ambiguousFooter = true;
+        seen.add(key);
+        counts[key] = value;
+      }
+      summary.originalDisabledFooterCounts = counts;
+      summary.originalDisabledFooterRecognized =
+        seen.size > 0 && !ambiguousFooter;
+      summary.originalDisabledAll17PassedNoSkips =
+        summary.childExitCode === 0 &&
+        summary.originalDisabledFooterRecognized &&
+        counts.passed === 17 &&
+        counts.failed === 0 &&
+        counts.skipped === 0 &&
+        counts.flaky === 0 &&
+        counts.interrupted === 0 &&
+        counts.didNotRun === 0;
+      if (
+        summary.childExitCode === 0 &&
+        !summary.originalDisabledAll17PassedNoSkips
+      ) {
+        summary.originalDisabledFooterRejected = true;
+        if (result === 0) result = 1;
+      }
       const files = (await readdir(output)).filter((name) =>
         /^\d+-(?:client|server)\.jsonl$/.test(name),
       );
       summary.observedFiles = files.length;
       for (const name of files) {
-        // Only new owned WHITELISTED observations; never read raw child logs,
-        // existing traces, private artifacts, operator configuration or env files.
+        // Only this run's WHITELISTED observations here; the owned numeric-footer
+        // projection above is the sole raw-log read. No existing traces/artifacts
+        // or operator configuration/env files are inspected.
         const text = await readFile(join(output, name), "utf8");
         for (const line of text.split("\n")) {
           if (!line) continue;

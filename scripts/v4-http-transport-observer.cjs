@@ -1,5 +1,5 @@
 "use strict";
-// OPT-IN SUBSET DIAGNOSTIC ONLY. Never changes HTTP defaults, headers, timers,
+// OPT-IN EXPANDED PASSIVE DIAGNOSTIC ONLY. Never changes HTTP defaults, headers, timers,
 // agents, retries or error handling. Synchronous observation has timing cost;
 // evidence from this preload is not a transport fix or acceptance proof.
 const fs = require("node:fs");
@@ -7,6 +7,7 @@ const path = require("node:path");
 const dc = require("node:diagnostics_channel");
 const { errorMonitor } = require("node:events");
 const { performance } = require("node:perf_hooks");
+const { isIP } = require("node:net");
 
 const root = path.resolve(__dirname, "..");
 const supplied = process.env.TALEATLAS_V4_HTTP_DIAGNOSTIC_DIRECTORY;
@@ -94,28 +95,144 @@ if (enabled) {
       ? null
       : number(time() - state.lastEnd);
   }
+  function passive(callback) {
+    return (...args) => {
+      try {
+        callback(...args);
+      } catch {
+        /* Never change the emitting operation. */
+      }
+    };
+  }
+  function port(value) {
+    return Number.isInteger(value) && value >= 1 && value <= 65535
+      ? value
+      : null;
+  }
+  function addressFacts(value) {
+    if (typeof value !== "string") return { family: "unknown", loopback: null };
+    const kind = isIP(value);
+    if (kind === 4)
+      return { family: "IPv4", loopback: value.startsWith("127.") };
+    // Mapped/embedded IPv4 is deliberately not normalized into an exact pair.
+    if (kind === 6 && !value.includes(".")) {
+      const halves = value.toLowerCase().split("::");
+      const left = halves[0].split(":").filter(Boolean);
+      const right =
+        halves.length === 2 ? halves[1].split(":").filter(Boolean) : [];
+      const groups =
+        halves.length === 2
+          ? [
+              ...left,
+              ...Array(8 - left.length - right.length).fill("0"),
+              ...right,
+            ]
+          : left;
+      const words = groups.map((part) => Number.parseInt(part, 16));
+      if (
+        words.length === 8 &&
+        !(words.slice(0, 5).every((part) => part === 0) && words[5] === 65535)
+      )
+        return {
+          family: "IPv6",
+          loopback:
+            words.slice(0, 7).every((part) => part === 0) && words[7] === 1,
+        };
+    }
+    return { family: "unknown", loopback: null };
+  }
+  function tupleFields(state) {
+    return {
+      localPort: state?.tuple?.localPort ?? null,
+      remotePort: state?.tuple?.remotePort ?? null,
+      loopback: state?.tuple?.loopback ?? null,
+      family: state?.tuple?.family ?? "unknown",
+      tupleCapturedAtMs: state?.tuple?.tupleCapturedAtMs ?? null,
+      observedFrom: state?.observedFrom ?? "unknown",
+    };
+  }
+  function captureTuple(socket, state) {
+    if (state.tuple !== null) return;
+    const localPort = port(socket.localPort),
+      remotePort = port(socket.remotePort);
+    if (localPort === null || remotePort === null) return;
+    // Addresses are inspected locally ONLY; never recorded, hashed or returned.
+    const local = addressFacts(socket.localAddress),
+      remote = addressFacts(socket.remoteAddress);
+    const family = local.family === remote.family ? local.family : "unknown";
+    const loopback =
+      local.loopback === false || remote.loopback === false
+        ? false
+        : local.loopback === true && remote.loopback === true
+          ? true
+          : null;
+    state.tuple = Object.freeze({
+      localPort,
+      remotePort,
+      loopback,
+      family,
+      tupleCapturedAtMs: time(),
+    });
+  }
   function socketState(socket, role) {
     if (!socket || typeof socket.once !== "function") return null;
     let state = sockets.get(socket);
     if (state) return state;
-    state = { ordinal: ++socketOrdinal, lastEnd: null, inFlight: false, role };
+    state = {
+      ordinal: ++socketOrdinal,
+      lastEnd: null,
+      inFlight: false,
+      role,
+      tuple: null,
+      observedFrom:
+        role === "client" ? "client-assignment" : "server-http-request",
+    };
     sockets.set(socket, state);
-    socket.on(errorMonitor, (error) =>
-      record(role, {
-        event: "socket-error",
-        connection: state.ordinal,
-        errorClass: errorClass(error),
-        idleAgeMs: idle(state),
-      }),
+    if (!socket.connecting) captureTuple(socket, state);
+    record(role, {
+      event: "socket-observed",
+      connection: state.ordinal,
+      ...tupleFields(state),
+    });
+    // This is observation time, NOT a wire-handshake timestamp. Server sockets
+    // are first observed at HTTP request start, never before their first HTTP.
+    if (role === "client" && socket.connecting) {
+      socket.once(
+        "connect",
+        passive(() => {
+          captureTuple(socket, state);
+          record(role, {
+            event: "socket-connected",
+            connection: state.ordinal,
+            ...tupleFields(state),
+          });
+        }),
+      );
+    }
+    socket.on(
+      errorMonitor,
+      passive((error) =>
+        record(role, {
+          event: "socket-error",
+          connection: state.ordinal,
+          ...tupleFields(state),
+          errorClass: errorClass(error),
+          idleAgeMs: idle(state),
+        }),
+      ),
     );
-    socket.once("close", (hadError) =>
-      record(role, {
-        event: "socket-close",
-        connection: state.ordinal,
-        hadError: !!hadError,
-        idleAgeMs: idle(state),
-        socketTimeoutMs: number(socket.timeout),
-      }),
+    socket.once(
+      "close",
+      passive((hadError) =>
+        record(role, {
+          event: "socket-close",
+          connection: state.ordinal,
+          ...tupleFields(state),
+          hadError: !!hadError,
+          idleAgeMs: idle(state),
+          socketTimeoutMs: number(socket.timeout),
+        }),
+      ),
     );
     return state;
   }
@@ -129,17 +246,23 @@ if (enabled) {
       assignedAt: null,
     };
     requests.set(request, state);
-    request.on(errorMonitor, (error) =>
-      record("client", {
-        event: "request-error",
-        request: state.ordinal,
-        category: state.category,
-        connection: state.connection?.ordinal ?? null,
-        errorClass: errorClass(error),
-        idleAtAssignmentMs: state.idleAtAssignment,
-        requestAgeMs:
-          state.assignedAt === null ? null : number(time() - state.assignedAt),
-      }),
+    request.on(
+      errorMonitor,
+      passive((error) =>
+        record("client", {
+          event: "request-error",
+          request: state.ordinal,
+          category: state.category,
+          connection: state.connection?.ordinal ?? null,
+          ...tupleFields(state.connection),
+          errorClass: errorClass(error),
+          idleAtAssignmentMs: state.idleAtAssignment,
+          requestAgeMs:
+            state.assignedAt === null
+              ? null
+              : number(time() - state.assignedAt),
+        }),
+      ),
     );
     function assigned(socket) {
       try {
@@ -155,6 +278,7 @@ if (enabled) {
           request: state.ordinal,
           category: state.category,
           connection: connection?.ordinal ?? null,
+          ...tupleFields(connection),
           reusedSocket: request.reusedSocket === true,
           idleAtAssignmentMs: state.idleAtAssignment,
           agentKeepAlive:
@@ -186,11 +310,12 @@ if (enabled) {
       request: state.ordinal,
       category: state.category,
       connection: state.connection?.ordinal ?? null,
+      ...tupleFields(state.connection),
       status: number(response.statusCode),
     });
     // The diagnostics channel is not a readable-body completion boundary.
     // Observe the actual stream end without consuming data or changing flow.
-    const ended = () => {
+    const ended = passive(() => {
       if (state.connection) {
         state.connection.lastEnd = time();
         state.connection.inFlight = false;
@@ -200,10 +325,11 @@ if (enabled) {
         request: state.ordinal,
         category: state.category,
         connection: state.connection?.ordinal ?? null,
+        ...tupleFields(state.connection),
         status: number(response.statusCode),
         complete: response.complete === true,
       });
-    };
+    });
     if (response.readableEnded) ended();
     else response.once("end", ended);
   }
@@ -226,6 +352,7 @@ if (enabled) {
       request: state.ordinal,
       category: state.category,
       connection: connection?.ordinal ?? null,
+      ...tupleFields(connection),
       idleAtStartMs: idleAtStart,
       keepAliveTimeoutMs: number(server?.keepAliveTimeout),
       keepAliveTimeoutBufferMs: number(server?.keepAliveTimeoutBuffer),
@@ -233,19 +360,23 @@ if (enabled) {
       headersTimeoutMs: number(server?.headersTimeout),
       serverTimeoutMs: number(server?.timeout),
     });
-    response.once("finish", () => {
-      if (connection) {
-        connection.lastEnd = time();
-        connection.inFlight = false;
-      }
-      record("server", {
-        event: "response-finish",
-        request: state.ordinal,
-        category: state.category,
-        connection: connection?.ordinal ?? null,
-        status: number(response.statusCode),
-      });
-    });
+    response.once(
+      "finish",
+      passive(() => {
+        if (connection) {
+          connection.lastEnd = time();
+          connection.inFlight = false;
+        }
+        record("server", {
+          event: "response-finish",
+          request: state.ordinal,
+          category: state.category,
+          connection: connection?.ordinal ?? null,
+          ...tupleFields(connection),
+          status: number(response.statusCode),
+        });
+      }),
+    );
   }
   function subscribe(name, handler) {
     dc.subscribe(name, (message) => {

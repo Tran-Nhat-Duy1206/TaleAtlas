@@ -1,7 +1,8 @@
 name: V4 synthetic HTTP transport diagnostic
 
-# Maintainer-approved additive diagnostic only. Never substitute this subset
-# for the unchanged Quality gates workflow or any milestone acceptance.
+# Maintainer-approved expanded passive diagnostic only, not milestone acceptance.
+# Build-preceded development workload is NOT identical first-12-gate conditioning.
+# Extra synthetic CI compute is approved; original Quality gates stay unchanged.
 on:
   push:
     branches: [feat/v4-work-communities]
@@ -47,7 +48,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm db:migrate
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Observe two unchanged baseline scenarios (diagnostic only)
+      # No observer preload is set during the unchanged build command.
+      - run: pnpm build
+      - name: Observe full original-disabled discovery (expected 17; diagnostic only)
         run: node scripts/v4-http-transport-diagnostic.mjs
       - name: Retain only sanitized synthetic socket observations
         if: always()
