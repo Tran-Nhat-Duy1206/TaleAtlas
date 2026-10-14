@@ -58,8 +58,14 @@ function event(entry: Entry, overrides: Record<string, unknown> = {}) {
     mutation_key: randomUUID(),
     request_hash: "a".repeat(64),
     kind: "UPDATE",
-    snapshot: {},
     ...overrides,
+    // Object-row helpers do not reliably infer JSONB serialization with
+    // prepare:false. Bind a native value explicitly, including negative cases.
+    snapshot: sql.json(
+      (Object.prototype.hasOwnProperty.call(overrides, "snapshot")
+        ? overrides.snapshot
+        : {}) as Parameters<typeof sql.json>[0],
+    ),
   };
 }
 
