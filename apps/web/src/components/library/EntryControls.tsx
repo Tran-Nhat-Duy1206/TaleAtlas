@@ -66,6 +66,10 @@ export function EntryControls({
     // Fence sibling editors before minting a command or dispatching a request.
     if (!scope.start()) return;
     if (!pending.current) {
+      if (!method) {
+        scope.fail(false, 400);
+        return;
+      }
       pending.current = {
         method,
         payload: JSON.stringify({

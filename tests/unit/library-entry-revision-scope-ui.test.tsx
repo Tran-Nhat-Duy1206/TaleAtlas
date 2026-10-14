@@ -77,7 +77,9 @@ for (const locale of ["en", "vi"] as const)
           }),
       );
       let resolveEntry!: (value: unknown) => void;
-      const entryWrites = vi.fn(
+      const entryWrites = vi.fn<
+        (url: string, options: RequestInit) => Promise<unknown>
+      >(
         () =>
           new Promise((resolve) => {
             resolveEntry = resolve;
@@ -135,29 +137,24 @@ for (const locale of ["en", "vi"] as const)
       const save = () =>
         screen.getByRole("button", {
           name: personalCopy[locale].save,
-          exact: true,
         });
       await waitFor(() => expect(save()).toBeEnabled());
       const rating = screen.getByRole("combobox", {
         name: personalCopy[locale].rating,
-        exact: true,
       });
       const notes = screen.getByRole("textbox", {
         name: personalCopy[locale].notes,
-        exact: true,
       });
       expect(notes).toHaveValue(privateNotes);
       fireEvent.change(
         screen.getByRole("combobox", {
           name: libraryCopy[locale].status,
-          exact: true,
         }),
         { target: { value: "READING" } },
       );
       fireEvent.click(
         screen.getByRole("button", {
           name: libraryCopy[locale].save,
-          exact: true,
         }),
       );
       // The sibling fence starts before the initiating request resolves, not in an effect.
@@ -188,7 +185,6 @@ for (const locale of ["en", "vi"] as const)
       expect(
         screen.getByRole("textbox", {
           name: personalCopy[locale].notes,
-          exact: true,
         }),
       ).toHaveValue("");
       expect(personalWrites).not.toHaveBeenCalled();
@@ -198,7 +194,6 @@ for (const locale of ["en", "vi"] as const)
       await waitFor(() => expect(save()).toBeEnabled());
       const freshRating = screen.getByRole("combobox", {
         name: personalCopy[locale].rating,
-        exact: true,
       });
       expect(freshRating).toHaveValue("");
       fireEvent.change(freshRating, { target: { value: "2" } });
