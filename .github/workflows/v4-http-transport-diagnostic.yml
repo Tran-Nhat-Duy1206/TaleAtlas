@@ -1,8 +1,9 @@
 name: V4 synthetic HTTP transport diagnostic
 
 # Maintainer-approved expanded passive diagnostic only, not milestone acceptance.
-# Build-preceded development workload is NOT identical first-12-gate conditioning.
-# Extra synthetic CI compute is approved; original Quality gates stay unchanged.
+# Mirrors unchanged Quality pre-native commands and synthetic fixture setup.
+# Matching preparation is NOT identical runner timing or causal proof.
+# Extra synthetic CI compute is explicitly approved; original Quality gates stay unchanged.
 on:
   push:
     branches: [feat/v4-work-communities]
@@ -45,12 +46,20 @@ jobs:
         with:
           node-version: "24"
           cache: pnpm
+      # Maintainer-approved unchanged Quality prefix, with no observer preload.
       - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
       - run: pnpm db:migrate
-      - run: pnpm exec playwright install --with-deps chromium
-      # No observer preload is set during the unchanged build command.
+      - run: pnpm db:migrate
+      - run: pnpm db:generate
+      - run: git diff --exit-code -- packages/database/drizzle
+      - run: pnpm test:integration
       - run: pnpm build
-      - name: Observe full original-disabled discovery (expected 17; diagnostic only)
+      - run: pnpm typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+      - name: Observe preparation-matched original-disabled discovery (expected 17; diagnostic only)
         run: node scripts/v4-http-transport-diagnostic.mjs
       - name: Retain only sanitized synthetic socket observations
         if: always()

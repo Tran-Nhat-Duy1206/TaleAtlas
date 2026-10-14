@@ -1,6 +1,7 @@
 // Explicitly authorized expanded passive diagnostic, never mandatory acceptance.
-// Full original-disabled discovery follows the unchanged build in its own workflow.
-// This development workload is NOT identical first-12-Quality-gate conditioning.
+// Own workflow mirrors unchanged Quality pre-native commands and synthetic setup.
+// Actual workflow steps must verify that expected prefix; this runner cannot.
+// Matching preparation is NOT identical runner timing or causal proof.
 // CLI arguments intentionally retain the wrapper's single disabled phase.
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -28,7 +29,10 @@ const summary = {
   reproductionEstablished: false,
   fullOriginalDisabledDiscovery: true,
   expectedOriginalDisabledScenarios: 17,
-  conditioning: "build-preceded-development-not-identical-full-quality-gates",
+  conditioning:
+    "quality-pre-native-command-prefix-expected-not-identical-runner-timing",
+  expectedPreNativeCommands: 12,
+  preparationEvidenceRequiresActualWorkflowSteps: true,
   serverSocketsBeforeFirstHTTPRequestNotObserved: true,
   numericSocketFactsDoNotEstablishPairingOrWireCause: true,
   workers: 1,
