@@ -37,17 +37,20 @@ async function facts(backend: Reader = sql) {
   ];
 }
 
-const eventColumns = [
-  "id",
-  "entry_id",
-  "user_id",
-  "work_id",
-  "entry_revision",
-  "mutation_key",
-  "request_hash",
-  "kind",
-  "snapshot",
-] as const;
+type Transaction = Parameters<Parameters<typeof sql.begin>[1]>[0];
+async function insertEvents(tx: Transaction, rows: ReturnType<typeof event>[]) {
+  // Explicit TEXT input avoids object-row-helper parameter serialization and
+  // JSONB string double encoding. SQL retains each native snapshot value/type.
+  const encoded = JSON.stringify(rows);
+  return tx`insert into public.library_events
+      (id, entry_id, user_id, work_id, entry_revision,
+       mutation_key, request_hash, kind, snapshot)
+    select id, entry_id, user_id, work_id, entry_revision,
+      mutation_key, request_hash, kind, snapshot
+    from jsonb_populate_recordset(null::public.library_events,
+      ${encoded}::text::jsonb)
+    returning id`;
+}
 function event(entry: Entry, overrides: Record<string, unknown> = {}) {
   return {
     id: randomUUID(),
@@ -58,14 +61,8 @@ function event(entry: Entry, overrides: Record<string, unknown> = {}) {
     mutation_key: randomUUID(),
     request_hash: "a".repeat(64),
     kind: "UPDATE",
+    snapshot: {},
     ...overrides,
-    // Object-row helpers do not reliably infer JSONB serialization with
-    // prepare:false. Bind a native value explicitly, including negative cases.
-    snapshot: sql.json(
-      (Object.prototype.hasOwnProperty.call(overrides, "snapshot")
-        ? overrides.snapshot
-        : {}) as Parameters<typeof sql.json>[0],
-    ),
   };
 }
 
@@ -100,21 +97,18 @@ beforeAll(async () => {
         "Bounded SQL fixture did not persist its expected entries",
       );
     unrelated = controlEntry;
-    await tx`insert into public.library_events ${tx(
-      [
-        event(owned[0]!, {
-          entry_revision: 1,
-          mutation_key: ownerKey,
-          kind: "ADD",
-        }),
-        event(unrelated, {
-          entry_revision: 1,
-          mutation_key: controlKey,
-          kind: "ADD",
-        }),
-      ],
-      ...eventColumns,
-    )}`;
+    await insertEvents(tx, [
+      event(owned[0]!, {
+        entry_revision: 1,
+        mutation_key: ownerKey,
+        kind: "ADD",
+      }),
+      event(unrelated, {
+        entry_revision: 1,
+        mutation_key: controlKey,
+        kind: "ADD",
+      }),
+    ]);
   });
 }, 60000);
 
@@ -420,18 +414,15 @@ describe("library event bulk-only cache guard (bounded real SQL)", () => {
       // This first valid two-owner bulk executes the guard before the subsequent
       // failing statement; the enclosing transaction must undo it as well.
       const operation = sql.begin(async (tx) => {
-        const accepted = await tx`insert into public.library_events ${tx(
-          [
-            event(owned[0]!, { entry_revision: 8000 }),
-            event(unrelated, { entry_revision: 8000 }),
-          ],
-          ...eventColumns,
-        )} returning id`;
+        const accepted = await insertEvents(tx, [
+          event(owned[0]!, { entry_revision: 8000 }),
+          event(unrelated, { entry_revision: 8000 }),
+        ]);
         expect(accepted).toHaveLength(2);
-        await tx`insert into public.library_events ${tx(
-          [event(unrelated), event(owned[0]!, testCase.patch)],
-          ...eventColumns,
-        )} returning id`;
+        await insertEvents(tx, [
+          event(unrelated),
+          event(owned[0]!, testCase.patch),
+        ]);
       });
       await expect(operation).rejects.toMatchObject({
         code: testCase.code,
