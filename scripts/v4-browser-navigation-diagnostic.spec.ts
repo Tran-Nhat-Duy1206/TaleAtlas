@@ -92,6 +92,16 @@ export const ERROR_CLASSES = [
 ] as const;
 export const PHASES = ["setup", "flow", "teardown"] as const;
 export const MAX_BROWSER_ROWS = 10000;
+export const HMR_HASH_COMPARISONS = ["MATCH", "DIFFER", "UNKNOWN"] as const;
+export const HMR_SOURCE_SITES = [
+  "APP_SOCKET_MESSAGE",
+  "APP_SOCKET_DISCONNECT",
+  "APP_UPDATE",
+  "APP_FULL_RELOAD",
+  "PAGES_HMR",
+  "TURBOPACK_HMR",
+  "UNKNOWN",
+] as const;
 
 export type BrowserRow = {
   v: 1;
@@ -113,6 +123,13 @@ export type BrowserRow = {
   hmrInitiator: boolean | null;
   success: boolean | null;
   droppedRows: number | null;
+  documentOrdinal: number | null;
+  hmrSocketOrdinal: number | null;
+  hmrPriorSyncSeen: boolean | null;
+  hmrSyncHashPresent: boolean | null;
+  hmrPriorSyncHashNonNull: boolean | null;
+  hmrSyncHashComparison: (typeof HMR_HASH_COMPARISONS)[number];
+  hmrSourceSite: (typeof HMR_SOURCE_SITES)[number];
 };
 
 export function browserEnum<T extends string>(
@@ -162,6 +179,21 @@ export function projectBrowserRow(input: Record<string, unknown>): BrowserRow {
     hmrInitiator: browserBoolean(input.hmrInitiator),
     success: browserBoolean(input.success),
     droppedRows: browserInteger(input.droppedRows),
+    documentOrdinal: browserInteger(input.documentOrdinal),
+    hmrSocketOrdinal: browserInteger(input.hmrSocketOrdinal),
+    hmrPriorSyncSeen: browserBoolean(input.hmrPriorSyncSeen),
+    hmrSyncHashPresent: browserBoolean(input.hmrSyncHashPresent),
+    hmrPriorSyncHashNonNull: browserBoolean(input.hmrPriorSyncHashNonNull),
+    hmrSyncHashComparison: browserEnum(
+      HMR_HASH_COMPARISONS,
+      input.hmrSyncHashComparison,
+      "UNKNOWN",
+    ),
+    hmrSourceSite: browserEnum(
+      HMR_SOURCE_SITES,
+      input.hmrSourceSite,
+      "UNKNOWN",
+    ),
   };
 }
 export function classifyBrowserRoute(
@@ -225,6 +257,128 @@ export function classifyHmrInitiator(input: unknown): boolean | null {
   }
   return null; // Missing or unmatched bounded stack is not proof of no HMR involvement.
 }
+/** Lexical evidence only, not an executed branch or active-client assertion. */
+export function classifyHmrSourceSite(
+  input: unknown,
+): (typeof HMR_SOURCE_SITES)[number] {
+  if (!input || typeof input !== "object") return "UNKNOWN";
+  let stack = (input as Record<string, unknown>).stack;
+  for (
+    let depth = 0;
+    depth < 4 && stack && typeof stack === "object";
+    depth++
+  ) {
+    const value = stack as Record<string, unknown>;
+    if (Array.isArray(value.callFrames)) {
+      for (const frame of value.callFrames.slice(0, 100)) {
+        if (!frame || typeof frame !== "object") continue;
+        const item = frame as Record<string, unknown>;
+        const url = typeof item.url === "string" ? item.url : "";
+        const name =
+          typeof item.functionName === "string" ? item.functionName : "";
+        if (
+          /client\/dev\/hot-reloader\/app\/web-socket\.[jt]s(?:[?:]|$)/i.test(
+            url,
+          )
+        ) {
+          if (/^(?:handleDisconnect|onDisconnect)$/.test(name))
+            return "APP_SOCKET_DISCONNECT";
+          if (/^(?:handleMessage|onMessage|processMessage)$/.test(name))
+            return "APP_SOCKET_MESSAGE";
+        }
+        if (
+          /client\/components\/react-dev-overlay\/app\/hot-reloader-app\.[jt]s(?:[?:]|$)|client\/dev\/hot-reloader\/app\/hot-reloader-app\.[jt]s(?:[?:]|$)/i.test(
+            url,
+          )
+        ) {
+          if (/performFullReload/.test(name)) return "APP_FULL_RELOAD";
+          return "APP_UPDATE";
+        }
+        if (
+          /client\/dev\/(?:hot-reloader\/pages\/hot-reloader-pages|hot-middleware-client|hot-reloader-client)\.[jt]s(?:[?:]|$)/i.test(
+            url,
+          )
+        )
+          return "PAGES_HMR";
+        if (/turbopack[-_/](?:hmr|reload)/i.test(url + " " + name))
+          return "TURBOPACK_HMR";
+      }
+    }
+    stack = value.parent;
+  }
+  return "UNKNOWN";
+}
+
+/** Hashes remain closure-private. Observed state is not the client's internal state.
+ * A pending navigation does not replace the owning document; only commit does.
+ */
+export function createHmrSyncTracker() {
+  let documentOrdinal = 0;
+  let socketOrdinal = 0;
+  let seen = false;
+  let known = false;
+  let hash: string | null = null;
+  return {
+    currentDocument: () => documentOrdinal,
+    mainFrameDocumentCommitted() {
+      documentOrdinal++;
+      seen = false;
+      known = false;
+      hash = null;
+    },
+    socketCreated() {
+      return { documentOrdinal, hmrSocketOrdinal: ++socketOrdinal };
+    },
+    observe(
+      owner: { documentOrdinal: number; hmrSocketOrdinal: number },
+      raw: unknown,
+    ) {
+      const result = {
+        documentOrdinal: owner.documentOrdinal,
+        hmrSocketOrdinal: owner.hmrSocketOrdinal,
+        hmrPriorSyncSeen: null as boolean | null,
+        hmrSyncHashPresent: null as boolean | null,
+        hmrPriorSyncHashNonNull: null as boolean | null,
+        hmrSyncHashComparison:
+          "UNKNOWN" as (typeof HMR_HASH_COMPARISONS)[number],
+      };
+      if (
+        owner.documentOrdinal !== documentOrdinal ||
+        typeof raw !== "string" ||
+        raw.length > 1048576 ||
+        Buffer.byteLength(raw, "utf8") > 1048576
+      )
+        return result;
+      let value: unknown;
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        return result;
+      }
+      if (!value || typeof value !== "object" || Array.isArray(value))
+        return result;
+      const message = value as Record<string, unknown>;
+      if (message.type !== "sync") return result;
+      const present = Object.prototype.hasOwnProperty.call(message, "hash");
+      result.hmrPriorSyncSeen = seen;
+      result.hmrSyncHashPresent = present;
+      result.hmrPriorSyncHashNonNull = seen && known ? hash !== null : null;
+      // Seeing SYNC and knowing its hash are independent observations.
+      seen = true;
+      // Installed App socket updates only SYNC with an own hash property.
+      if (!present) return result;
+      const valid = message.hash === null || typeof message.hash === "string";
+      if (seen && known && hash !== null && valid) {
+        result.hmrSyncHashComparison =
+          hash === message.hash ? "MATCH" : "DIFFER";
+      }
+      known = valid;
+      hash = valid ? (message.hash as string | null) : null;
+      return result;
+    },
+  };
+}
+
 export function isDiagnosticHmrSocket(raw: unknown): boolean {
   if (typeof raw !== "string") return false;
   try {
@@ -345,7 +499,15 @@ for (const locale of ["en", "vi"] as const) {
       string,
       { ordinal: number; route: BrowserRow["route"]; mainFrame: boolean }
     >();
-    const hmrSockets = new Map<string, number>();
+    const hmrTracker = createHmrSyncTracker();
+    const hmrSockets = new Map<
+      string,
+      {
+        requestOrdinal: number;
+        documentOrdinal: number;
+        hmrSocketOrdinal: number;
+      }
+    >();
     function emit(
       event: BrowserRow["event"],
       fields: Record<string, unknown> = {},
@@ -357,6 +519,7 @@ for (const locale of ["en", "vi"] as const) {
       }
       rows.push(
         projectBrowserRow({
+          documentOrdinal: hmrTracker.currentDocument(),
           ...fields,
           locale,
           event,
@@ -422,7 +585,10 @@ for (const locale of ["en", "vi"] as const) {
         if (!frame || typeof frame !== "object") return;
         const data = frame as Record<string, unknown>;
         const isMain = typeof data.id === "string" && !data.parentId;
-        if (isMain) mainFrameId = data.id as string;
+        if (isMain) {
+          mainFrameId = data.id as string;
+          hmrTracker.mainFrameDocumentCommitted();
+        }
         emit("navigation-committed", {
           route: classifyBrowserRoute(data.url, workPath),
           reason: value.type,
@@ -463,6 +629,7 @@ for (const locale of ["en", "vi"] as const) {
           requestOrdinal: item.ordinal,
           initiator: initiator?.type,
           hmrInitiator: classifyHmrInitiator(initiator),
+          hmrSourceSite: classifyHmrSourceSite(initiator),
           mainFrame: item.mainFrame,
           sourceAtMs: sourceAt(value.timestamp),
         });
@@ -512,7 +679,10 @@ for (const locale of ["en", "vi"] as const) {
         )
           return;
         const id = ++ordinal;
-        hmrSockets.set(value.requestId, id);
+        hmrSockets.set(value.requestId, {
+          requestOrdinal: id,
+          ...hmrTracker.socketCreated(),
+        });
       });
       listen("Network.webSocketHandshakeResponseReceived", (value) => {
         if (typeof value.requestId !== "string") return;
@@ -521,7 +691,7 @@ for (const locale of ["en", "vi"] as const) {
         if (id === undefined || response?.status !== 101) return;
         emit("hmr-connected", {
           route: "framework-resource",
-          requestOrdinal: id,
+          ...id,
           hmrKind: "connected",
           status: 101,
           sourceAtMs: sourceAt(value.timestamp),
@@ -533,10 +703,12 @@ for (const locale of ["en", "vi"] as const) {
         if (id === undefined) return;
         const response = value.response as Record<string, unknown> | undefined;
         if (response?.opcode !== 1) return;
+        const comparison = hmrTracker.observe(id, response.payloadData);
         for (const hmrKind of classifyHmrPayload(response.payloadData)) {
           emit("hmr-message", {
             route: "framework-resource",
-            requestOrdinal: id,
+            requestOrdinal: id.requestOrdinal,
+            ...comparison,
             hmrKind,
             sourceAtMs: sourceAt(value.timestamp),
           });

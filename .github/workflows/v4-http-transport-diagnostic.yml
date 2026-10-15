@@ -61,9 +61,11 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm exec playwright install --with-deps chromium
-      # Additional human-approved isolated EN/VI CDP navigation metadata probe.
+      # Human-approved unchanged full native 17→8 plus isolated EN/VI probes.
+      # Added eight scenarios: ≤48min + unchanged startup ≤150s; existing probes ≤360s each.
+      # Closed HMR comparisons and passive Node method/category only, not a repair.
       # Existing Quality suites/configs/runtime defaults/assertions/budgets are frozen.
-      - name: Observe preparation-matched original 17 and isolated browser 2 (diagnostic only)
+      - name: Observe preparation-matched original 17 then enabled 8 and isolated browser 2 (diagnostic only)
         run: node scripts/v4-http-transport-diagnostic.mjs
       - name: Retain only sanitized synthetic socket observations
         if: always()

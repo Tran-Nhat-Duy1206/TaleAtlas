@@ -53,6 +53,22 @@ if (enabled) {
   function errorClass(error) {
     return codes.has(error?.code) ? error.code : "OTHER";
   }
+  function method(request) {
+    // Closed enum only: never retain an unknown or caller-supplied raw token.
+    const value = request?.method;
+    switch (value) {
+      case "GET":
+      case "POST":
+      case "PUT":
+      case "PATCH":
+      case "DELETE":
+      case "HEAD":
+      case "OPTIONS":
+        return value;
+      default:
+        return "UNKNOWN";
+    }
+  }
   function category(request) {
     const value =
       typeof request?.path === "string" ? request.path : request?.url;
@@ -62,6 +78,12 @@ if (enabled) {
       return "private-library-sessions";
     if (/^\/api\/requests(?:[/?]|$)/.test(value))
       return "private-owned-request";
+    if (
+      /^\/api\/community\/works\/[^/?#]+\/contents\/[^/?#]+\/moderation(?:\?[^#]*)?$/.test(
+        value,
+      )
+    )
+      return "community-moderation-command";
     return "other";
   }
   function record(role, fields) {
@@ -241,6 +263,7 @@ if (enabled) {
     const state = {
       ordinal: ++requestOrdinal,
       category: category(request),
+      method: method(request),
       connection: null,
       idleAtAssignment: null,
       assignedAt: null,
@@ -253,6 +276,7 @@ if (enabled) {
           event: "request-error",
           request: state.ordinal,
           category: state.category,
+          method: state.method,
           connection: state.connection?.ordinal ?? null,
           ...tupleFields(state.connection),
           errorClass: errorClass(error),
@@ -277,6 +301,7 @@ if (enabled) {
           event: "request-start",
           request: state.ordinal,
           category: state.category,
+          method: state.method,
           connection: connection?.ordinal ?? null,
           ...tupleFields(connection),
           reusedSocket: request.reusedSocket === true,
@@ -309,6 +334,7 @@ if (enabled) {
       event: "response-observed",
       request: state.ordinal,
       category: state.category,
+      method: state.method,
       connection: state.connection?.ordinal ?? null,
       ...tupleFields(state.connection),
       status: number(response.statusCode),
@@ -324,6 +350,7 @@ if (enabled) {
         event: "response-end",
         request: state.ordinal,
         category: state.category,
+        method: state.method,
         connection: state.connection?.ordinal ?? null,
         ...tupleFields(state.connection),
         status: number(response.statusCode),
@@ -341,9 +368,24 @@ if (enabled) {
     const state = {
       ordinal: ++requestOrdinal,
       category: category(request),
+      method: method(request),
       connection,
     };
     requests.set(request, state);
+    request.on(
+      errorMonitor,
+      passive((error) =>
+        record("server", {
+          event: "request-error",
+          request: state.ordinal,
+          category: state.category,
+          method: state.method,
+          connection: connection?.ordinal ?? null,
+          ...tupleFields(connection),
+          errorClass: errorClass(error),
+        }),
+      ),
+    );
     const server = message.server ?? request.socket?.server;
     const idleAtStart = connection ? idle(connection) : null;
     if (connection) connection.inFlight = true;
@@ -351,6 +393,7 @@ if (enabled) {
       event: "request-start",
       request: state.ordinal,
       category: state.category,
+      method: state.method,
       connection: connection?.ordinal ?? null,
       ...tupleFields(connection),
       idleAtStartMs: idleAtStart,
@@ -371,6 +414,7 @@ if (enabled) {
           event: "response-finish",
           request: state.ordinal,
           category: state.category,
+          method: state.method,
           connection: connection?.ordinal ?? null,
           ...tupleFields(connection),
           status: number(response.statusCode),

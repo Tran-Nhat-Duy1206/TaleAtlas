@@ -2,7 +2,10 @@
 // Own workflow mirrors unchanged Quality pre-native commands and synthetic setup.
 // Actual workflow steps must verify that expected prefix; this runner cannot.
 // Matching preparation is NOT identical runner timing or causal proof.
-// CLI arguments intentionally retain the wrapper's single disabled phase.
+// Preserve the existing full17 wrapper CLI override (workers1/retries0).
+// Then run the unchanged enabled config directly with the same diagnostic overrides.
+// No-argument wrapper would inherit the original disabled CI retry1; never alter it.
+// Separate browser probes retain their own closed metadata and original budgets.
 import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, open, readFile, readdir, writeFile } from "node:fs/promises";
@@ -35,6 +38,7 @@ const nodeObservationKeys = new Set([
   "connection",
   "request",
   "category",
+  "method",
   "reusedSocket",
   "idleAgeMs",
   "idleAtAssignmentMs",
@@ -73,7 +77,18 @@ const nodeObservationEnums = {
   category: new Set([
     "private-library-sessions",
     "private-owned-request",
+    "community-moderation-command",
     "other",
+  ]),
+  method: new Set([
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "HEAD",
+    "OPTIONS",
+    "UNKNOWN",
   ]),
   event: new Set([
     "socket-observed",
@@ -111,6 +126,14 @@ function validateNodeObservation(row) {
     row.atMs < 0
   )
     return false;
+  const requestAssociated = [
+    "request-start",
+    "request-error",
+    "response-observed",
+    "response-end",
+    "response-finish",
+  ].includes(row.event);
+  if (Object.hasOwn(row, "method") !== requestAssociated) return false;
   return Object.entries(row).every(([key, value]) => {
     if (!nodeObservationKeys.has(key)) return false;
     if (nodeObservationEnums[key]) return nodeObservationEnums[key].has(value);
@@ -142,8 +165,25 @@ const browserObservationKeys = [
   "hmrInitiator",
   "success",
   "droppedRows",
+  "documentOrdinal",
+  "hmrSocketOrdinal",
+  "hmrPriorSyncSeen",
+  "hmrSyncHashPresent",
+  "hmrPriorSyncHashNonNull",
+  "hmrSyncHashComparison",
+  "hmrSourceSite",
 ];
 const browserObservationEnums = {
+  hmrSyncHashComparison: new Set(["MATCH", "DIFFER", "UNKNOWN"]),
+  hmrSourceSite: new Set([
+    "APP_SOCKET_MESSAGE",
+    "APP_SOCKET_DISCONNECT",
+    "APP_UPDATE",
+    "APP_FULL_RELOAD",
+    "PAGES_HMR",
+    "TURBOPACK_HMR",
+    "UNKNOWN",
+  ]),
   locale: new Set(["en", "vi"]),
   event: new Set([
     "fixture-ready",
@@ -232,6 +272,9 @@ const browserObservationEnums = {
   ]),
 };
 const browserObservationBooleans = new Set([
+  "hmrPriorSyncSeen",
+  "hmrSyncHashPresent",
+  "hmrPriorSyncHashNonNull",
   "canceled",
   "mainFrame",
   "hmrInitiator",
@@ -296,12 +339,41 @@ function parseBrowserProbeFooter(text) {
   }
   return { counts, recognized: seen.size > 0 && !ambiguous };
 }
+function footerDiscoveryComplete(footer, expected) {
+  return (
+    footer.recognized &&
+    footer.counts.passed + footer.counts.failed === expected &&
+    ["skipped", "flaky", "interrupted", "didNotRun"].every(
+      (key) => footer.counts[key] === 0,
+    )
+  );
+}
+
+function enabledFooterDiscoveryComplete(footer, code, signal) {
+  return (
+    signal === null &&
+    (code === 0 || code === 1) &&
+    footerDiscoveryComplete(footer, 8)
+  );
+}
 const summary = {
   diagnosticOnly: true,
   productAcceptance: false,
   reproductionEstablished: false,
   fullOriginalDisabledDiscovery: true,
   expectedOriginalDisabledScenarios: 17,
+  fullOriginalEnabledDiscovery: true,
+  expectedOriginalEnabledScenarios: 8,
+  originalEnabledReached: false,
+  originalEnabledChildExitCode: null,
+  originalEnabledFooterRecognized: false,
+  originalEnabledDiscoveryComplete: false,
+  originalEnabledAll8PassedNoSkips: false,
+  originalNativeAll25PassedNoSkips: false,
+  additionalApprovedEnabledScenariosMaximumSeconds: 2880,
+  additionalServerStartupMaximumSeconds: 150,
+  observedHmrComparisonsAreNotInternalBranchOrRestartCertificates: true,
+  passiveMethodCategoryOnlyNotMutationCommitOrWireCertificate: true,
   conditioning:
     "quality-pre-native-command-prefix-expected-not-identical-runner-timing",
   expectedPreNativeCommands: 12,
@@ -428,50 +500,105 @@ try {
         join(output, "private-child-output.log"),
         "utf8",
       );
-      const counts = {
-        passed: 0,
-        failed: 0,
-        skipped: 0,
-        flaky: 0,
-        interrupted: 0,
-        didNotRun: 0,
-      };
-      const seen = new Set();
-      let ambiguousFooter = false;
-      for (const rawLine of childText.split(/\r?\n/)) {
-        const line = rawLine.replace(/\u001b\[[0-9;]*m|\^\[\[[0-9;]*m/g, "");
-        const match =
-          /^\s*(\d+) (passed|failed|skipped|flaky|interrupted|did not run)(?:\s+\([0-9.]+(?:ms|s|m|h)\))?\s*$/.exec(
-            line,
-          );
-        if (!match) continue;
-        const key = match[2] === "did not run" ? "didNotRun" : match[2];
-        const value = Number(match[1]);
-        if (seen.has(key) || !Number.isSafeInteger(value))
-          ambiguousFooter = true;
-        seen.add(key);
-        counts[key] = value;
-      }
-      summary.originalDisabledFooterCounts = counts;
-      summary.originalDisabledFooterRecognized =
-        seen.size > 0 && !ambiguousFooter;
+      const disabled = parseBrowserProbeFooter(childText);
+      summary.originalDisabledFooterCounts = disabled.counts;
+      summary.originalDisabledFooterRecognized = disabled.recognized;
       summary.originalDisabledAll17PassedNoSkips =
         summary.childExitCode === 0 &&
-        summary.originalDisabledFooterRecognized &&
-        counts.passed === 17 &&
-        counts.failed === 0 &&
-        counts.skipped === 0 &&
-        counts.flaky === 0 &&
-        counts.interrupted === 0 &&
-        counts.didNotRun === 0;
+        footerDiscoveryComplete(disabled, 17) &&
+        disabled.counts.failed === 0;
       if (
         summary.childExitCode === 0 &&
         !summary.originalDisabledAll17PassedNoSkips
       ) {
         summary.originalDisabledFooterRejected = true;
-        if (result === 0) result = 1;
+        result = 1;
       }
+      // Preserve the old full17 invocation. The unchanged root config has CI
+      // retry1, so a no-argument wrapper would silently change this diagnostic.
+      // Execute the unchanged enabled config directly with explicit retry0.
       if (summary.originalDisabledAll17PassedNoSkips) {
+        summary.originalEnabledReached = true;
+        let enabledLog;
+        try {
+          enabledLog = await open(
+            join(output, "private-enabled-child-output.log"),
+            "wx",
+            0o600,
+          );
+          const enabledChild = spawn(
+            process.execPath,
+            [
+              "--import",
+              "tsx",
+              "./node_modules/@playwright/test/cli.js",
+              "test",
+              "--config",
+              "playwright.community.config.ts",
+              "--workers=1",
+              "--retries=0",
+            ],
+            {
+              cwd: root,
+              stdio: ["ignore", enabledLog.fd, enabledLog.fd],
+              env: { ...diagnosticEnvironment, V4_COMMUNITIES_ENABLED: "true" },
+            },
+          );
+          const outcome = await new Promise((done, reject) => {
+            enabledChild.once("error", reject);
+            enabledChild.once("exit", (code, signal) => done({ code, signal }));
+          });
+          summary.originalEnabledChildExitCode = outcome.code ?? 1;
+          summary.originalEnabledChildSignal = [
+            "SIGTERM",
+            "SIGINT",
+            "SIGKILL",
+          ].includes(outcome.signal)
+            ? outcome.signal
+            : outcome.signal
+              ? "OTHER"
+              : null;
+          const enabled = parseBrowserProbeFooter(
+            await readFile(
+              join(output, "private-enabled-child-output.log"),
+              "utf8",
+            ),
+          );
+          summary.originalEnabledFooterCounts = enabled.counts;
+          summary.originalEnabledFooterRecognized = enabled.recognized;
+          summary.originalEnabledDiscoveryComplete =
+            enabledFooterDiscoveryComplete(
+              enabled,
+              outcome.code,
+              outcome.signal,
+            );
+          summary.originalEnabledAll8PassedNoSkips =
+            summary.originalEnabledChildExitCode === 0 &&
+            summary.originalEnabledDiscoveryComplete &&
+            enabled.counts.failed === 0;
+          if (!summary.originalEnabledAll8PassedNoSkips)
+            result = summary.originalEnabledChildExitCode || 1;
+          if (
+            summary.originalEnabledChildExitCode === 0 &&
+            !summary.originalEnabledAll8PassedNoSkips
+          )
+            summary.originalEnabledFooterRejected = true;
+        } catch {
+          summary.originalEnabledErrorClass = "CHILD_OR_IO_ERROR";
+          result = 1;
+        } finally {
+          if (enabledLog) await enabledLog.close();
+        }
+      }
+      summary.originalNativeAll25PassedNoSkips =
+        summary.originalDisabledAll17PassedNoSkips &&
+        summary.originalEnabledAll8PassedNoSkips;
+      // A completed failing enabled phase remains failed, but must not hide the
+      // independent navigation reproducer. Partial/crashed/skipped discovery does.
+      if (
+        summary.originalDisabledAll17PassedNoSkips &&
+        summary.originalEnabledDiscoveryComplete
+      ) {
         summary.browserProbeReached = true;
         let browserLog;
         try {
@@ -538,7 +665,8 @@ try {
           if (browserLog) await browserLog.close();
         }
       } else {
-        summary.browserProbeNotReachedReason = "ORIGINAL_DISABLED_NOT_COMPLETE";
+        summary.browserProbeNotReachedReason =
+          "ORIGINAL_NATIVE_DISCOVERY_NOT_COMPLETE";
       }
       const sanitized = join(output, "sanitized");
       await mkdir(sanitized, { recursive: false, mode: 0o700 });
@@ -634,7 +762,7 @@ try {
       }
       summary.browserProbeMetadataComplete = browserMetadataComplete;
       summary.nodeHTTPObservationScope =
-        "original17-and-isolated-browser-probe-when-reached";
+        "original17-then-enabled8-and-isolated-browser-probe-when-reached";
       if (
         !validatedNodeFiles.some((name) => name.endsWith("-client.jsonl")) ||
         !validatedNodeFiles.some((name) => name.endsWith("-server.jsonl")) ||
