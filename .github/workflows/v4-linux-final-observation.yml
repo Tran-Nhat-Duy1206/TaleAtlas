@@ -1,0 +1,98 @@
+name: V4 final bounded Linux observation
+
+# One authorized observation, not acceptance or a change to Quality gates.
+# Workflow/sidecar revision and exact tested source revision are intentionally separate.
+# Diagnostic deviation: original 17 with explicit retry0, then original enabled 8
+# ONLY if all 17 pass. This is not the literal no-argument test:e2e invocation.
+# No reruns, extra probes, mutation replay, or application/runtime repairs.
+on:
+  push:
+    branches: [diagnostics/v4-linux-final-a266-5f36c8a2]
+    paths:
+      - .github/workflows/v4-linux-final-observation.yml
+      - scripts/v4-linux-final-observation.cjs
+
+permissions:
+  contents: read
+
+jobs:
+  observe:
+    if: github.run_attempt == 1
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    services:
+      postgres:
+        # Same PostgreSQL manifest digest observed in both original runs.
+        image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+        env:
+          POSTGRES_USER: taleatlas_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: taleatlas_test
+        ports: ["5432:5432"]
+        # Suppress Docker's automatic raw service-log dump on a diagnostic failure.
+        # Query execution/authentication are unchanged; no production logging is touched.
+        options: >-
+          --log-driver=none --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      DATABASE_URL_DIRECT: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      TEST_DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
+      APP_ORIGIN: http://127.0.0.1:3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_FROM: TaleAtlas <test@example.invalid>
+      TALEATLAS_LINUX_FINAL_SUT: ${{ github.workspace }}/sut
+      TALEATLAS_LINUX_FINAL_OUTPUT: ${{ github.workspace }}/linux-final-output
+      TALEATLAS_LINUX_FINAL_HEAD: a2663369906360ee0db3b51012688c997d32cfad
+      TALEATLAS_LINUX_FINAL_DIAG_BRANCH: diagnostics/v4-linux-final-a266-5f36c8a2
+      TALEATLAS_LINUX_FINAL_WORKFLOW: v4-linux-final-observation.yml
+    steps:
+      - name: Check out authorized observer revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+      - name: Check out exact frozen source under test
+        uses: actions/checkout@v4
+        with:
+          ref: a2663369906360ee0db3b51012688c997d32cfad
+          path: sut
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          package_json_file: sut/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+          cache: pnpm
+          cache-dependency-path: sut/pnpm-lock.yaml
+      # Controller runs the original Quality preparation prefix privately, then
+      # the authorized zero-retry diagnostic 17 -> 8 sequence. Original source,
+      # configurations, deadlines, assertions, and security controls stay frozen.
+      # Predeclared hypotheses: owned PID/starttime lifecycle, time-aligned resource
+      # pressure, request/response stream completion and tuple-qualified socket reuse.
+      # Missing coverage is UNKNOWN; correlation or a passing run is not causal proof.
+      # Worker cap is 85 minutes within this external 90-minute job cap; incomplete
+      # observation is C, with no rerun. Hard kill can defeat cleanup: private data
+      # remains ephemeral runner-only and is never an upload path.
+      - name: Check closed schemas and phase gates without application requests
+        run: node diagnostic/scripts/v4-linux-final-observation.cjs --canary
+      - name: Observe once with closed metadata and private transient output
+        id: observe
+        run: node diagnostic/scripts/v4-linux-final-observation.cjs
+      # Controller may set safe_to_upload ONLY after deleting owned private logs,
+      # original trace/report/result directories and validating canonical closed JSON.
+      - name: Retain validated closed metadata only
+        if: always() && github.run_attempt == 1 && steps.observe.outputs.safe_to_upload == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: v4-linux-final-observation-closed
+          path: |
+            linux-final-output/sanitized/*.jsonl
+            linux-final-output/sanitized/summary.json
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error
