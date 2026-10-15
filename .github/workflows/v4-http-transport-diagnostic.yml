@@ -11,6 +11,8 @@ on:
       - .github/workflows/v4-http-transport-diagnostic.yml
       - scripts/v4-http-transport-observer.cjs
       - scripts/v4-http-transport-diagnostic.mjs
+      - scripts/v4-browser-navigation-diagnostic.config.ts
+      - scripts/v4-browser-navigation-diagnostic.spec.ts
 
 permissions:
   contents: read
@@ -59,7 +61,9 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm exec playwright install --with-deps chromium
-      - name: Observe preparation-matched original-disabled discovery (expected 17; diagnostic only)
+      # Additional human-approved isolated EN/VI CDP navigation metadata probe.
+      # Existing Quality suites/configs/runtime defaults/assertions/budgets are frozen.
+      - name: Observe preparation-matched original 17 and isolated browser 2 (diagnostic only)
         run: node scripts/v4-http-transport-diagnostic.mjs
       - name: Retain only sanitized synthetic socket observations
         if: always()
@@ -67,8 +71,8 @@ jobs:
         with:
           name: v4-http-transport-diagnostic-sanitized
           path: |
-            .local/v4-http-transport-diagnostic/**/*.jsonl
-            .local/v4-http-transport-diagnostic/**/safe-summary.json
+            .local/v4-http-transport-diagnostic/*/sanitized/*.jsonl
+            .local/v4-http-transport-diagnostic/*/sanitized/safe-summary.json
           retention-days: 7
           include-hidden-files: true
           if-no-files-found: error
