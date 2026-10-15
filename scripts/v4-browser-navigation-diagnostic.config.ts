@@ -55,6 +55,15 @@ export default defineConfig({
   retries: 0,
   reporter: [["list"]],
   outputDir: path.join(directory, "browser-private-output"),
+  // Playwright otherwise defaults to THIS config's scripts/ directory. Preserve
+  // the original root config's effective command cwd, not scripts/scripts/.
+  webServer: (Array.isArray(base.webServer)
+    ? base.webServer
+    : [base.webServer]
+  ).map((server) => {
+    if (!server) throw new Error("BROWSER_DIAGNOSTIC_GUARD_FAILED");
+    return { ...server, cwd: server.cwd ?? root };
+  }),
   use: { ...base.use, trace: "off", screenshot: "off", video: "off" },
   projects: base.projects?.map((project) => ({
     ...project,
