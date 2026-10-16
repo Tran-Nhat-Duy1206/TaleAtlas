@@ -2,6 +2,10 @@
 
 V0 foundation is implemented with local checks; final evidence is in VALIDATION. **No real Neon/Vercel deployment or production mail delivery is claimed.** Node 24, pnpm 11.7.0, Next.js 16, PostgreSQL and SMTP are required. No GitHub authentication, Vercel token or Neon API credential is supplied.
 
+## V4 source/CI acceptance and hosted rollout boundary (2026-10-16)
+
+V4A–D were merged to `main` by [PR #4](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/4) at `ac7cf261`. The [post-merge main CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38844260208) succeeded with all mandatory foundations, original 17 and enabled V4 8 browsers, both audits and `verify`. This is **source and synthetic CI acceptance only**, NOT evidence of live Neon/Vercel/SMTP, authenticated hosted behavior or any public rollout. `V4_COMMUNITIES_ENABLED` remains off by default. A separate operator go/no-go must verify forward DB migrations, production secrets/role provisioning and revocation, sender/verification flows, TLS/proxy/cookies, privacy/erasure, moderation safety, load and verified backup/restore before hosted enablement. Unexplained historical Next development-server failures remain unproven. See [release-status handoff](V4_RELEASE_STATUS.md).
+
 ## Neon setup (operator action)
 
 1. Create a Neon project in the chosen region. Create deliberately isolated development and production branches/databases; restrict access and do not copy live personal data into development. Preview deployments must target a synthetic/isolated branch, never production.

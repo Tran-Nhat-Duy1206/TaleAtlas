@@ -1,5 +1,11 @@
 # V4 Work-community domain and security contract
 
+## V4 source/CI acceptance and hosted rollout boundary (2026-10-16)
+
+V4A–D were merged to `main` by [PR #4](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/4) at `ac7cf261`. The [post-merge main CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38844260208) succeeded with all mandatory foundations, original 17 and enabled V4 8 browsers, both audits and `verify`. This is **source and synthetic CI acceptance only**, NOT evidence of live Neon/Vercel/SMTP, authenticated hosted behavior or any public rollout. `V4_COMMUNITIES_ENABLED` remains off by default. A separate operator go/no-go must verify forward DB migrations, production secrets/role provisioning and revocation, sender/verification flows, TLS/proxy/cookies, privacy/erasure, moderation safety, load and verified backup/restore before hosted enablement. Unexplained historical Next development-server failures remain unproven. See [release-status handoff](V4_RELEASE_STATUS.md).
+
+The later **Baseline, delivery and gate** section is historical pre-V4 source context; it does not mean the V4 PR remains open.
+
 ## Baseline, delivery and gate
 
 This implements the V4 master directive, not V5 social networking. Audited `main` and freshly fetched `origin/main` equal `b8cec8de874759d14aba570f406af7b0afd2813a`; PR3 is actually merged. Actual [post-merge CI38189215191](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38189215191) completed SUCCESS:710 units/156 PostgreSQL17 cases/all14 native browser scenarios10.4m/all mandatory gates/audits0;20k private-library deletion302/625ms with entries/events/users0. V4 uses only `feat/v4-work-communities`, one draft PR/main, no automatic merge/deployment. Preserve migrations0000–0009, all V0–V3 validation history/business assertions and private-library contracts. V2 broader corrections and manual/offline provider policy remain unchanged. Graph tools unavailable: bounded direct-source Verify; graph generation/index/coverage UNKNOWN.
