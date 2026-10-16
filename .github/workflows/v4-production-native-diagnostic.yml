@@ -1,0 +1,63 @@
+name: V4 production native diagnostic (not acceptance)
+
+# One-shot synthetic test of development-only HMR as a contributor to
+# intermittent navigation failures. Not a mandatory Quality acceptance gate.
+on:
+  push:
+    branches:
+      - experiment/v4-production-native-e2e
+
+permissions:
+  contents: read
+
+jobs:
+  production-native-17-then-8:
+    name: Isolated production HTTPS native 17 then 8
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: taleatlas_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: taleatlas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      DATABASE_URL_DIRECT: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      TEST_DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
+      APP_ORIGIN: http://127.0.0.1:3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_FROM: TaleAtlas <test@example.invalid>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm db:generate
+      - run: git diff --exit-code -- packages/database/drizzle
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+
+      # Reuse the existing guarded production TLS / Next.js server.
+      # No changes to tests, deadlines, assertions, workers or retries.
+      - name: Run original 17 then enabled V4 8 in production HTTPS
+        env:
+          TALEATLAS_TEST_NATIVE_SERVER_MODE: production
+        run: pnpm test:e2e
+
+      # Intentionally do not upload raw traces or synthetic auth cookies.
+      # Job logs and the native phase counts remain diagnostic only.
