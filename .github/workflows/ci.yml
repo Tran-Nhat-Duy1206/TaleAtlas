@@ -85,7 +85,7 @@ jobs:
           node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # This runner owns a fresh PostgreSQL 17 database and its own dev/SMTP servers.
+      # This runner owns a fresh PostgreSQL 17 database and isolated production HTTPS/STARTTLS servers.
       - run: pnpm db:migrate
       - run: pnpm db:migrate
       - run: pnpm db:generate
@@ -93,12 +93,13 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm exec playwright install --with-deps chromium
-      # Exact original wrapper child CLI, unchanged config, assertions and CI retries.
-      - name: Run complete original 17
-        run: node --import tsx ./node_modules/@playwright/test/cli.js test --config playwright.config.ts
+      # Original 17 only: existing production config, assertions, deadlines, workers and retries.
+      - name: Run complete original 17 on production HTTPS
+        run: node --import tsx scripts/ci-production-native-phase.ts legacy
         env:
           NODE_ENV: development
-          V4_COMMUNITIES_ENABLED: "false"
+          TEST_SMTP_PORT: "1025"
+          TALEATLAS_TEST_NATIVE_SERVER_MODE: production
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -148,12 +149,13 @@ jobs:
       - run: pnpm build
       - run: pnpm typecheck
       - run: pnpm exec playwright install --with-deps chromium
-      # Exact enabled wrapper child CLI; community config owns retries: 0.
-      - name: Run complete enabled V4 8
-        run: node --import tsx ./node_modules/@playwright/test/cli.js test --config playwright.community.config.ts
+      # Enabled 8 only: production config retains original community retries: 0.
+      - name: Run complete enabled V4 8 on production HTTPS
+        run: node --import tsx scripts/ci-production-native-phase.ts v4
         env:
           NODE_ENV: development
-          V4_COMMUNITIES_ENABLED: "true"
+          TEST_SMTP_PORT: "1025"
+          TALEATLAS_TEST_NATIVE_SERVER_MODE: production
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
