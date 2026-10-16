@@ -2,6 +2,10 @@
 
 V0 foundation is implemented with local verification; no production operational proof. There is one web runtime plus PostgreSQL and SMTP. No worker, provider refresh scheduler or production monitoring stack is claimed.
 
+## V4 source/CI acceptance and hosted rollout boundary (2026-10-16)
+
+V4A–D were merged to `main` by [PR #4](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/4) at `ac7cf261`. The [post-merge main CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38844260208) succeeded with all mandatory foundations, original 17 and enabled V4 8 browsers, both audits and `verify`. This is **source and synthetic CI acceptance only**, NOT evidence of live Neon/Vercel/SMTP, authenticated hosted behavior or any public rollout. `V4_COMMUNITIES_ENABLED` remains off by default. A separate operator go/no-go must verify forward DB migrations, production secrets/role provisioning and revocation, sender/verification flows, TLS/proxy/cookies, privacy/erasure, moderation safety, load and verified backup/restore before hosted enablement. Unexplained historical Next development-server failures remain unproven. See [release-status handoff](V4_RELEASE_STATUS.md).
+
 ## Startup and configuration
 
 Validate Node 24/pnpm 11.7.0, canonical origin, private auth secret, DB and SMTP. Production auth rejects non-HTTPS origin and invalid mail configuration. SMTP failure means verification/recovery cannot be assumed available. Supply CLI variables explicitly; Next app-local environment loading differs from root tools. Apply reviewed migrations manually before releasing compatible code.
