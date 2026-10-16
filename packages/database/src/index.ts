@@ -9,3 +9,5 @@ export * from "./edit-suggestion-schema";
 export * from "./release-schema";
 export * from "./library-schema";
 export * from "./library-types";
+export * from "./community-schema";
+export * from "./community-types";

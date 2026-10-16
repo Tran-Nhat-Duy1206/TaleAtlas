@@ -10,6 +10,7 @@ import { EntryControls } from "@/components/library/EntryControls";
 import { ReadingControls } from "@/components/library/ReadingControls";
 import { ReadingHistory } from "@/components/library/ReadingHistory";
 import { PersonalControls } from "@/components/library/PersonalControls";
+import { EntryRevisionScope } from "@/components/library/EntryRevisionScope";
 import { personalHttpDetailsSchema } from "@/features/library/personal-http-contracts";
 import {
   readingHttpEntry,
@@ -76,38 +77,43 @@ export default async function LibraryEntryPage({
           </Link>
         </>
       )}
-      <EntryControls
-        key={`${entry.id}:${entry.revision}`}
-        locale={locale}
-        entry={{
-          id: entry.id,
-          workId: entry.workId,
-          revision: entry.revision,
-          status: entry.status,
-          favorite: entry.favorite,
-          hasCompletedRead: entry.hasCompletedRead,
-          currentSession: entry.currentSession
-            ? { state: entry.currentSession.state }
-            : null,
-        }}
-      />
-      <ReadingControls
-        key={`reading:${entry.id}:${entry.revision}`}
-        locale={locale}
-        entry={reading}
-      />
-      <ReadingHistory
-        key={`history:${entry.id}:${entry.revision}`}
-        id={entry.id}
-        locale={locale}
-      />
-      {personalSeed.success && (
-        <PersonalControls
-          key={`personal:${entry.id}:${entry.revision}`}
-          seed={personalSeed.data}
+      <EntryRevisionScope
+        key={`entry-scope:${entry.id}:${entry.workId}:${locale}`}
+        revision={entry.revision}
+      >
+        <EntryControls
+          key={`${entry.id}:${entry.revision}`}
+          locale={locale}
+          entry={{
+            id: entry.id,
+            workId: entry.workId,
+            revision: entry.revision,
+            status: entry.status,
+            favorite: entry.favorite,
+            hasCompletedRead: entry.hasCompletedRead,
+            currentSession: entry.currentSession
+              ? { state: entry.currentSession.state }
+              : null,
+          }}
+        />
+        <ReadingControls
+          key={`reading:${entry.id}:${entry.revision}`}
+          locale={locale}
+          entry={reading}
+        />
+        <ReadingHistory
+          key={`history:${entry.id}:${entry.revision}`}
+          id={entry.id}
           locale={locale}
         />
-      )}
+        {personalSeed.success && (
+          <PersonalControls
+            key={`personal:${entry.id}:${entry.revision}`}
+            seed={personalSeed.data}
+            locale={locale}
+          />
+        )}
+      </EntryRevisionScope>
     </section>
   );
 }

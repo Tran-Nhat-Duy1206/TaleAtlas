@@ -14,7 +14,7 @@
     "lint": "pnpm --filter @taleatlas/web lint",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "test:e2e": "node --import tsx ./node_modules/@playwright/test/cli.js test",
+    "test:e2e": "node --import tsx scripts/test-e2e.ts",
     "db:generate": "pnpm --filter @taleatlas/database generate",
     "db:migrate": "pnpm --filter @taleatlas/database migrate"
   },

@@ -4,6 +4,9 @@ import { createServer } from "node:http";
 // Synthetic tests only: a loopback inbox, never installed in the deployed application.
 if (process.env.NODE_ENV === "production")
   throw new Error("Test inbox must not run in production");
+const smtpPort = Number(process.env.TEST_SMTP_PORT ?? "1025");
+if (!Number.isInteger(smtpPort) || smtpPort < 1024 || smtpPort > 65535)
+  throw new Error("Invalid isolated test SMTP port");
 const messages: { recipients: string[]; text: string }[] = [];
 const smtp = new SMTPServer({
   authOptional: true,
@@ -49,9 +52,9 @@ const http = createServer((request, response) => {
   response.writeHead(404);
   response.end("{}");
 });
-smtp.listen(1025, "127.0.0.1");
+smtp.listen(smtpPort, "127.0.0.1");
 http.listen(1026, "127.0.0.1", () =>
-  console.log("Synthetic test inbox ready on loopback ports 1025/1026"),
+  console.log(`Synthetic test inbox ready on loopback ports ${smtpPort}/1026`),
 );
 const stop = () => {
   smtp.close();

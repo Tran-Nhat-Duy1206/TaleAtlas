@@ -1,0 +1,118 @@
+.community {
+  display: grid;
+  gap: 1.25rem;
+  min-width: 0;
+  max-width: 56rem;
+  margin: auto;
+  padding: 1.5rem;
+}
+.community h1,
+.community h2,
+.community h3 {
+  overflow-wrap: anywhere;
+}
+.community a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.navigation,
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.card,
+.form {
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  min-width: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+.form label {
+  display: grid;
+  gap: 0.35rem;
+}
+.form .check,
+.check {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+.form input:not([type="checkbox"]),
+.form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  padding: 0.6rem;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+}
+.form textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+.community button {
+  min-height: 44px;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.25rem;
+  background: var(--wash);
+  color: var(--ink);
+  font: inherit;
+}
+.prose {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.notice,
+.meta {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.masked {
+  border-inline-start: 3px solid var(--line);
+  padding-inline-start: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+}
+.reply {
+  margin-inline-start: min(calc(var(--reply-depth, 0) * 1rem), 2rem);
+}
+.community button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.community button:focus-visible,
+.community a:focus-visible,
+.community input:focus-visible,
+.community textarea:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+}
+.community fieldset {
+  margin: 0;
+  min-inline-size: 0;
+}
+.meta dd {
+  margin-inline-start: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 480px) {
+  .community {
+    padding: 0.75rem;
+  }
+  .card,
+  .form {
+    padding: 0.75rem;
+  }
+  .actions button {
+    flex: 1 1 auto;
+  }
+}

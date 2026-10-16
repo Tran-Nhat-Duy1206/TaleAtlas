@@ -6,6 +6,7 @@ import type { Locale } from "@/lib/i18n";
 import { libraryCopy, statuses, type Status } from "./copy";
 import { libraryCommand, LibraryRequestError } from "./transport";
 import styles from "./library.module.css";
+import { useEntryRevisionFence } from "./EntryRevisionScope";
 export type EntryControlData = {
   id: string;
   workId: string;
@@ -23,7 +24,8 @@ export function EntryControls({
   locale: Locale;
 }) {
   const t = libraryCopy[locale],
-    router = useRouter();
+    router = useRouter(),
+    scope = useEntryRevisionFence(entry.revision);
   const [status, setStatus] = useState(entry.status),
     [favorite, setFavorite] = useState(entry.favorite),
     [ack, setAck] = useState(false),
@@ -54,13 +56,20 @@ export function EntryControls({
       error === 409
     )
       return;
-    if (!pending.current) {
-      if (
-        !method ||
+    if (
+      !pending.current &&
+      (!method ||
         (method === "DELETE" && !confirm) ||
-        (method === "PATCH" && needsAck && !ack)
-      )
+        (method === "PATCH" && needsAck && !ack))
+    )
+      return;
+    // Fence sibling editors before minting a command or dispatching a request.
+    if (!scope.start()) return;
+    if (!pending.current) {
+      if (!method) {
+        scope.fail(false, 400);
         return;
+      }
       pending.current = {
         method,
         payload: JSON.stringify({
@@ -93,6 +102,7 @@ export function EntryControls({
         result.archived !== (command.method === "DELETE")
       )
         throw new LibraryRequestError(0, true);
+      scope.commit(result.revision, result.archived);
       pending.current = null;
       setRetryReady(false);
       if (command.method === "DELETE") setArchived(true);
@@ -109,6 +119,7 @@ export function EntryControls({
         cause instanceof LibraryRequestError
           ? cause
           : new LibraryRequestError(0, true);
+      scope.fail(failure.ambiguous, failure.status);
       setError(failure.status || -1);
       setRetryReady(failure.ambiguous);
       if (!failure.ambiguous) pending.current = null;
@@ -133,7 +144,13 @@ export function EntryControls({
         }}
       >
         <fieldset
-          disabled={busy || awaitingRefresh || retryReady || error === 409}
+          disabled={
+            scope.blocked ||
+            busy ||
+            awaitingRefresh ||
+            retryReady ||
+            error === 409
+          }
         >
           <div className={styles.controls}>
             <label>
@@ -141,6 +158,7 @@ export function EntryControls({
               <select
                 value={status}
                 onChange={(e) => {
+                  if (!scope.canEdit()) return;
                   setStatus(e.target.value as Status);
                   setAck(false);
                 }}
@@ -184,7 +202,13 @@ export function EntryControls({
         </fieldset>
       </form>
       <fieldset
-        disabled={busy || awaitingRefresh || retryReady || error === 409}
+        disabled={
+          scope.blocked ||
+          busy ||
+          awaitingRefresh ||
+          retryReady ||
+          error === 409
+        }
       >
         <label className={styles.check}>
           <input

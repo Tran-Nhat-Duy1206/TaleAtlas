@@ -13,6 +13,7 @@ import { getWorkBySlug } from "../../../../server/catalog/service";
 import { CatalogError } from "../../../../server/catalog/errors";
 import { WorkCover } from "../../../../components/catalog/WorkCover";
 import { OwnWorkLibrary } from "../../../../components/library/OwnWorkLibrary";
+import { isCommunityEnabled } from "../../../../server/community/availability";
 import { publicCopy } from "../../../../components/catalog/query";
 import styles from "../../../../components/catalog/catalog.module.css";
 export const dynamic = "force-dynamic";
@@ -96,6 +97,20 @@ export default async function WorkPage({ params }: Props) {
       >
         {locale === "vi" ? "Đề xuất chỉnh sửa" : "Suggest a correction"}
       </Link>
+      {isCommunityEnabled() && (
+        // Community entry is a document/SSR boundary, not a prefetched or
+        // unfinished client transition exposing a temporary interaction surface.
+        <>
+          <a
+            href={`/${locale}/works/${encodeURIComponent(work.slug)}/discussions`}
+          >
+            {locale === "vi" ? "Thảo luận" : "Discussions"}
+          </a>
+          <a href={`/${locale}/works/${encodeURIComponent(work.slug)}/reviews`}>
+            {locale === "vi" ? "Đánh giá công khai" : "Public reviews"}
+          </a>
+        </>
+      )}
       <header className={styles.detailHero}>
         <WorkCover work={work} locale={locale} />
         <div>

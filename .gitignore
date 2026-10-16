@@ -6,6 +6,8 @@ node_modules/
 coverage/
 playwright-report/
 test-results/
+playwright-report-community/
+test-results-community/
 *.tsbuildinfo
 .local/
 .DS_Store

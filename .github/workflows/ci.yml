@@ -4,8 +4,13 @@ on:
   pull_request:
 permissions:
   contents: read
+
+# Keep the existing mandatory verify check. Every required job must succeed,
+# including both separately owned native suites and both security audits.
+# Independent GitHub-hosted runners prevent cross-suite server/socket/DB state.
 jobs:
-  verify:
+  checks:
+    name: Quality foundations
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -14,7 +19,7 @@ jobs:
           POSTGRES_USER: taleatlas_test
           POSTGRES_PASSWORD: synthetic_ci_only
           POSTGRES_DB: taleatlas_test
-        ports: ['5432:5432']
+        ports: ["5432:5432"]
         options: >-
           --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
     env:
@@ -24,7 +29,7 @@ jobs:
       BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
       APP_ORIGIN: http://127.0.0.1:3000
       SMTP_HOST: 127.0.0.1
-      SMTP_PORT: '1025'
+      SMTP_PORT: "1025"
       SMTP_FROM: TaleAtlas <test@example.invalid>
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +38,7 @@ jobs:
           version: 11.7.0
       - uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -45,13 +50,157 @@ jobs:
       - run: git diff --exit-code -- packages/database/drizzle
       - run: pnpm test:integration
       - run: pnpm build
+      - run: pnpm typecheck
+
+  e2e_legacy:
+    name: Native original 17 (V4 disabled)
+    needs: checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: taleatlas_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: taleatlas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      DATABASE_URL_DIRECT: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      TEST_DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
+      APP_ORIGIN: http://127.0.0.1:3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_FROM: TaleAtlas <test@example.invalid>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # This runner owns a fresh PostgreSQL 17 database and isolated production HTTPS/STARTTLS servers.
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm db:generate
+      - run: git diff --exit-code -- packages/database/drizzle
+      - run: pnpm build
+      - run: pnpm typecheck
       - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
-      - run: pnpm audit --prod --audit-level high
-      - run: pnpm audit --audit-level moderate
+      # Original 17 only: existing production config, assertions, deadlines, workers and retries.
+      - name: Run complete original 17 on production HTTPS
+        run: node --import tsx scripts/ci-production-native-phase.ts legacy
+        env:
+          NODE_ENV: development
+          TEST_SMTP_PORT: "1025"
+          TALEATLAS_TEST_NATIVE_SERVER_MODE: production
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: playwright-report
-          path: playwright-report/
+          name: playwright-report-legacy
+          path: |
+            playwright-report/
+            test-results/
           retention-days: 7
+
+  e2e_v4:
+    name: Native enabled V4 8 (retry zero)
+    needs: checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: taleatlas_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: taleatlas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      DATABASE_URL_DIRECT: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      TEST_DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
+      APP_ORIGIN: http://127.0.0.1:3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_FROM: TaleAtlas <test@example.invalid>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm db:generate
+      - run: git diff --exit-code -- packages/database/drizzle
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+      # Enabled 8 only: production config retains original community retries: 0.
+      - name: Run complete enabled V4 8 on production HTTPS
+        run: node --import tsx scripts/ci-production-native-phase.ts v4
+        env:
+          NODE_ENV: development
+          TEST_SMTP_PORT: "1025"
+          TALEATLAS_TEST_NATIVE_SERVER_MODE: production
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-v4
+          path: |
+            playwright-report-community/
+            test-results-community/
+          retention-days: 7
+
+  audits:
+    name: Dependency security audits
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+      - run: pnpm audit --audit-level moderate
+
+  verify:
+    name: verify
+    needs: [checks, e2e_legacy, e2e_v4, audits]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every mandatory job to succeed
+        env:
+          CHECKS_RESULT: ${{ needs.checks.result }}
+          LEGACY_RESULT: ${{ needs.e2e_legacy.result }}
+          V4_RESULT: ${{ needs.e2e_v4.result }}
+          AUDITS_RESULT: ${{ needs.audits.result }}
+        run: |
+          set -euo pipefail
+          failed=0
+          for entry in "checks:$CHECKS_RESULT" "e2e_legacy:$LEGACY_RESULT" "e2e_v4:$V4_RESULT" "audits:$AUDITS_RESULT"; do
+            case "$entry" in
+              *:success) echo "MANDATORY SUCCESS: $entry" ;;
+              *) echo "::error::Mandatory gate not successful: $entry"; failed=1 ;;
+            esac
+          done
+          test "$failed" -eq 0

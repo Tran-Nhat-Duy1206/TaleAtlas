@@ -1,0 +1,80 @@
+name: V4 synthetic HTTP transport diagnostic
+
+# Maintainer-approved expanded passive diagnostic only, not milestone acceptance.
+# Mirrors unchanged Quality pre-native commands and synthetic fixture setup.
+# Matching preparation is NOT identical runner timing or causal proof.
+# Extra synthetic CI compute is explicitly approved; original Quality gates stay unchanged.
+on:
+  push:
+    branches: [feat/v4-work-communities]
+    paths:
+      - .github/workflows/v4-http-transport-diagnostic.yml
+      - scripts/v4-http-transport-observer.cjs
+      - scripts/v4-http-transport-diagnostic.mjs
+      - scripts/v4-browser-navigation-diagnostic.config.ts
+      - scripts/v4-browser-navigation-diagnostic.spec.ts
+
+permissions:
+  contents: read
+
+jobs:
+  observe-synthetic-transport:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: taleatlas_test
+          POSTGRES_PASSWORD: synthetic_ci_only
+          POSTGRES_DB: taleatlas_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      DATABASE_URL_DIRECT: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      TEST_DATABASE_URL: postgresql://taleatlas_test:synthetic_ci_only@127.0.0.1:5432/taleatlas_test
+      BETTER_AUTH_SECRET: synthetic-ci-auth-secret-not-for-production-12345
+      APP_ORIGIN: http://127.0.0.1:3000
+      SMTP_HOST: 127.0.0.1
+      SMTP_PORT: "1025"
+      SMTP_FROM: TaleAtlas <test@example.invalid>
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+      # Maintainer-approved unchanged Quality prefix, with no observer preload.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - run: pnpm db:migrate
+      - run: pnpm db:migrate
+      - run: pnpm db:generate
+      - run: git diff --exit-code -- packages/database/drizzle
+      - run: pnpm test:integration
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+      # Human-approved unchanged full native 17→8 plus isolated EN/VI probes.
+      # Added eight scenarios: ≤48min + unchanged startup ≤150s; existing probes ≤360s each.
+      # Closed HMR comparisons and passive Node method/category only, not a repair.
+      # Existing Quality suites/configs/runtime defaults/assertions/budgets are frozen.
+      - name: Observe preparation-matched original 17 then enabled 8 and isolated browser 2 (diagnostic only)
+        run: node scripts/v4-http-transport-diagnostic.mjs
+      - name: Retain only sanitized synthetic socket observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v4-http-transport-diagnostic-sanitized
+          path: |
+            .local/v4-http-transport-diagnostic/*/sanitized/*.jsonl
+            .local/v4-http-transport-diagnostic/*/sanitized/safe-summary.json
+          retention-days: 7
+          include-hidden-files: true
+          if-no-files-found: error

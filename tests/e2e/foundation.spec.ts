@@ -60,7 +60,7 @@ test("real registration, email verification, login, protected settings and logou
     await response.json();
   const mail = messages.find((message) => message.recipients.includes(email));
   const link = mail?.text.match(
-    /http:\/\/127\.0\.0\.1:\d+\/api\/auth\/verify-email[^\s<>]+/,
+    /https?:\/\/127\.0\.0\.1:\d+\/api\/auth\/verify-email[^\s<>]+/,
   )?.[0];
   expect(link).toBeTruthy();
   expect(new URL(link!).origin).toBe(baseURL);
