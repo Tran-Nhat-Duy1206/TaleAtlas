@@ -3,11 +3,6 @@ name: taleatlas-testing-verification
 description: "Verify TaleAtlas implementations through focused tests, regression checks, PostgreSQL integration tests, Playwright E2E, security audits, and evidence-based acceptance gates."
 ---
 
----
-name: taleatlas-testing-verification
-description: Verify TaleAtlas features, regression safety, and acceptance evidence using existing project testing standards.
----
-
 # TaleAtlas Testing & Verification
 
 ## Purpose
