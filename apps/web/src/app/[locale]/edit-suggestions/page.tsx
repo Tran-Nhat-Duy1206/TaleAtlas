@@ -5,6 +5,7 @@ import { isLocale } from "@/lib/i18n";
 import { suggestionGuard } from "@/server/catalog/suggestion-guard";
 import { listEditSuggestions } from "@/server/catalog/edit-suggestions";
 import { suggestionCopy } from "@/components/catalog/suggestion-ui";
+import { metadataCopy } from "@/components/catalog/metadata-suggestion-ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function MySuggestionsPage({
@@ -39,6 +40,11 @@ export default async function MySuggestionsPage({
   return (
     <section className="auth-page">
       <h1>{t.mine}</h1>
+      <p>
+        <Link href={`/${locale}/metadata-suggestions`}>
+          {metadataCopy[locale].advanced}
+        </Link>
+      </p>
       {result.items.length ? (
         <ul>
           {result.items.map((s) => (

@@ -1,5 +1,25 @@
 import { defineConfig, devices } from "@playwright/test";
 import { requireTestDatabase } from "./tests/helpers/test-database";
+import { isAbsolute, relative, resolve, basename, join } from "node:path";
+import { lstatSync, realpathSync } from "node:fs";
+// Optional local-only artifact isolation preserves earlier ignored test reports.
+// With no override, CI and all original fixture settings remain unchanged.
+export const fixtureArtifactsDirectory =
+  process.env.TALEATLAS_TEST_ARTIFACTS_DIRECTORY;
+if (fixtureArtifactsDirectory) {
+  const target = resolve(fixtureArtifactsDirectory);
+  const withinLocal = relative(resolve(".local"), target);
+  if (
+    !isAbsolute(fixtureArtifactsDirectory) ||
+    !withinLocal ||
+    withinLocal.startsWith("..") ||
+    isAbsolute(withinLocal) ||
+    !/^v5b-native-artifacts-[0-9a-f-]{36}$/.test(basename(target)) ||
+    lstatSync(target).isSymbolicLink() ||
+    realpathSync(target).toLowerCase() !== target.toLowerCase()
+  )
+    throw new Error("Owned isolated native artifact directory required");
+}
 const databaseURL = requireTestDatabase();
 const port = Number(process.env.E2E_PORT ?? "3000");
 if (!Number.isInteger(port) || port < 1024 || port > 65535)
@@ -15,7 +35,21 @@ export default defineConfig({
   expect: { timeout: 15000 },
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  outputDir: fixtureArtifactsDirectory
+    ? join(fixtureArtifactsDirectory, "default-results")
+    : undefined,
+  reporter: [
+    ["list"],
+    [
+      "html",
+      {
+        open: "never",
+        ...(fixtureArtifactsDirectory
+          ? { outputFolder: join(fixtureArtifactsDirectory, "default-report") }
+          : {}),
+      },
+    ],
+  ],
   use: { baseURL: origin, trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [

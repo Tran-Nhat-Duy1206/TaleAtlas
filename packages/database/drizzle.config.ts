@@ -8,6 +8,7 @@ export default defineConfig({
     "./src/catalog-schema.ts",
     "./src/ingestion-schema.ts",
     "./src/edit-suggestion-schema.ts",
+    "./src/metadata-edit-schema.ts",
     "./src/release-schema.ts",
     "./src/library-schema.ts",
     "./src/community-schema.ts",

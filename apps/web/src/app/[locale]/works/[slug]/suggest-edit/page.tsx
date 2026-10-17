@@ -6,6 +6,7 @@ import { suggestionGuard } from "@/server/catalog/suggestion-guard";
 import { getSuggestionTarget } from "@/server/catalog/suggestion-target";
 import { EditSuggestionForm } from "@/components/catalog/EditSuggestionForm";
 import { suggestionCopy } from "@/components/catalog/suggestion-ui";
+import { metadataCopy } from "@/components/catalog/metadata-suggestion-ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function SuggestEditPage({
@@ -37,6 +38,13 @@ export default async function SuggestEditPage({
       <Link href={`/${locale}/works/${encodeURIComponent(target.slug)}`}>
         {t.back}
       </Link>
+      <p>
+        <Link
+          href={`/${locale}/works/${encodeURIComponent(target.slug)}/suggest-metadata`}
+        >
+          {metadataCopy[locale].advanced}
+        </Link>
+      </p>
       <EditSuggestionForm locale={locale} target={target} />
     </section>
   );
