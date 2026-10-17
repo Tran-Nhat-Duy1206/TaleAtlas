@@ -107,7 +107,9 @@ describe("real persisted authentication", () => {
       403,
     );
     const verify = await getAuth().handler(
-      new Request(mailURL("verify-email")),
+      new Request(mailURL("verify-email"), {
+        headers: { "x-real-ip": ip },
+      }),
     );
     expect([200, 302]).toContain(verify.status);
     expect(

@@ -98,7 +98,11 @@ export function catalogAuthFixture() {
       )?.[0];
       if (!link) throw new Error(`No verification mail for ${email}`);
       expect([200, 302]).toContain(
-        (await getAuth().handler(new Request(link))).status,
+        (
+          await getAuth().handler(
+            new Request(link, { headers: { "x-real-ip": ip } }),
+          )
+        ).status,
       );
       expect(
         (
