@@ -3,11 +3,6 @@ name: taleatlas-project-rules
 description: "Project-specific coding, architecture, security, Git worktree, and verification rules for TaleAtlas."
 ---
 
----
-name: taleatlas-project-rules
-description: Apply TaleAtlas architecture, security, privacy, Git safety, and CI requirements when working on this repository.
----
-
 # TaleAtlas Project Rules
 
 ## Before starting

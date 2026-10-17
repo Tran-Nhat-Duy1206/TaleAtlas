@@ -3,11 +3,6 @@ name: taleatlas-ci-debugging
 description: "Diagnose TaleAtlas CI failures, GitHub Actions, Vitest, Playwright, PostgreSQL, and build regressions using evidence-based debugging without weakening quality gates."
 ---
 
----
-name: taleatlas-ci-debugging
-description: Diagnose CI failures and test regressions in the TaleAtlas repository using evidence-based investigation.
----
-
 # TaleAtlas CI Debugging
 
 ## Before Investigation
