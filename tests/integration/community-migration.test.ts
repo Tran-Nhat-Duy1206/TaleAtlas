@@ -68,6 +68,12 @@ const v4Tables = [
   "community_reports",
   "community_contents",
 ] as const;
+// Approved additive 0014 objects remain present during this V4-only DDL exercise.
+const v5bTables = [
+  "metadata_edit_suggestions",
+  "metadata_edit_events",
+  "catalog_metadata_evidence",
+] as const;
 const v4Functions = [
   "community_user_erasure_budgets",
   "community_content_scope_and_erasure",
@@ -192,6 +198,48 @@ async function prototypeFacts(backend: Reader) {
       )
     )[0];
   return { objects, enums, functions, triggers, data };
+}
+
+async function v5bFacts(backend: Reader) {
+  // Return schema definitions and server-side row digests, never private payloads.
+  const objects = [
+    ...(await backend.unsafe(
+      `select c.relname as name,c.oid::text as oid,c.reltype::text as row_type_oid from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname=any($1::text[]) order by name`,
+      [v5bTables],
+    )),
+  ];
+  const columns = [
+    ...(await backend.unsafe(
+      `select c.relname as table_name,a.attnum,a.attname,pg_catalog.format_type(a.atttypid,a.atttypmod) as type,a.attnotnull,a.attidentity,a.attgenerated,pg_get_expr(d.adbin,d.adrelid) as default_expression from pg_catalog.pg_attribute a join pg_catalog.pg_class c on c.oid=a.attrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace left join pg_catalog.pg_attrdef d on d.adrelid=a.attrelid and d.adnum=a.attnum where n.nspname='public' and c.relname=any($1::text[]) and a.attnum>0 and not a.attisdropped order by c.relname,a.attnum`,
+      [v5bTables],
+    )),
+  ];
+  const constraints = [
+    ...(await backend.unsafe(
+      `select c.relname as table_name,k.conname,k.oid::text as oid,k.contype,k.convalidated,pg_get_constraintdef(k.oid) as definition from pg_catalog.pg_constraint k join pg_catalog.pg_class c on c.oid=k.conrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname=any($1::text[]) order by c.relname,k.conname`,
+      [v5bTables],
+    )),
+  ];
+  const indexes = [
+    ...(await backend.unsafe(
+      `select c.relname as table_name,i.indexrelid::text as oid,i.indisvalid,i.indisready,pg_get_indexdef(i.indexrelid) as definition from pg_catalog.pg_index i join pg_catalog.pg_class c on c.oid=i.indrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relname=any($1::text[]) order by c.relname,i.indexrelid`,
+      [v5bTables],
+    )),
+  ];
+  const guards = [
+    ...(await backend.unsafe(
+      `select c.relname as table_name,t.tgname,t.oid::text as trigger_oid,t.tgenabled,t.tgdeferrable,t.tginitdeferred,pg_get_triggerdef(t.oid) as trigger_definition,p.oid::text as function_oid,p.prosecdef,p.proconfig,pg_get_functiondef(p.oid) as function_definition from pg_catalog.pg_trigger t join pg_catalog.pg_class c on c.oid=t.tgrelid join pg_catalog.pg_namespace n on n.oid=c.relnamespace join pg_catalog.pg_proc p on p.oid=t.tgfoid where n.nspname='public' and c.relname=any($1::text[]) and not t.tgisinternal order by c.relname,t.tgname`,
+      [v5bTables],
+    )),
+  ];
+  const data: Record<string, unknown> = {};
+  for (const table of v5bTables)
+    data[table] = (
+      await backend.unsafe(
+        `select count(*)::int as count,md5(string_agg(row_to_json(t)::text,'|' order by id)) as digest from public.${table} t`,
+      )
+    )[0];
+  return { objects, columns, constraints, indexes, guards, data };
 }
 
 beforeAll(async () => {
@@ -352,7 +400,32 @@ describe("V4A populated legacy forward-DDL preservation", () => {
       expect(originalPrototype.objects).toHaveLength(5);
       expect(originalPrototype.enums).toHaveLength(8);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v4Tables].sort(),
+        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
+      );
+      expect((await tableNames(backend)).length).toBe(40);
+      expect(
+        (await tableNames(backend)).filter(
+          (name) => !v5bTables.some((v5b) => v5b === name),
+        ),
+      ).toEqual([...legacyTables, ...v4Tables].sort());
+      expect(
+        (await tableNames(backend)).filter(
+          (name) => !v5bTables.some((v5b) => v5b === name),
+        ).length,
+      ).toBe(37);
+      const metadata = await v5bFacts(backend);
+      expect(metadata.objects).toHaveLength(3);
+      expect(metadata.objects.map((row) => String(row.name))).toEqual(
+        [...v5bTables].sort(),
+      );
+      expect(metadata.guards).toHaveLength(10);
+      expect(
+        metadata.guards.every(
+          (row) => row.tgenabled === "O" || row.tgenabled === "A",
+        ),
+      ).toBe(true);
+      expect(metadata.guards.every((row) => row.prosecdef === false)).toBe(
+        true,
       );
       await backend.unsafe("BEGIN");
       transaction = true;
@@ -365,7 +438,11 @@ describe("V4A populated legacy forward-DDL preservation", () => {
         await backend.unsafe(`DROP FUNCTION public.${name}()`);
       for (const name of v4Enums)
         await backend.unsafe(`DROP TYPE public.${name}`);
-      expect(await tableNames(backend)).toEqual([...legacyTables].sort());
+      expect(await tableNames(backend)).toEqual(
+        [...legacyTables, ...v5bTables].sort(),
+      );
+      expect((await tableNames(backend)).length).toBe(35);
+      expect(await v5bFacts(backend)).toEqual(metadata);
       expect(legacyTables).toHaveLength(32);
       expect(await legacyFacts(backend, work.id)).toEqual(facts);
       expect(await libraryGuard(backend)).toEqual(guard);
@@ -376,9 +453,15 @@ describe("V4A populated legacy forward-DDL preservation", () => {
           .filter(Boolean))
           await backend.unsafe(statement);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v4Tables].sort(),
+        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
       );
-      expect((await tableNames(backend)).length).toBe(37);
+      expect((await tableNames(backend)).length).toBe(40);
+      expect(
+        (await tableNames(backend)).filter(
+          (name) => !v5bTables.some((v5b) => v5b === name),
+        ).length,
+      ).toBe(37);
+      expect(await v5bFacts(backend)).toEqual(metadata);
       const recreated = await prototypeFacts(backend);
       expect(recreated.objects).toHaveLength(5);
       expect(recreated.enums).toHaveLength(8);
@@ -406,6 +489,11 @@ describe("V4A populated legacy forward-DDL preservation", () => {
       await backend.unsafe("ROLLBACK");
       transaction = false;
       expect(await prototypeFacts(backend)).toEqual(originalPrototype);
+      expect(await v5bFacts(backend)).toEqual(metadata);
+      expect(await tableNames(backend)).toEqual(
+        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
+      );
+      expect((await tableNames(backend)).length).toBe(40);
       expect(
         await backend.unsafe(
           "select body from community_contents where id=$1",

@@ -6,6 +6,7 @@ export * from "./catalog-types";
 export * from "./ingestion-schema";
 export * from "./ingestion-types";
 export * from "./edit-suggestion-schema";
+export * from "./metadata-edit-schema";
 export * from "./release-schema";
 export * from "./library-schema";
 export * from "./library-types";

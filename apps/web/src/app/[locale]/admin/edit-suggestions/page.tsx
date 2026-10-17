@@ -7,6 +7,7 @@ import { listEditSuggestions } from "@/server/catalog/edit-suggestions";
 import { adminGetWork } from "@/server/catalog/service";
 import { EditSuggestionReview } from "@/components/catalog/EditSuggestionReview";
 import { suggestionCopy } from "@/components/catalog/suggestion-ui";
+import { metadataCopy } from "@/components/catalog/metadata-suggestion-ui";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export default async function AdminSuggestionsPage({
@@ -51,6 +52,11 @@ export default async function AdminSuggestionsPage({
   return (
     <section className="auth-page" style={{ width: "100%", maxWidth: "70rem" }}>
       <h1>{t.review}</h1>
+      <p>
+        <Link href={`/${locale}/admin/metadata-suggestions`}>
+          {metadataCopy[locale].review}
+        </Link>
+      </p>
       {items.length ? (
         items.map(({ suggestion, current }) => (
           <EditSuggestionReview
