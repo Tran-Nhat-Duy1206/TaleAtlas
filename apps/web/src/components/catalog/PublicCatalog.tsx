@@ -1,13 +1,22 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { WORK_FORMATS } from "@taleatlas/database/catalog-types";
+import {
+  RELEASE_STATUSES,
+  WORK_FORMATS,
+} from "@taleatlas/database/catalog-types";
 import type {
   AggregateWork,
   CatalogPage,
   ParsedCatalogQuery,
+  PublicGenreOptions,
 } from "../../features/catalog/contracts";
 import type { Locale } from "../../lib/i18n";
-import { catalogDictionary, formatLabels } from "../../lib/catalog-i18n";
+import {
+  catalogDictionary,
+  formatLabels,
+  releaseLabels,
+} from "../../lib/catalog-i18n";
+import { catalogDiscoveryCopy } from "../../lib/catalog-discovery-i18n";
 import { WorkCard } from "./WorkCard";
 import { catalogPageHref, publicCopy } from "./query";
 import styles from "./catalog.module.css";
@@ -15,15 +24,24 @@ export function PublicCatalog({
   locale,
   query,
   result,
+  genreOptions,
+  invalidQuery,
   requestPrompt,
 }: {
   locale: Locale;
   query: ParsedCatalogQuery;
   result: CatalogPage<AggregateWork>;
+  genreOptions: PublicGenreOptions;
+  invalidQuery?: boolean;
   requestPrompt?: ReactNode;
 }) {
   const t = { ...publicCopy[locale], format: catalogDictionary(locale).format };
+  const discovery = catalogDiscoveryCopy[locale];
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
+  const emptyPage = result.total > 0 && result.items.length === 0;
+  const missingGenre =
+    query.genre &&
+    !genreOptions.items.some((item) => item.slug === query.genre);
   return (
     <section className={styles.catalog}>
       <header className={styles.heading}>
@@ -31,6 +49,11 @@ export function PublicCatalog({
         <h1>{t.title}</h1>
         <p>{t.intro}</p>
       </header>
+      {invalidQuery && (
+        <p role="note" className={styles.notice}>
+          {discovery.invalidQuery}
+        </p>
+      )}
       <form
         action={`/${locale}/works`}
         method="get"
@@ -56,14 +79,77 @@ export function PublicCatalog({
             ))}
           </select>
         </label>
-        <label>
-          {t.genre}
+        <div className={styles.field}>
+          <label htmlFor="catalog-genre">{discovery.genre}</label>
+          {genreOptions.overflow ? (
+            <>
+              <select
+                id="catalog-genre"
+                disabled
+                defaultValue={query.genre ?? ""}
+                aria-describedby="catalog-genre-capacity"
+              >
+                <option value={query.genre ?? ""}>
+                  {query.genre
+                    ? discovery.selectedGenre(query.genre)
+                    : discovery.genresUnavailable}
+                </option>
+              </select>
+              <input type="hidden" name="genre" value={query.genre ?? ""} />
+              <p id="catalog-genre-capacity" className={styles.helper}>
+                {discovery.genreCapacity}
+              </p>
+            </>
+          ) : (
+            <select
+              id="catalog-genre"
+              name="genre"
+              defaultValue={query.genre ?? ""}
+            >
+              <option value="">{discovery.allGenres}</option>
+              {missingGenre && query.genre && (
+                <option value={query.genre}>
+                  {discovery.selectedGenre(query.genre)}
+                </option>
+              )}
+              {genreOptions.items.map((genre) => (
+                <option key={genre.slug} value={genre.slug}>
+                  {locale === "vi" ? genre.nameVi : genre.nameEn}
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        <div className={styles.field}>
+          <label htmlFor="catalog-original-language">
+            {discovery.originalLanguage}
+          </label>
           <input
-            name="genre"
-            maxLength={100}
-            pattern="[a-z0-9-]+"
-            defaultValue={query.genre ?? ""}
+            id="catalog-original-language"
+            name="originalLanguage"
+            type="text"
+            maxLength={63}
+            pattern="[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*"
+            defaultValue={query.originalLanguage ?? ""}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            aria-describedby="catalog-original-language-help"
           />
+          <p id="catalog-original-language-help" className={styles.helper}>
+            {discovery.originalLanguageHelp}
+          </p>
+        </div>
+        <label>
+          {discovery.releaseStatus}
+          <select name="releaseStatus" defaultValue={query.releaseStatus ?? ""}>
+            <option value="">{discovery.allStatuses}</option>
+            {RELEASE_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {releaseLabels[locale][status]}
+              </option>
+            ))}
+          </select>
         </label>
         <input type="hidden" name="pageSize" value={query.pageSize} />
         <button className={`button ${styles.button}`} type="submit">
@@ -82,6 +168,17 @@ export function PublicCatalog({
             <WorkCard key={work.id} work={work} locale={locale} />
           ))}
         </div>
+      ) : emptyPage ? (
+        <section className={`feature ${styles.empty}`}>
+          <h2>{discovery.emptyPage}</h2>
+          <p>{discovery.emptyPageText}</p>
+          <Link
+            className={`button ${styles.button}`}
+            href={catalogPageHref(locale, query, 1)}
+          >
+            {discovery.firstPage}
+          </Link>
+        </section>
       ) : (
         <section className={`feature ${styles.empty}`}>
           <h2>{t.empty}</h2>
@@ -89,27 +186,29 @@ export function PublicCatalog({
         </section>
       )}
       {requestPrompt}
-      <nav className={styles.pagination} aria-label={t.page}>
-        {result.page > 1 && (
-          <Link
-            className={`button ${styles.button}`}
-            href={catalogPageHref(locale, query, result.page - 1)}
-          >
-            {t.previous}
-          </Link>
-        )}
-        <span>
-          {t.page} {result.page} / {pages}
-        </span>
-        {result.page < pages && result.page * result.pageSize <= 10000 && (
-          <Link
-            className={`button ${styles.button}`}
-            href={catalogPageHref(locale, query, result.page + 1)}
-          >
-            {t.next}
-          </Link>
-        )}
-      </nav>
+      {!emptyPage && result.page <= pages && (
+        <nav className={styles.pagination} aria-label={t.page}>
+          {result.page > 1 && (
+            <Link
+              className={`button ${styles.button}`}
+              href={catalogPageHref(locale, query, result.page - 1)}
+            >
+              {t.previous}
+            </Link>
+          )}
+          <span>
+            {t.page} {result.page} / {pages}
+          </span>
+          {result.page < pages && result.page * result.pageSize <= 10000 && (
+            <Link
+              className={`button ${styles.button}`}
+              href={catalogPageHref(locale, query, result.page + 1)}
+            >
+              {t.next}
+            </Link>
+          )}
+        </nav>
+      )}
     </section>
   );
 }

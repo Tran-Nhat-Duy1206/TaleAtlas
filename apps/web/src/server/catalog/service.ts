@@ -13,6 +13,7 @@ import { CatalogError, sanitizeCatalogError } from "./errors";
 import {
   findWorkBySlug,
   searchWorks,
+  searchPublicDiscovery,
   loadWork,
   saveWork,
   changeVisibility,
@@ -42,6 +43,9 @@ async function safe<T>(work: () => Promise<T>): Promise<T> {
 }
 export async function listWorks(query: CatalogQuery = {}) {
   return safe(() => searchWorks(parse(catalogQuerySchema, query), false));
+}
+export async function getPublicCatalogPage(query: CatalogQuery = {}) {
+  return safe(() => searchPublicDiscovery(parse(catalogQuerySchema, query)));
 }
 export async function getWorkBySlug(slug: string, locale: "en" | "vi" = "en") {
   return safe(() =>

@@ -8,13 +8,31 @@ export function publicCatalogQuery(
   params: PublicSearchParams,
   locale: Locale,
 ): ParsedCatalogQuery {
+  return publicCatalogQueryState(params, locale).query;
+}
+export function publicCatalogQueryState(
+  params: PublicSearchParams,
+  locale: Locale,
+): { query: ParsedCatalogQuery; invalid: boolean } {
+  const defaults = () => catalogQuerySchema.parse({ locale });
   const known: Record<string, string> = {};
-  for (const key of ["q", "page", "pageSize", "format", "genre"] as const) {
+  for (const key of [
+    "q",
+    "page",
+    "pageSize",
+    "format",
+    "genre",
+    "originalLanguage",
+    "releaseStatus",
+  ] as const) {
     const value = params[key];
+    if (Array.isArray(value)) return { query: defaults(), invalid: true };
     if (typeof value === "string" && value.trim()) known[key] = value;
   }
   const parsed = catalogQuerySchema.safeParse({ ...known, locale });
-  return parsed.success ? parsed.data : catalogQuerySchema.parse({ locale });
+  return parsed.success
+    ? { query: parsed.data, invalid: false }
+    : { query: defaults(), invalid: true };
 }
 export function catalogPageHref(
   locale: Locale,
@@ -25,6 +43,9 @@ export function catalogPageHref(
   if (query.q) params.set("q", query.q);
   if (query.format) params.set("format", query.format);
   if (query.genre) params.set("genre", query.genre);
+  if (query.originalLanguage)
+    params.set("originalLanguage", query.originalLanguage);
+  if (query.releaseStatus) params.set("releaseStatus", query.releaseStatus);
   params.set("pageSize", String(query.pageSize));
   params.set("page", String(page));
   return `/${locale}/works?${params}`;
