@@ -1,12 +1,11 @@
 "use client";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { ThemeProvider, useTheme } from "next-themes";
-import { useEffect, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useSyncExternalStore } from "react";
 const subscribeHydration = () => () => {};
 const clientSnapshot = () => true;
 const serverSnapshot = () => false;
-const locationSnapshot = () => window.location.search + window.location.hash;
 const serverLocationSnapshot = () => "";
 function subscribeLocation(notify: () => void) {
   window.addEventListener("popstate", notify);
@@ -56,6 +55,48 @@ export function Preferences({ locale }: { locale: Locale }) {
     </label>
   );
 }
+type LocaleLinkProps = { locale: Locale; pathname: string };
+function LocaleAnchor({
+  locale,
+  pathname,
+  suffix = "",
+}: LocaleLinkProps & { suffix?: string }) {
+  const t = dictionary(locale);
+  const other = locale === "en" ? "vi" : "en";
+  return (
+    // Locale changes cross document/root-layout boundaries: use native navigation.
+    <a
+      href={pathname.replace(/^\/(en|vi)(?=\/|$)/, `/${other}`) + suffix}
+      hrefLang={other}
+      lang={other}
+      aria-label={`${t.language}: ${other === "vi" ? "Tiếng Việt" : "English"}`}
+    >
+      {other === "vi" ? "VI" : "EN"}
+    </a>
+  );
+}
+function RouterLocaleLink({ locale, pathname }: LocaleLinkProps) {
+  const searchParams = useSearchParams();
+  // Router state renders before Next commits browser history. A new router
+  // snapshot also triggers a post-commit reread, including hash-only navigation.
+  const locationSnapshot = useCallback(() => {
+    const query = searchParams.toString();
+    if (
+      window.location.pathname !== pathname ||
+      new URLSearchParams(window.location.search).toString() !== query
+    ) {
+      return query ? `?${query}` : "";
+    }
+    // Preserve raw query encoding and hash only once browser and router agree.
+    return window.location.search + window.location.hash;
+  }, [pathname, searchParams]);
+  const suffix = useSyncExternalStore(
+    subscribeLocation,
+    locationSnapshot,
+    serverLocationSnapshot,
+  );
+  return <LocaleAnchor locale={locale} pathname={pathname} suffix={suffix} />;
+}
 export function Shell({
   locale,
   children,
@@ -68,15 +109,7 @@ export function Shell({
   }, [locale]);
   const t = dictionary(locale);
   const pathname = usePathname();
-  const other = locale === "en" ? "vi" : "en";
   const { data: session } = authClient.useSession();
-  const locationSuffix = useSyncExternalStore(
-    subscribeLocation,
-    locationSnapshot,
-    serverLocationSnapshot,
-  );
-  const switched =
-    pathname.replace(/^\/(en|vi)(?=\/|$)/, `/${other}`) + locationSuffix;
   return (
     <>
       <a className="skip-link" href="#main">
@@ -110,15 +143,11 @@ export function Shell({
               {catalogDictionary(locale).admin}
             </a>
           )}
-          {/* Locale changes cross document/root-layout boundaries: use native navigation. */}
-          <a
-            href={switched}
-            hrefLang={other}
-            lang={other}
-            aria-label={`${t.language}: ${other === "vi" ? "Tiếng Việt" : "English"}`}
+          <Suspense
+            fallback={<LocaleAnchor locale={locale} pathname={pathname} />}
           >
-            {other === "vi" ? "VI" : "EN"}
-          </a>
+            <RouterLocaleLink locale={locale} pathname={pathname} />
+          </Suspense>
           <a
             className="nav-account"
             href={`/${locale}/${session ? "settings" : "login"}`}
