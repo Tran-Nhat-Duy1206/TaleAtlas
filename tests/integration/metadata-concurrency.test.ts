@@ -382,7 +382,7 @@ async function approvedTitle(
     citation: s.proposal!.citation.citation,
     url: null,
     consulted_at: null,
-    created_at: expect.any(Date),
+    created_at: rawTimestamp(),
   });
   const sourceId = source[0].id;
   const searchTitles = before.titles
@@ -407,7 +407,7 @@ async function approvedTitle(
     source_id: sourceId,
     search_text: expectedSearch,
     search_vector: search.vector,
-    updated_at: expect.any(Date),
+    updated_at: rawTimestamp(),
   });
   expect(after.proposals).toEqual(
     before.proposals.map((row) =>
@@ -417,7 +417,7 @@ async function approvedTitle(
             state: "APPROVED",
             revision: 2,
             applied_work_revision: before.work[0].revision + 1,
-            updated_at: expect.any(Date),
+            updated_at: rawTimestamp(),
           }
         : row,
     ),
@@ -440,7 +440,7 @@ async function approvedTitle(
     publication_review_acknowledged: true,
     rights_review_acknowledged: true,
     reason_redacted: false,
-    created_at: expect.any(Date),
+    created_at: rawTimestamp(),
   });
   expect(after.events).toHaveLength(before.events.length + 1);
   const audits = after.audits.filter(
@@ -456,7 +456,7 @@ async function approvedTitle(
     previous_revision: before.work[0].revision,
     new_revision: before.work[0].revision + 1,
     changes: { sourceId },
-    timestamp: expect.any(Date),
+    timestamp: rawTimestamp(),
   });
   const evidence = after.evidence.filter(
     (row) => !before.evidence.some((old) => old.id === row.id),
@@ -493,7 +493,7 @@ async function approvedTitle(
     rights_basis: null,
     originality_acknowledged: null,
     rights_review_acknowledged: null,
-    created_at: expect.any(Date),
+    created_at: rawTimestamp(),
   });
   const expectedTitles = before.titles.filter((row) => row.id !== targetId);
   for (const row of expectedTitles)
@@ -641,7 +641,7 @@ describe.sequential(
             source_id: expect.any(String),
             search_text: expectedSearch,
             search_vector: search.vector,
-            updated_at: expect.any(Date),
+            updated_at: rawTimestamp(),
           });
           const sources = after.sources.filter(
             (row) => !before.sources.some((old) => old.id === row.id),
@@ -772,7 +772,7 @@ describe.sequential(
             ...before.work[0],
             visibility: "HIDDEN",
             revision: w.revision + 1,
-            updated_at: expect.any(Date),
+            updated_at: rawTimestamp(),
           });
           const audits = after.audits.filter(
             (row) => !before.audits.some((old) => old.id === row.id),
@@ -1326,3 +1326,20 @@ describe.sequential(
     });
   },
 );
+
+function rawTimestamp() {
+  // Only for raw SELECT columns typed timestamptz NOT NULL by PostgreSQL.
+  // PostgreSQL guarantees calendar validity; check present, finite raw text
+  // without assuming DateStyle or parsing/rounding away timestamp precision.
+  // Never insert matchers into snapshots: unchanged values stay exactly equal.
+  return {
+    asymmetricMatch(value: unknown) {
+      return (
+        typeof value === "string" &&
+        value.trim().length > 0 &&
+        !/^[+-]?infinity$/i.test(value.trim())
+      );
+    },
+    toString: () => "RawPostgreSQLTimestamp",
+  };
+}
