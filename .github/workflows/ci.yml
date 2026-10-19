@@ -52,11 +52,20 @@ jobs:
         run: |
           set +x
           umask 077
-          if [[ -z "${RUNNER_TEMP:-}" ]] || ! output="$(mktemp "$RUNNER_TEMP/taleatlas-integration.XXXXXX" 2>/dev/null)"; then
-            printf '%s\n' 'INTEGRATION FAIL'
+          unknown_receipt() {
+            for id in V5D-C01 V5D-C02 V5D-C03 V5D-C04 V5D-C05 V5D-C06; do
+              printf '%s UNKNOWN\n' "$id" || :
+            done
+            printf '%s\n' 'V5D_REPORT UNKNOWN' 'V5D_COUNTS UNKNOWN' 'V5D_FAILURE_SCOPE UNKNOWN' 'V5D_CATEGORY UNKNOWN' || :
+          }
+          if [[ -z "${RUNNER_TEMP:-}" ]] || ! private="$(mktemp -d "$RUNNER_TEMP/taleatlas-integration.XXXXXX" 2>/dev/null)"; then
+            printf '%s\n' 'INTEGRATION FAIL' 'INTEGRATION_EXIT UNKNOWN' || :
+            unknown_receipt
             exit 1
           fi
-          if { pnpm test:integration >"$output" 2>&1; } 2>/dev/null; then
+          # Full original selection; only reporters/output destination are added.
+          # Directory0700 + inherited umask077 keep raw output/JSON job-local.
+          if { pnpm test:integration --reporter=default --reporter=json --outputFile="$private/report.json" >"$private/output.log" 2>&1; } 2>/dev/null; then
             status=$?
             result=PASS
           else
@@ -64,6 +73,11 @@ jobs:
             result=FAIL
           fi
           printf 'INTEGRATION %s\n' "$result" || :
+          printf 'INTEGRATION_EXIT %s\n' "$status" || :
+          # Trusted projection emits no report strings; all Node stderr is private.
+          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" 2>>"$private/output.log"; } 2>/dev/null; then
+            unknown_receipt
+          fi
           exit "$status"
       - run: pnpm build
       - run: pnpm typecheck
