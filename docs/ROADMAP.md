@@ -1,5 +1,7 @@
 # Roadmap
 
+**Current V5 status:** V5A–V5C are accepted and merged; V5D Phase 1 is an authorized evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). Milestone receipts below preserve their historical context; hosted deployment remains unverified.
+
 ## V0 — foundation (local acceptance complete; hosted validation pending)
 
 Account UI/verification/reset/session handling, server role guards, EN/VI core pages/themes, explicit migrations and health/readiness are implemented. Latest static typecheck (all packages/tests and Next type generation), 57 unit tests, lint, production build, isolated PostgreSQL migration/repeat/no-change generation, six real PostgreSQL integration tests and zero-vulnerability production dependency audit passed.

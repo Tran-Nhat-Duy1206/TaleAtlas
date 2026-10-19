@@ -1,5 +1,13 @@
 # Database
 
+## Current V5 metadata persistence
+
+V5A–V5C are accepted and merged; [source-bound status](<V5_PLAN.md#current-status-receipt>) records PR #12 and successful independent Push/PR/main CI. V5D Phase 1 is an unpublished documentation/test-evidence candidate and changes no schema. The older table totals and migration results below are historical milestone receipts, not current deployment state.
+
+Approved forward-only [0014_metadata_edits.sql](<../packages/database/drizzle/0014_metadata_edits.sql>) adds `metadata_edit_suggestions`, `metadata_edit_events` and `catalog_metadata_evidence`, with typed intent/lifecycle, immutable delivery identity, bound approval evidence, deferred event consistency and TRUNCATE denial. The [journal](<../packages/database/drizzle/meta/_journal.json>) appends0014; applied0000–0013 SQL/snapshots remain unchanged. Application capability checks fail closed if required guards/columns are absent. See [V5B persistence/erasure](<V5B_METADATA_EDITS.md>) and [real SQL assertions](<../tests/integration/metadata-persistence.test.ts>).
+
+Model B erases private owner payload/citation/declaration/key/hash and linked private reasons irreversibly, but retains already approved factual before/after evidence, publication source/citation and minimal originality/review bits. Retention can identify contributors; it is not universal anonymity, license proof or backup/log erasure. Selective approval locks/rechecks the published Work and current revision, updates only the targeted fact, preserves siblings and atomically records source/audit/evidence. Pool10 and per-statement5000ms remain unchanged. Production migration, real data/load and hosted retention/backup checks require separate operator authorization; synthetic acceptance is not deployment permission.
+
 V0 schema is implemented; isolated UTF-8 PostgreSQL 18.4 migration and integration constraints were exercised locally. This is not production certification. PostgreSQL with Drizzle schema in `packages/database/src/schema.ts` and explicit tooling in `packages/database/drizzle.config.ts`.
 
 Current identity schema:

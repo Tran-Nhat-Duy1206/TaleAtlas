@@ -4,6 +4,8 @@
 
 ## Current repository status
 
+**V5A–V5C are accepted and merged; V5D Phase 1 is an authorized evidence-only candidate, not final accepted or published V5D.** See the [canonical V5 current-status receipt](docs/V5_PLAN.md#current-status-receipt) for exact feature/PR/main identities, CI evidence and limitations. The V4 closure below remains historical; hosted launch is still unverified and V4 stays off by default.
+
 **V4 DONE — implemented source, merged code, and GitHub CI (2026-10-16); hosted launch NOT VERIFIED.** [PR #4](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/4) merged to `main` as `ac7cf261`. The feature head `6aff4bf` passed [Push](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38842239084) and [PR](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38842244397) Quality gates independently; the [post-merge main run](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38844260208) passed all mandatory jobs, 17/17 original E2E, 8/8 enabled V4 E2E and both security audits. CI was executed in guarded synthetic production HTTPS, not on a real hosted deployment. `V4_COMMUNITIES_ENABLED` remains off by default; public posting requires separately authorized operational/hosted reviews (migrations, roles, SMTP, TLS/proxy, privacy, backups and load). Earlier failed CI attempts remain failed and their transport root cause remains unproven. See [V4 release status](docs/V4_RELEASE_STATUS.md).
 
 ### Preserved V3 milestone receipts

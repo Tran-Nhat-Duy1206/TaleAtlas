@@ -1,6 +1,8 @@
 # V5A — metadata contracts and safety foundation
 
-**Scope: contracts only.** The maintainer approved the conservative operation matrix through session question `v5a-contract-policy-approval` before product code was written. No new endpoint, UI, storage, metadata writer, migration, discovery filter or V5B behavior is delivered. Existing Suggest an Edit remains the six-field V2 workflow.
+**Current status:** V5A–V5C are accepted and merged; V5D Phase 1 remains an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The contracts-only scope, future V5B wiring/acceptance notes and baseline below describe the historical V5A milestone, not today's integration status.
+
+**Historical V5A scope: contracts only.** The maintainer approved the conservative operation matrix through session question `v5a-contract-policy-approval` before product code was written. No new endpoint, UI, storage, metadata writer, migration, discovery filter or V5B behavior is delivered. Existing Suggest an Edit remains the six-field V2 workflow.
 
 Verified base: `301b4a7b81f0442a5098e4635af87985b62a838f`, merged PR8, independently fetched origin/main; [post-merge Quality38854250631](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38854250631) passed all five mandatory jobs. Its archived native17/8 pass footers and audit-zero summaries were checked in memory without retaining raw logs. The effective main rules require PR/verify and prohibit deletion/force updates; no safeguards were changed.
 

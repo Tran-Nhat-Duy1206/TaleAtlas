@@ -1,17 +1,29 @@
 # TaleAtlas V5 — Metadata & Discovery plan
 
-**Status:** Design proposal only, not a delivered V5 milestone. **Source baseline:** `main` at `b6c0859696d68ea669cbb305c64cfb811204fb30`, after V4 source, CI and documentation closure. Scope and all implementation changes require review; this planning PR changes only two Markdown documents.
+**Historical planning context:** The original design proposal used `main` at `b6c0859696d68ea669cbb305c64cfb811204fb30`, after V4 closure, and changed only two Markdown documents. Its baseline, branch instructions, proposed decisions and planning-only acceptance below are historical, not the current implementation status.
 
-## Objective and current baseline
+## Current status receipt
+
+**V5A–V5C are accepted and merged. V5D Phase 1 is an authorized evidence-only candidate, not final accepted or published V5D.** This status supersedes historical candidate, unmerged, future-wiring and publication-pending notes in the milestone documents; their original design, contract and local verification context remains preserved.
+
+- Accepted [PR #12](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/12) feature head: `a07183443612adc936243594f3a3149accd6e667`. [Push 39178806723](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39178806723) and [PR 39178810725](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39178810725) each passed all five mandatory jobs on attempt 1.
+- Actual PR checkout: `a8f5b246f9d87610245fc619f3ac5156d04381c7`, not the feature head. Merge/main: `144de9a14f1e4b8517596545a884d3c0a1dfab86`. Both checkout and main have tree `0f822763a1affe535d54f75c4e74e5a6872f2c2c`. [Main CI 39180956802](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39180956802) passed all five mandatory jobs on attempt 1.
+- Existing main evidence observed 2030 unit tests and PostgreSQL 17.11. Integration/browser numeric runtime totals are private and withheld here. The 20 default / 8 V4 browser cases are source-defined inventory, not a newly observed runtime footer. Historical PostgreSQL 18.4, 2023-unit, 326-SQL and 31+9 performance receipts below and in [V5C](V5C_DISCOVERY.md#verification-and-performance) remain historical, not current totals.
+- Performance query SHA-256 `f115e398eb5b932a577d31a88e94eeec69ba5a6da163143b9e6938d5aa3fb3d5` matches the current query only. Local 31+9 bounded measurements are neither a production SLO nor clean-checkout reproducibility proof; all four optional benchmark/diagnostic files remain excluded and unchanged.
+- New deterministic V5D A-update/B-hide/C-remove-replace schedules are runtime-pending; earlier CI cannot prove new tests pass. These new SQL schedules have not been executed locally; no passing SQL result is claimed.
+
+Description rights remain original-summary-only; Model B retains approved factual history/citations with its documented privacy limits. All scope/non-goals, the 200-genre overflow bound, default-off V4 and unverified hosted deployment remain unchanged. Final V5D acceptance/publication requires its own authorized evidence and review.
+
+## Original design objective and baseline (historical)
 
 Improve the completeness and usefulness of TaleAtlas's existing curated canonical Work catalog without violating privacy, evidence rights, human publication decisions or existing performance/security budgets.
 
-Observed existing capabilities:
+Capabilities observed at the original design baseline:
 - **V1:** published-only canonical Work identities, titles/aliases, creator credits, editions, descriptions, genres, identifiers, relations, source evidence and local bilingual catalog search.
 - **V2D:** `Suggest an Edit` accepts precisely six scalar fields (`primaryTitle`, `primaryTitleLanguage`, `releaseStatus`, `publicationYear`, `publicationLabel`, `originalLanguage`). Browser submits one field, API accepts one or more of these fields, and administrator approves or rejects the whole proposal against the exact published Work revision.
 - **V3:** private personal reading data. Never infer public metadata or recommendation from library notes, ratings, progress, histories or favorites.
 - **V4:** separate deliberately public discussions and reviews, reports and manual moderation, with exact-`true` server-only `V4_COMMUNITIES_ENABLED` disabled by default. V5 must not turn it on.
-- **Current discovery:** catalog `q`, `format`, `genre`, `page`, `pageSize`; no live metadata providers, automated imports or recommendation engine.
+- **Discovery at that baseline:** catalog `q`, `format`, `genre`, `page`, `pageSize`; no live metadata providers, automated imports or recommendation engine.
 
 ## Milestone sequence
 
