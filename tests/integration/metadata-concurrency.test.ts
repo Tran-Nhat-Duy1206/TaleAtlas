@@ -1,8 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { works } from "../../packages/database/src/catalog-schema";
+import * as database from "../../apps/web/src/server/database";
+import { adminInput } from "../../apps/web/src/components/catalog/admin-input";
+import { normalizeTitle } from "../../apps/web/src/features/catalog/contracts";
 import { catalogAuthFixture } from "../helpers/catalog-auth-fixture";
 import { requireTestDatabase } from "../helpers/test-database";
-import { createWork } from "../../apps/web/src/server/catalog/service";
+import {
+  createWork,
+  updateWork,
+  setVisibility,
+} from "../../apps/web/src/server/catalog/service";
 import {
   submitMetadataSuggestion,
   reviewMetadataSuggestion,
@@ -14,6 +22,9 @@ import type { MetadataSuggestion } from "../../apps/web/src/features/catalog/met
 const f = catalogAuthFixture();
 type Actor = Awaited<ReturnType<typeof f.account>>;
 type Reserved = Awaited<ReturnType<typeof f.client.reserve>>;
+type Tx = Parameters<
+  Parameters<ReturnType<typeof database.getDatabase>["transaction"]>[0]
+>[0];
 let admin: Actor;
 const workIds = new Set<string>();
 const headers = (a: Actor) =>
@@ -129,6 +140,385 @@ async function blockedBy(
     "Owned PostgreSQL lock dependency did not materialize within 4.5 seconds",
   );
 }
+async function publicationSnapshot(id: string) {
+  return {
+    ...(await snapshot(id)),
+    proposals: [
+      ...(await f.client`select * from metadata_edit_suggestions where work_id=${id} order by id`),
+    ],
+    events: [
+      ...(await f.client`select e.* from metadata_edit_events e join metadata_edit_suggestions s on s.id=e.suggestion_id where s.work_id=${id} order by e.suggestion_id,e.revision`),
+    ],
+    scalarEvidence: [
+      ...(await f.client`select * from catalog_field_evidence where work_id=${id} order by id`),
+    ],
+    memberships: [
+      ...(await f.client`select * from work_genres where work_id=${id} order by genre_slug`),
+    ],
+    editions: [
+      ...(await f.client`select * from editions where work_id=${id} order by id`),
+    ],
+    credits: [
+      ...(await f.client`select * from work_creators where work_id=${id} order by id`),
+    ],
+    covers: [
+      ...(await f.client`select * from work_covers where work_id=${id}`),
+    ],
+    identifiers: [
+      ...(await f.client`select * from work_identifiers where work_id=${id} order by id`),
+    ],
+    relations: [
+      ...(await f.client`select * from work_relations where from_work_id=${id} or to_work_id=${id} order by from_work_id,to_work_id,type`),
+    ],
+  };
+}
+type PublicationSnapshot = Awaited<ReturnType<typeof publicationSnapshot>>;
+function latch<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+async function bounded<T>(promise: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("SQL delivery gate exceeded 4.5 seconds")),
+          4500,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+/** Gate delivery, not execution: both mutations use their real transactions and SQL.
+ * First owns Work; second is observed waiting on that backend. Pause second after
+ * it acquires Work to capture the committed winner, then prove the loser writes
+ * absolutely nothing (including timestamps, private headers/events and sources).
+ */
+async function orderedPublication<A, B>(
+  id: string,
+  first: () => Promise<A>,
+  second: () => Promise<B>,
+) {
+  const db = database.getDatabase();
+  const reached = [latch<number>(), latch<number>()];
+  const release = [latch<void>(), latch<void>()];
+  let deliveries = 0;
+  const deliveredTransactions = new WeakSet<object>();
+  const wrapBuilder = (
+    builder: object,
+    tx: Tx,
+    work = false,
+    locked = false,
+  ): object =>
+    new Proxy(builder, {
+      get(object, key) {
+        const member = Reflect.get(object, key, object);
+        if (typeof member !== "function") return member;
+        if (key === "then")
+          return (
+            resolve?: (rows: unknown) => unknown,
+            reject?: (error: unknown) => unknown,
+          ) =>
+            Promise.resolve(
+              Reflect.apply(member, object, [
+                async (rows: unknown) => {
+                  if (work && locked && !deliveredTransactions.has(tx)) {
+                    deliveredTransactions.add(tx);
+                    expect(rows).toEqual(
+                      expect.arrayContaining([expect.objectContaining({ id })]),
+                    );
+                    const index = deliveries++;
+                    if (index > 1)
+                      throw new Error("Unexpected third Work lock delivery");
+                    const pids = (await tx.execute(
+                      "select pg_backend_pid() as pid",
+                    )) as { pid: number }[];
+                    reached[index].resolve(Number(pids[0].pid));
+                    await bounded(release[index].promise);
+                  }
+                  return rows;
+                },
+              ]),
+            ).then(resolve, reject);
+        return (...args: unknown[]) => {
+          const next = Reflect.apply(member, object, args);
+          return next && typeof next === "object"
+            ? wrapBuilder(
+                next,
+                tx,
+                work || (key === "from" && args[0] === works),
+                locked || (key === "for" && args[0] === "update"),
+              )
+            : next;
+        };
+      },
+    });
+  const gated = new Proxy(db, {
+    get(object, key) {
+      const member = Reflect.get(object, key, object);
+      if (typeof member !== "function") return member;
+      if (key === "transaction")
+        return (callback: (tx: object) => unknown, config?: unknown) =>
+          Reflect.apply(member, object, [
+            (tx: Tx) =>
+              callback(
+                new Proxy(tx, {
+                  get(target, method) {
+                    const value = Reflect.get(target, method, target);
+                    if (method === "select")
+                      return (...args: unknown[]) =>
+                        wrapBuilder(Reflect.apply(value, target, args), tx);
+                    return typeof value === "function"
+                      ? value.bind(target)
+                      : value;
+                  },
+                }),
+              ),
+            config,
+          ]);
+      return member.bind(object);
+    },
+  });
+  const observer = await f.client.reserve();
+  const spy = vi.spyOn(database, "getDatabase").mockReturnValue(gated);
+  let firstTask: ReturnType<typeof settle<A>> | undefined;
+  let secondTask: ReturnType<typeof settle<B>> | undefined;
+  try {
+    firstTask = settle(first());
+    const firstPid = await bounded(reached[0].promise);
+    secondTask = settle(second());
+    const secondPid = await blockedBy(observer, firstPid);
+    const [waiting] =
+      await observer`select query from pg_stat_activity where pid=${secondPid}`;
+    expect(waiting.query).toMatch(/works/);
+    expect(waiting.query).toMatch(/for update/i);
+    release[0].resolve();
+    const winner = await bounded(firstTask);
+    expect(winner.ok).toBe(true);
+    if (!winner.ok) throw winner.error;
+    expect(await bounded(reached[1].promise)).toBe(secondPid);
+    const committed = await publicationSnapshot(id);
+    release[1].resolve();
+    const loser = await bounded(secondTask);
+    expect(loser.ok).toBe(false);
+    if (loser.ok)
+      throw new Error("Stale concurrent mutation unexpectedly committed");
+    expect(await publicationSnapshot(id)).toEqual(committed);
+    expect(deliveries).toBe(2);
+    return { committed, winner: winner.value, error: loser.error };
+  } finally {
+    // No abandoned mutation, open gate, spy or reserved observer on assertion failure.
+    release[0].resolve();
+    release[1].resolve();
+    try {
+      await Promise.all([firstTask, secondTask]);
+    } finally {
+      spy.mockRestore();
+      observer.release();
+    }
+  }
+}
+function unchangedCollections(
+  before: PublicationSnapshot,
+  after: PublicationSnapshot,
+) {
+  for (const key of [
+    "descriptions",
+    "memberships",
+    "editions",
+    "credits",
+    "covers",
+    "identifiers",
+    "relations",
+  ] as const)
+    expect(after[key], key).toEqual(before[key]);
+  for (const key of [
+    "sources",
+    "audits",
+    "evidence",
+    "scalarEvidence",
+  ] as const)
+    for (const row of before[key])
+      expect(
+        after[key].find((next) => next.id === row.id),
+        key,
+      ).toEqual(row);
+}
+function unchangedProposal(
+  before: PublicationSnapshot,
+  after: PublicationSnapshot,
+  id: string,
+) {
+  expect(after.proposals.find((row) => row.id === id)).toEqual(
+    before.proposals.find((row) => row.id === id),
+  );
+  expect(after.events.filter((row) => row.suggestion_id === id)).toEqual(
+    before.events.filter((row) => row.suggestion_id === id),
+  );
+}
+async function approvedTitle(
+  before: PublicationSnapshot,
+  after: PublicationSnapshot,
+  s: MetadataSuggestion,
+  reviewer: Actor,
+  operation: "TITLE_ADD" | "TITLE_REMOVE" | "TITLE_REPLACE",
+  title: string | null,
+  targetId?: string,
+) {
+  const source = after.sources.filter(
+    (row) => !before.sources.some((old) => old.id === row.id),
+  );
+  expect(source).toHaveLength(1);
+  expect(source[0]).toEqual({
+    id: expect.any(String),
+    label: f.sourceLabel,
+    citation: s.proposal!.citation.citation,
+    url: null,
+    consulted_at: null,
+    created_at: rawTimestamp(),
+  });
+  const sourceId = source[0].id;
+  const searchTitles = before.titles
+    .filter((row) => row.kind !== "PRIMARY")
+    .filter((row) => !(operation === "TITLE_REMOVE" && row.id === targetId))
+    .map((row) =>
+      operation === "TITLE_REPLACE" && row.id === targetId ? title : row.title,
+    );
+  if (operation === "TITLE_ADD") searchTitles.push(title);
+  const expectedSearch = normalizeTitle(
+    [
+      before.work[0].primary_title,
+      ...searchTitles,
+      ...before.descriptions.map((row) => row.text),
+    ].join(" "),
+  );
+  const [search] =
+    await f.client`select to_tsvector('simple'::regconfig, ${expectedSearch}) as vector`;
+  expect(after.work[0]).toEqual({
+    ...before.work[0],
+    revision: before.work[0].revision + 1,
+    source_id: sourceId,
+    search_text: expectedSearch,
+    search_vector: search.vector,
+    updated_at: rawTimestamp(),
+  });
+  expect(after.proposals).toEqual(
+    before.proposals.map((row) =>
+      row.id === s.id
+        ? {
+            ...row,
+            state: "APPROVED",
+            revision: 2,
+            applied_work_revision: before.work[0].revision + 1,
+            updated_at: rawTimestamp(),
+          }
+        : row,
+    ),
+  );
+  const events = after.events.filter((row) => row.suggestion_id === s.id);
+  expect(events).toHaveLength(2);
+  expect(events[0]).toEqual(
+    before.events.find((row) => row.suggestion_id === s.id),
+  );
+  expect(events[1]).toEqual({
+    id: expect.any(String),
+    suggestion_id: s.id,
+    revision: 2,
+    from_state: "SUBMITTED",
+    to_state: "APPROVED",
+    actor_user_id: reviewer.id,
+    review_reason: decision(s).reason,
+    applied_work_revision: before.work[0].revision + 1,
+    metadata_review_acknowledged: true,
+    publication_review_acknowledged: true,
+    rights_review_acknowledged: true,
+    reason_redacted: false,
+    created_at: rawTimestamp(),
+  });
+  expect(after.events).toHaveLength(before.events.length + 1);
+  const audits = after.audits.filter(
+    (row) => !before.audits.some((old) => old.id === row.id),
+  );
+  expect(audits).toHaveLength(1);
+  expect(audits[0]).toEqual({
+    id: expect.any(String),
+    work_id: s.workId,
+    actor_user_id: reviewer.id,
+    actor_id_snapshot: "metadata-review",
+    operation: "UPDATE",
+    previous_revision: before.work[0].revision,
+    new_revision: before.work[0].revision + 1,
+    changes: { sourceId },
+    timestamp: rawTimestamp(),
+  });
+  const evidence = after.evidence.filter(
+    (row) => !before.evidence.some((old) => old.id === row.id),
+  );
+  expect(evidence).toHaveLength(1);
+  const selected = targetId
+    ? before.titles.find((row) => row.id === targetId)
+    : undefined;
+  const titleId =
+    targetId ?? after.titles.find((row) => row.title === title)?.id;
+  expect(titleId).toBeTruthy();
+  expect(evidence[0]).toEqual({
+    id: expect.any(String),
+    suggestion_id: s.id,
+    work_id: s.workId,
+    work_revision: before.work[0].revision + 1,
+    approval_event_id: events[1].id,
+    audit_event_id: audits[0].id,
+    operation_type: operation,
+    title_id: titleId,
+    title_language: selected?.language ?? "fr",
+    title_kind: selected?.kind ?? "ALIAS",
+    description_language: null,
+    genre_slug: null,
+    before_present: operation !== "TITLE_ADD",
+    after_present: operation !== "TITLE_REMOVE",
+    before_title: selected?.title ?? null,
+    after_title: title,
+    before_description: null,
+    after_description: null,
+    decision_source_id: sourceId,
+    previous_source_id: selected?.source_id ?? null,
+    resulting_source_id: operation === "TITLE_REMOVE" ? null : sourceId,
+    rights_basis: null,
+    originality_acknowledged: null,
+    rights_review_acknowledged: null,
+    created_at: rawTimestamp(),
+  });
+  const expectedTitles = before.titles.filter((row) => row.id !== targetId);
+  for (const row of expectedTitles)
+    expect(after.titles.find((next) => next.id === row.id)).toEqual(row);
+  expect(after.titles).toHaveLength(
+    before.titles.length +
+      (operation === "TITLE_ADD" ? 1 : operation === "TITLE_REMOVE" ? -1 : 0),
+  );
+  if (operation === "TITLE_REMOVE")
+    expect(after.titles.find((row) => row.id === titleId)).toBeUndefined();
+  else
+    expect(after.titles.find((row) => row.id === titleId)).toEqual({
+      ...(selected ?? {
+        id: titleId,
+        work_id: s.workId,
+        language: "fr",
+        kind: "ALIAS",
+      }),
+      title,
+      normalized: normalizeTitle(title!),
+      source_id: sourceId,
+    });
+  unchangedCollections(before, after);
+  expect(after.scalarEvidence).toEqual(before.scalarEvidence);
+}
 async function erased(id: string) {
   const [row] =
     await f.client`select * from metadata_edit_suggestions where id=${id}`;
@@ -175,6 +565,345 @@ afterAll(async () => {
 describe.sequential(
   "V5B real PostgreSQL publication/erasure lock ordering",
   () => {
+    for (const first of ["CANONICAL_UPDATE", "APPROVAL"] as const) {
+      it(`canonical Work update vs approval: ${first} owns Work first; stale loser leaves the committed winner byte-for-byte unchanged`, async () => {
+        const { w, s, input } = await fixture();
+        const reviewer = await f.account("admin");
+        const writer = await f.account("admin");
+        const before = await publicationSnapshot(w.id);
+        const citation = `Canonical concurrent revision ${randomUUID()}`;
+        const value = {
+          ...adminInput(w),
+          revision: w.revision,
+          publicationReviewAcknowledged: true,
+          releaseStatus: "COMPLETED",
+          // The seed has no cover; do not materialize adminInput's UNKNOWN default.
+          cover: undefined,
+          titles: [
+            ...adminInput(w).titles!,
+            {
+              title: "Canonical winner sibling",
+              language: "de",
+              kind: "ALIAS",
+            },
+          ],
+          source: { label: f.sourceLabel, citation },
+        };
+        const write = () => updateWork(w.id, value, headers(writer));
+        const publish = () =>
+          reviewMetadataSuggestion(s.id, decision(s), headers(reviewer));
+        const { committed: after, error } =
+          first === "CANONICAL_UPDATE"
+            ? await orderedPublication(w.id, write, publish)
+            : await orderedPublication(w.id, publish, write);
+        expect(error).toMatchObject({
+          status: 409,
+          code:
+            first === "CANONICAL_UPDATE"
+              ? "WORK_REVISION_CONFLICT"
+              : "CONFLICT",
+        });
+        if (first === "APPROVAL") {
+          await approvedTitle(
+            before,
+            after,
+            s,
+            reviewer,
+            "TITLE_ADD",
+            input.operation.value.title,
+          );
+          expect(after.work[0].release_status).toBe("UNKNOWN");
+          expect(
+            after.titles.some(
+              (row) => row.title === "Canonical winner sibling",
+            ),
+          ).toBe(false);
+          expect(after.sources.some((row) => row.citation === citation)).toBe(
+            false,
+          );
+        } else {
+          unchangedProposal(before, after, s.id);
+          unchangedCollections(before, after);
+          const expectedSearch = normalizeTitle(
+            [
+              w.primaryTitle,
+              "Untouched sibling",
+              "Canonical winner sibling",
+              "Untouched summary",
+            ].join(" "),
+          );
+          const [search] =
+            await f.client`select to_tsvector('simple'::regconfig, ${expectedSearch}) as vector`;
+          expect(after.work[0]).toEqual({
+            ...before.work[0],
+            revision: w.revision + 1,
+            release_status: "COMPLETED",
+            source_id: expect.any(String),
+            search_text: expectedSearch,
+            search_vector: search.vector,
+            updated_at: rawTimestamp(),
+          });
+          const sources = after.sources.filter(
+            (row) => !before.sources.some((old) => old.id === row.id),
+          );
+          expect(sources).toHaveLength(1);
+          expect(sources[0]).toMatchObject({
+            id: after.work[0].source_id,
+            label: f.sourceLabel,
+            citation,
+            url: null,
+            consulted_at: null,
+          });
+          const added = after.titles.filter(
+            (row) => !before.titles.some((old) => old.id === row.id),
+          );
+          expect(added).toHaveLength(1);
+          expect(added[0]).toMatchObject({
+            work_id: w.id,
+            title: "Canonical winner sibling",
+            normalized: normalizeTitle("Canonical winner sibling"),
+            language: "de",
+            kind: "ALIAS",
+            source_id: sources[0].id,
+          });
+          for (const row of before.titles)
+            expect(after.titles.find((next) => next.id === row.id)).toEqual(
+              row,
+            );
+          expect(after.titles).toHaveLength(before.titles.length + 1);
+          expect(after.work[0].search_text).toBe(
+            normalizeTitle(
+              [
+                w.primaryTitle,
+                "Untouched sibling",
+                "Canonical winner sibling",
+                "Untouched summary",
+              ].join(" "),
+            ),
+          );
+          expect(
+            after.titles.some(
+              (row) => row.title === input.operation.value.title,
+            ),
+          ).toBe(false);
+          const audits = after.audits.filter(
+            (row) => !before.audits.some((old) => old.id === row.id),
+          );
+          expect(audits).toHaveLength(1);
+          expect(audits[0]).toMatchObject({
+            actor_user_id: writer.id,
+            actor_id_snapshot: writer.id,
+            operation: "UPDATE",
+            previous_revision: w.revision,
+            new_revision: w.revision + 1,
+          });
+          expect(audits[0].changes).toEqual({
+            primaryTitle: w.primaryTitle,
+            primaryTitleLanguage: "en",
+            format: "NOVEL",
+            visibility: "PUBLISHED",
+            releaseStatus: "COMPLETED",
+            originalLanguage: null,
+            country: null,
+            publicationYear: null,
+            publicationLabel: null,
+            sourceId: sources[0].id,
+            publicationReviewAcknowledged: true,
+            titles: value.titles,
+            descriptions: value.descriptions,
+            editions: [],
+            creators: [],
+            genres: [],
+            cover: null,
+            identifiers: [],
+            relations: [],
+          });
+          expect(after.evidence).toEqual(before.evidence);
+          expect(after.proposals).toEqual(before.proposals);
+          expect(after.events).toEqual(before.events);
+          const scalar = after.scalarEvidence.filter(
+            (row) => !before.scalarEvidence.some((old) => old.id === row.id),
+          );
+          expect(scalar).toHaveLength(1);
+          expect(scalar[0]).toMatchObject({
+            work_id: w.id,
+            source_id: sources[0].id,
+            revision: w.revision + 1,
+            field_path: "work.releaseStatus",
+            value: "COMPLETED",
+          });
+        }
+      });
+    }
+    for (const first of ["UNPUBLISH", "APPROVAL"] as const) {
+      it(`unpublish vs approval: ${first} owns Work first; no stale visibility or metadata overwrite`, async () => {
+        const { w, s, input } = await fixture();
+        const reviewer = await f.account("admin");
+        const writer = await f.account("admin");
+        const before = await publicationSnapshot(w.id);
+        const hide = () =>
+          setVisibility(
+            w.id,
+            { revision: w.revision, visibility: "HIDDEN" },
+            headers(writer),
+          );
+        const publish = () =>
+          reviewMetadataSuggestion(s.id, decision(s), headers(reviewer));
+        const { committed: after, error } =
+          first === "UNPUBLISH"
+            ? await orderedPublication(w.id, hide, publish)
+            : await orderedPublication(w.id, publish, hide);
+        expect(error).toMatchObject({
+          status: 409,
+          code: first === "UNPUBLISH" ? "WORK_REVISION_CONFLICT" : "CONFLICT",
+        });
+        if (first === "APPROVAL") {
+          await approvedTitle(
+            before,
+            after,
+            s,
+            reviewer,
+            "TITLE_ADD",
+            input.operation.value.title,
+          );
+          expect(after.work[0].visibility).toBe("PUBLISHED");
+        } else {
+          expect(after.work[0]).toEqual({
+            ...before.work[0],
+            visibility: "HIDDEN",
+            revision: w.revision + 1,
+            updated_at: rawTimestamp(),
+          });
+          const audits = after.audits.filter(
+            (row) => !before.audits.some((old) => old.id === row.id),
+          );
+          expect(audits).toHaveLength(1);
+          expect(audits[0]).toMatchObject({
+            work_id: w.id,
+            actor_user_id: writer.id,
+            actor_id_snapshot: writer.id,
+            operation: "HIDE",
+            previous_revision: w.revision,
+            new_revision: w.revision + 1,
+            changes: { visibility: "HIDDEN" },
+          });
+          expect(after).toEqual({
+            ...before,
+            work: after.work,
+            audits: after.audits,
+          });
+          unchangedProposal(before, after, s.id);
+        }
+      });
+    }
+    for (const first of ["TITLE_REMOVE", "TITLE_REPLACE"] as const) {
+      it(`distinct remove/replace proposals target the exact same title UUID: ${first} wins, the other remains privately SUBMITTED`, async () => {
+        const { owner, w, input, s: unrelated } = await fixture();
+        // Disjoint principals ensure the observed waiter is on Work, not the
+        // shared proposer/reviewer row used by the existing two-approver test.
+        const otherOwner = await f.account("user");
+        const removeReviewer = await f.account("admin");
+        const replaceReviewer = await f.account("admin");
+        const [target] =
+          await f.client`select * from work_titles where work_id=${w.id} and language='vi' and kind='ALIAS'`;
+        expect(target).toMatchObject({
+          work_id: w.id,
+          title: "Untouched sibling",
+          language: "vi",
+          kind: "ALIAS",
+        });
+        const replacement = `Replacement exact fact ${randomUUID()}`;
+        const remove = await submitMetadataSuggestion(
+          w.id,
+          {
+            ...input,
+            submitKey: randomUUID(),
+            operation: {
+              type: "TITLE_REMOVE",
+              titleId: target.id,
+              reason: "Synthetic explicitly removed alias",
+            },
+            citation: {
+              label: f.sourceLabel,
+              citation: `Remove exact fact ${randomUUID()}`,
+            },
+          },
+          headers(owner),
+        );
+        const replace = await submitMetadataSuggestion(
+          w.id,
+          {
+            ...input,
+            submitKey: randomUUID(),
+            operation: {
+              type: "TITLE_REPLACE",
+              titleId: target.id,
+              title: replacement,
+            },
+            citation: {
+              label: f.sourceLabel,
+              citation: `Replace exact fact ${randomUUID()}`,
+            },
+          },
+          headers(otherOwner),
+        );
+        expect(remove.id).not.toBe(replace.id);
+        expect(remove).toMatchObject({
+          baseWorkRevision: w.revision,
+          revision: 1,
+          state: "SUBMITTED",
+          appliedWorkRevision: null,
+        });
+        expect(replace).toMatchObject({
+          baseWorkRevision: w.revision,
+          revision: 1,
+          state: "SUBMITTED",
+          appliedWorkRevision: null,
+        });
+        const before = await publicationSnapshot(w.id);
+        const removeTask = () =>
+          reviewMetadataSuggestion(
+            remove.id,
+            decision(remove),
+            headers(removeReviewer),
+          );
+        const replaceTask = () =>
+          reviewMetadataSuggestion(
+            replace.id,
+            decision(replace),
+            headers(replaceReviewer),
+          );
+        const { committed: after, error } =
+          first === "TITLE_REMOVE"
+            ? await orderedPublication(w.id, removeTask, replaceTask)
+            : await orderedPublication(w.id, replaceTask, removeTask);
+        expect(error).toMatchObject({
+          status: 409,
+          code: "WORK_REVISION_CONFLICT",
+        });
+        const winner = first === "TITLE_REMOVE" ? remove : replace;
+        const loser = first === "TITLE_REMOVE" ? replace : remove;
+        await approvedTitle(
+          before,
+          after,
+          winner,
+          first === "TITLE_REMOVE" ? removeReviewer : replaceReviewer,
+          first,
+          first === "TITLE_REMOVE" ? null : replacement,
+          target.id,
+        );
+        unchangedProposal(before, after, loser.id);
+        unchangedProposal(before, after, unrelated.id);
+        expect(
+          after.evidence.some((row) => row.suggestion_id === loser.id),
+        ).toBe(false);
+        expect(
+          after.sources.some(
+            (row) => row.citation === loser.proposal!.citation.citation,
+          ),
+        ).toBe(false);
+      });
+    }
     it("APPROVE owns principals before Work wait; owner DELETE waits, then erases only private content after publication", async () => {
       const { owner, w, input, s } = await fixture();
       const before = await snapshot(w.id);
@@ -597,3 +1326,20 @@ describe.sequential(
     });
   },
 );
+
+function rawTimestamp() {
+  // Only for raw SELECT columns typed timestamptz NOT NULL by PostgreSQL.
+  // PostgreSQL guarantees calendar validity; check present, finite raw text
+  // without assuming DateStyle or parsing/rounding away timestamp precision.
+  // Never insert matchers into snapshots: unchanged values stay exactly equal.
+  return {
+    asymmetricMatch(value: unknown) {
+      return (
+        typeof value === "string" &&
+        value.trim().length > 0 &&
+        !/^[+-]?infinity$/i.test(value.trim())
+      );
+    },
+    toString: () => "RawPostgreSQLTimestamp",
+  };
+}

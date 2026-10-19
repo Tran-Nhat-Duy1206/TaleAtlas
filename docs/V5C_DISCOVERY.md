@@ -1,6 +1,6 @@
 # V5C — Advanced Story Discovery
 
-Implementation candidate based on merged main `844e53fc9d8e286a5ca7e223104a64b27eb31499`. V5A/V5B and their post-merge CI are complete; this milestone does not reopen them. V5C local verification is recorded separately below. No publication, PR, new migration, index, dependency or hosted operation is implied.
+**Current status:** V5C is accepted and merged with V5A–V5B; V5D Phase 1 remains an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The original V5C baseline `844e53fc9d8e286a5ca7e223104a64b27eb31499`, local results and proposed-commit packaging below are historical. No new migration, index, dependency or hosted operation is implied.
 
 ## Delivered scope
 
@@ -65,7 +65,7 @@ Local V5C verification is complete. These are local results; database-backed ver
 
 Focused contract/URL and UI tests, real SQL/filter/privacy/snapshot/overflow cases and the native public discovery scenario are additive; existing assertions, limits, retries and mandatory suites are preserved.
 
-The optional main performance benchmark and separate controlled concurrency diagnostic were executed locally; their results and retained evidence remain valid local verification history. All four optional performance/diagnostic files (the benchmark and diagnostic tests and their two configurations) are excluded from the proposed 16-file V5C commit. The main benchmark is separate from ordinary integration tests and requires a locally prepared, gitignored historical-baseline artifact; it is NOT independently executable from a fresh checkout of the resulting commit. Its preparation obtains the actual baseline repository source from the approved main commit into a new ignored artifact, rewriting relative imports only. Baseline and candidate use the same database/dependencies and synthetic dataset. It must not swap live source files or touch another worktree.
+The optional main performance benchmark and separate controlled concurrency diagnostic were executed locally; their results and retained evidence remain valid local verification history. All four optional performance/diagnostic files (the benchmark and diagnostic tests and their two configurations) were excluded from the then-proposed 16-file V5C commit and remain excluded and unchanged. The main benchmark is separate from ordinary integration tests and requires a locally prepared, gitignored historical-baseline artifact; it is NOT independently executable from a fresh checkout of the resulting commit. Its preparation obtains the actual baseline repository source from the approved main commit into a new ignored artifact, rewriting relative imports only. Baseline and candidate use the same database/dependencies and synthetic dataset. It must not swap live source files or touch another worktree.
 
 The additional controlled concurrency diagnostic and its evidence are retained locally. No reproducible candidate slowdown was demonstrated; no production SLO or statistical equivalence was established.
 
@@ -73,6 +73,6 @@ Measurements compare legacy baseline/candidate result equality and timings, new 
 
 All local SQL runs must use freshly created ownership-verified loopback test databases. Verification data directories and prior artifacts are retained, with only graceful shutdown of newly owned processes. No historical cluster, artifact or Quarantine cleanup is performed.
 
-PostgreSQL 17 CI has NOT been verified for this V5C candidate. Production deployment data and the real published-backed genre count have NOT been verified. The 200-genre overflow limitation remains a documented MVP constraint; the synthetic overflow coverage does not establish deployment size.
+PostgreSQL 17 CI was unverified at this historical local receipt; accepted main PostgreSQL 17.11 evidence is now linked in the current-status receipt above. Production deployment data and the real published-backed genre count have NOT been verified. The 200-genre overflow limitation remains a documented MVP constraint; the synthetic overflow coverage does not establish deployment size.
 
-Same-head new V5C CI requires separately authorized publication; no old PR9 rerun is needed.
+The then-pending V5C publication/CI requirement is superseded by the accepted PR/main receipt above; it is not evidence for new V5D tests or final V5D publication.

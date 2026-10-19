@@ -2,6 +2,12 @@
 
 V0 foundation is implemented with local checks; final evidence is in VALIDATION. **No real Neon/Vercel deployment or production mail delivery is claimed.** Node 24, pnpm 11.7.0, Next.js 16, PostgreSQL and SMTP are required. No GitHub authentication, Vercel token or Neon API credential is supplied.
 
+## Current V5 source/CI boundary
+
+V5A–V5C are accepted and merged via PR #12; [current source-bound status](<V5_PLAN.md#current-status-receipt>) links the successful Push, PR and post-merge main CI. V5D Phase 1 remains an unpublished evidence-only candidate. Reviewed source includes the approved forward-only [0014 metadata migration](<../packages/database/drizzle/0014_metadata_edits.sql>), not permission to apply it to a hosted database. Applied0000–0013 migrations remain immutable. No new migration or deployment is part of Phase 1.
+
+Before any separately authorized rollout, an operator must verify the actual migration state, compatible runtime/migration roles, retention/Model B disclosures and backup/restore, SMTP, TLS/proxy/cookies, production data/load and the real public genre count. The accepted200-genre overflow behavior and local performance observations are not hosted sizing or an SLO. V4 remains server-only/default-off; source acceptance does not authorize activation.
+
 ## V4 source/CI acceptance and hosted rollout boundary (2026-10-16)
 
 V4A–D were merged to `main` by [PR #4](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/4) at `ac7cf261`. The [post-merge main CI](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/38844260208) succeeded with all mandatory foundations, original 17 and enabled V4 8 browsers, both audits and `verify`. This is **source and synthetic CI acceptance only**, NOT evidence of live Neon/Vercel/SMTP, authenticated hosted behavior or any public rollout. `V4_COMMUNITIES_ENABLED` remains off by default. A separate operator go/no-go must verify forward DB migrations, production secrets/role provisioning and revocation, sender/verification flows, TLS/proxy/cookies, privacy/erasure, moderation safety, load and verified backup/restore before hosted enablement. Unexplained historical Next development-server failures remain unproven. See [release-status handoff](V4_RELEASE_STATUS.md).

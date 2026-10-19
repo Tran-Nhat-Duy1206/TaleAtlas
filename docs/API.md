@@ -66,7 +66,23 @@ Idempotency is per owner/submission key plus exact canonical input hash; conflic
 
 Processing currently normalizes human request input only: a request-before-job transaction fences live owner/token/input revision and database wall-clock expiry, persists one candidate per request/input revision, appends ENRICHING/NEEDS_REVIEW events and completes the job atomically. Stale or disabled discovery jobs do not run network adapters; failure uses a sanitized retry code, not request rejection. The C processing path never creates/merges/publishes a Work or fetches a provider. Its original milestone did not include a V2D approval endpoint; the separately accepted implemented D contracts are below. Manual/offline V2C is accepted at `ae5822c`: both actual PR/push CI passed181 units/66 real SQL/all six Chromium cases together and every mandatory gate, zero retries. Provider authorization and V2D decisions remain outside this acceptance.
 
-## V2D moderation, suggestions and discovery (accepted locally and in actual CI)
+## V5 typed metadata proposals (accepted and merged; V5D evidence candidate pending)
+
+[Current V5 receipts](<V5_PLAN.md#current-status-receipt>) distinguish accepted PR #12 Push/PR/main source from unpublished V5D work. These routes are separate from the unchanged V2 six-scalar routes below:
+
+| Method/path | Contract |
+| --- | --- |
+| GET `/api/catalog/works/[workUUID]/metadata-target` | Verified-session, current-PUBLISHED minimal exact-target DTO; existing `[slug]` segment name accepts a UUID |
+| POST `/api/catalog/works/[workUUID]/metadata-suggestions` | Version1, owner-bound submitKey/current base revision, one strict typed operation and citation; ORIGINAL_SUMMARY declarations where required |
+| GET `/api/metadata-suggestions` | Verified owner's private paginated proposals |
+| GET `/api/metadata-suggestions/[id]` | Verified owner's private detail/history; another owner404; no typed approval evidence |
+| GET `/api/admin/metadata-suggestions` | Persisted verified administrator private queue |
+| GET `/api/admin/metadata-suggestions/[id]` | Administrator structured current/proposed/history; approved evidence must join its matching audit |
+| POST `/api/admin/metadata-suggestions/[id]/review` | Version1, matching suggestionId/revision/baseWorkRevision/reason and whole APPROVE or REJECT; APPROVE requires literal metadataReviewAcknowledged/publicationReviewAcknowledged/rightsReviewAcknowledged:true |
+
+The closed [operation/review contracts](<../apps/web/src/features/catalog/metadata-operations.ts>) allow eligible title ADD/REPLACE/REMOVE, language-keyed description ADD/REPLACE/REMOVE, and existing genre membership ADD/REMOVE only. No ORIGINAL-title addition or replacement/removal of protected canonical PRIMARY/ORIGINAL titles, creator/edition/cover/provider edits, arbitrary patches, automatic rebasing or partial decisions. Persisted authorization precedes lazy body parsing, then is rechecked under transactional locks; trusted Origin,64KiB body and existing mutation budget remain. Selective approval preserves siblings and atomically commits source/audit/evidence; submit/reject never edits catalog. Inert citations and explicit rights attestations are not permission proof. [V5B privacy/Model B](<V5B_METADATA_EDITS.md#privacy-and-erasure-model-b>) governs private erasure and retained approved facts; no public projection of proposals or V3 data is added.
+
+## V2D moderation, suggestions and discovery (legacy six-scalar scope; accepted locally and in actual CI)
 
 | Method/path | Contract |
 | --- | --- |

@@ -1,6 +1,6 @@
 # V5B — Advanced Suggest an Edit
 
-Implementation candidate on the existing V5 feature branch. Not merged, deployed, or accepted for production. This document describes the approved scope; the private validation ledger records actual execution results, including failures. No V5C work is included.
+**Current status:** V5B is accepted and merged with V5A–V5C; hosted production remains unverified. V5D Phase 1 is an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). This document describes V5B's approved scope only; the private validation ledger preserves actual results and failures. Local PostgreSQL and publication-deferred notes below retain their historical milestone-time context, not current merge/CI status.
 
 ## Scope and compatibility
 
@@ -62,4 +62,4 @@ New unit, real signed-auth/SMTP/SQL, concurrency, preservation, citation, and EN
 
 All database execution is restricted to freshly created, ownership-verified disposable loopback test clusters, followed by graceful `pg_ctl` shutdown and owned-parent/child absence checks. Historical clusters are untouched. Local embedded PostgreSQL is 18.4; PostgreSQL 17 verification belongs to the independent existing CI jobs and is not inferred from local results.
 
-Graph tools were unavailable: the independent review is bounded Tier2 direct-source evidence, with graph generation/freshness/coverage unknown, not exhaustive certification. The validation ledger retains failed runs and their diagnoses. Full local and browser acceptance must be established by actual final-candidate results. Exact-head Push/PR CI, any commit/push/PR mutation, and production actions remain deferred pending fresh maintainer authorization.
+Graph tools were unavailable: the independent review is bounded Tier2 direct-source evidence, with graph generation/freshness/coverage unknown, not exhaustive certification. The validation ledger retains failed runs and their diagnoses. At this historical receipt, full local/browser acceptance and exact-head Push/PR publication were still pending authorization; subsequent accepted merge/CI evidence is linked above. Production actions remain unauthorized.
