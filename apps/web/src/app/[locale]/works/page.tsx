@@ -10,10 +10,10 @@ import {
 import { MissingStoryPrompt } from "../../../components/requests/MissingStoryPrompt";
 import { notFound } from "next/navigation";
 import { isLocale } from "../../../lib/i18n";
-import { listWorks } from "../../../server/catalog/service";
+import { getPublicCatalogPage } from "../../../server/catalog/service";
 import { PublicCatalog } from "../../../components/catalog/PublicCatalog";
 import {
-  publicCatalogQuery,
+  publicCatalogQueryState,
   publicCopy,
   type PublicSearchParams,
 } from "../../../components/catalog/query";
@@ -37,8 +37,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function WorksPage({ params, searchParams }: Props) {
   const { locale } = await params;
   if (!isLocale(locale)) notFound();
-  const query = publicCatalogQuery(await searchParams, locale);
-  const result = await listWorks(query);
+  const { query, invalid } = publicCatalogQueryState(
+    await searchParams,
+    locale,
+  );
+  const { result, genreOptions } = await getPublicCatalogPage(query);
   let authenticated = false;
   let requestError = false;
   let summaries: RequestSummary[] = [];
@@ -73,6 +76,8 @@ export default async function WorksPage({ params, searchParams }: Props) {
         locale={locale}
         query={query}
         result={result}
+        genreOptions={genreOptions}
+        invalidQuery={invalid}
         requestPrompt={
           <MissingStoryPrompt
             locale={locale}

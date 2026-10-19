@@ -1,5 +1,5 @@
 import {
-  catalogQuerySchema,
+  parseCatalogSearchParams,
   workInputSchema,
 } from "@/features/catalog/contracts";
 import { adminListWorks, createWork } from "@/server/catalog/service";
@@ -16,9 +16,7 @@ export function GET(request: Request) {
   return safeJson("catalog.admin.list", async () => {
     await requireRole(["admin"], request.headers);
     return adminListWorks(
-      catalogQuerySchema.parse(
-        Object.fromEntries(new URL(request.url).searchParams),
-      ),
+      parseCatalogSearchParams(new URL(request.url).searchParams),
       request.headers,
     );
   });

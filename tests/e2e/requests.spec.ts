@@ -283,10 +283,15 @@ test("verified request ownership, reviewed equivalence, following and private li
     await page
       .getByLabel(dictionary("vi").theme, { exact: true })
       .selectOption("dark");
+    const englishLink = page.getByRole("link", {
+      name: "Ngôn ngữ: English",
+      exact: true,
+    });
+    await expect(englishLink).toHaveAttribute("href", `/en/requests/${id}`, {
+      timeout: 15_000,
+    });
     const switched = page.waitForNavigation({ timeout: 45_000 });
-    await page
-      .getByRole("link", { name: "Ngôn ngữ: English", exact: true })
-      .click();
+    await englishLink.click();
     expect((await switched)?.status()).toBe(200);
     await expect(page).toHaveURL(new RegExp(`/en/requests/${id}$`), {
       timeout: 15_000,
@@ -302,10 +307,15 @@ test("verified request ownership, reviewed equivalence, following and private li
         .locator("header nav")
         .getByRole("link", { name: en.mine, exact: true }),
     ).toBeVisible({ timeout: 15_000 });
+    const vietnameseLink = page.getByRole("link", {
+      name: "Language: Tiếng Việt",
+      exact: true,
+    });
+    await expect(vietnameseLink).toHaveAttribute("href", `/vi/requests/${id}`, {
+      timeout: 15_000,
+    });
     const switchedBack = page.waitForNavigation({ timeout: 45_000 });
-    await page
-      .getByRole("link", { name: "Language: Tiếng Việt", exact: true })
-      .click();
+    await vietnameseLink.click();
     expect((await switchedBack)?.status()).toBe(200);
     await expect(page).toHaveURL(new RegExp(`/vi/requests/${id}$`), {
       timeout: 15_000,

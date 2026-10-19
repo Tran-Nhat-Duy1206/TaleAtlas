@@ -38,12 +38,37 @@
   border: 1px solid color-mix(in srgb, var(--ink) 18%, transparent);
   border-radius: 12px;
 }
-.filters label {
+.filters label,
+.filters .field {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   font-size: 0.9rem;
   flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.filters label {
+  font-weight: 600;
+}
+.filters .field label {
+  flex: 0 0 auto;
+}
+.filters .helper {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.notice {
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
+  border-radius: 6px;
+  background: var(--paper);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
 .filters .search {
   flex: 3 1 300px;
@@ -59,6 +84,11 @@
   border: 1px solid color-mix(in srgb, var(--ink) 30%, transparent);
   border-radius: 6px;
   font: inherit;
+}
+.filters select:disabled {
+  cursor: not-allowed;
+  opacity: 1;
+  border-style: dashed;
 }
 .button {
   display: inline-flex;
@@ -76,7 +106,12 @@
   cursor: pointer;
 }
 .reset {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  box-sizing: border-box;
   padding: 0.7rem 0;
+  overflow-wrap: anywhere;
 }
 .catalog a {
   color: var(--green);
@@ -265,6 +300,7 @@
     align-items: stretch;
   }
   .filters label,
+  .filters .field,
   .filters .search {
     flex: 0 0 auto;
   }

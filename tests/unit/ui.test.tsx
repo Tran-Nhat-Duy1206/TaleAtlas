@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 import React from "react";
+import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -24,6 +26,9 @@ const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
   setTheme: vi.fn(),
+  pathname: "/en/settings",
+  suspendSearch: false,
+  pendingSearch: new Promise<never>(() => {}),
   search: new URLSearchParams(),
 }));
 vi.mock("next/navigation", () => ({
@@ -32,8 +37,11 @@ vi.mock("next/navigation", () => ({
     push: mocks.push,
     refresh: mocks.refresh,
   }),
-  useSearchParams: () => mocks.search,
-  usePathname: () => "/en/settings",
+  useSearchParams: () => {
+    if (mocks.suspendSearch) throw mocks.pendingSearch;
+    return mocks.search;
+  },
+  usePathname: () => mocks.pathname,
 }));
 vi.mock("next/link", () => ({
   default: ({
@@ -63,7 +71,7 @@ vi.mock("../../apps/web/src/lib/auth-client", () => ({
   },
 }));
 import { AuthForm } from "../../apps/web/src/components/auth-form";
-import { Preferences } from "../../apps/web/src/components/shell";
+import { Preferences, Shell } from "../../apps/web/src/components/shell";
 import { Settings } from "../../apps/web/src/components/settings";
 import { dictionary } from "../../apps/web/src/lib/i18n";
 import { WorkEditor } from "../../apps/web/src/components/catalog/WorkEditor";
@@ -71,6 +79,8 @@ import { catalogDictionary } from "../../apps/web/src/lib/catalog-i18n";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.pathname = "/en/settings";
+  mocks.suspendSearch = false;
   mocks.search = new URLSearchParams();
   mocks.useSession.mockReturnValue({
     data: null,
@@ -332,5 +342,195 @@ describe("appearance and session accessibility", () => {
     await waitFor(() =>
       expect(mocks.replace).toHaveBeenCalledWith("/vi/login"),
     );
+  });
+});
+
+describe("router-synchronized native locale links", () => {
+  let originalUrl: string;
+  let originalState: unknown;
+  let originalLang: string | null;
+  const locationEvents = vi.fn();
+  beforeEach(() => {
+    originalUrl = window.location.href;
+    originalState = window.history.state;
+    originalLang = document.documentElement.getAttribute("lang");
+    window.addEventListener("popstate", locationEvents);
+    window.addEventListener("hashchange", locationEvents);
+  });
+  afterEach(() => {
+    cleanup();
+    window.removeEventListener("popstate", locationEvents);
+    window.removeEventListener("hashchange", locationEvents);
+    window.history.replaceState(originalState, "", originalUrl);
+    if (originalLang === null) document.documentElement.removeAttribute("lang");
+    else document.documentElement.setAttribute("lang", originalLang);
+  });
+  function setRouterLocation(url: string) {
+    const route = new URL(url, window.location.href);
+    mocks.pathname = route.pathname;
+    mocks.search = new URLSearchParams(route.search);
+  }
+  function localeLink(locale: "en" | "vi") {
+    return screen.getByRole("link", {
+      name: locale === "vi" ? "Ngôn ngữ: English" : "Language: Tiếng Việt",
+    });
+  }
+  function NavigationCommit({
+    url,
+    locale,
+  }: {
+    url: string;
+    locale: "en" | "vi";
+  }) {
+    // Like Next's HistoryUpdater, commit the URL AFTER child render without
+    // emitting popstate/hashchange. Updating location before rerender hides the bug.
+    React.useInsertionEffect(() => {
+      window.history.replaceState(null, "", url);
+    }, [url]);
+    return (
+      <Shell locale={locale}>
+        <h1>Destination content</h1>
+      </Shell>
+    );
+  }
+  it.each(["en", "vi"] as const)(
+    "drops the form query on clean %s detail navigation without location events",
+    (locale) => {
+      const other = locale === "en" ? "vi" : "en";
+      const initial = `/${locale}/requests/new?q=old%20title&format=UNKNOWN#draft`;
+      const destination = `/${locale}/requests/synthetic-request`;
+      window.history.replaceState(null, "", initial);
+      setRouterLocation(initial);
+      const { rerender } = render(
+        <NavigationCommit url={initial} locale={locale} />,
+      );
+      expect(localeLink(locale)).toHaveAttribute(
+        "href",
+        `/${other}/requests/new?q=old%20title&format=UNKNOWN#draft`,
+      );
+      setRouterLocation(destination);
+      rerender(<NavigationCommit url={destination} locale={locale} />);
+      expect(window.location.pathname).toBe(destination);
+      expect(window.location.search + window.location.hash).toBe("");
+      expect(localeLink(locale)).toHaveAttribute(
+        "href",
+        `/${other}/requests/synthetic-request`,
+      );
+      expect(locationEvents).not.toHaveBeenCalled();
+    },
+  );
+  it("tracks query-only replacement and removal while preserving raw encoding", () => {
+    const initial = "/en/works?q=old#old";
+    const destination =
+      "/en/works?q=new%20title&tag=a&tag=b&empty=&literal=%2B#results";
+    window.history.replaceState(null, "", initial);
+    setRouterLocation(initial);
+    const { rerender } = render(<NavigationCommit url={initial} locale="en" />);
+    setRouterLocation(destination);
+    rerender(<NavigationCommit url={destination} locale="en" />);
+    expect(localeLink("en")).toHaveAttribute(
+      "href",
+      "/vi/works?q=new%20title&tag=a&tag=b&empty=&literal=%2B#results",
+    );
+    setRouterLocation("/en/works");
+    rerender(<NavigationCommit url="/en/works" locale="en" />);
+    expect(localeLink("en")).toHaveAttribute("href", "/vi/works");
+    expect(locationEvents).not.toHaveBeenCalled();
+  });
+  it("rereads hash-only router changes even when pathname and query are unchanged", () => {
+    const route = "/en/works?q=title%20one";
+    const initial = `${route}#old`;
+    window.history.replaceState(null, "", initial);
+    setRouterLocation(initial);
+    const { rerender } = render(<NavigationCommit url={initial} locale="en" />);
+    for (const hash of ["#new", ""]) {
+      const destination = route + hash;
+      // Next publishes a fresh search-param object on canonical URL changes,
+      // including hash-only navigation; its query text is deliberately identical.
+      setRouterLocation(destination);
+      rerender(<NavigationCommit url={destination} locale="en" />);
+      expect(localeLink("en")).toHaveAttribute(
+        "href",
+        `/vi/works?q=title%20one${hash}`,
+      );
+    }
+    expect(locationEvents).not.toHaveBeenCalled();
+  });
+  it("tracks hashchange and popstate, including restored pathname and query", () => {
+    const initial = "/en/works?q=history";
+    window.history.replaceState(null, "", initial);
+    setRouterLocation(initial);
+    const { rerender } = render(<NavigationCommit url={initial} locale="en" />);
+    act(() => {
+      window.history.replaceState(null, "", `${initial}#section`);
+      window.dispatchEvent(new HashChangeEvent("hashchange"));
+    });
+    expect(localeLink("en")).toHaveAttribute(
+      "href",
+      "/vi/works?q=history#section",
+    );
+    act(() => {
+      window.history.replaceState(null, "", initial);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    expect(localeLink("en")).toHaveAttribute("href", "/vi/works?q=history");
+    for (const destination of [
+      "/en/requests?state=SUBMITTED#previous",
+      initial,
+    ]) {
+      setRouterLocation(destination);
+      act(() => {
+        window.history.replaceState(null, "", destination);
+        window.dispatchEvent(new PopStateEvent("popstate"));
+      });
+      rerender(<NavigationCommit url={destination} locale="en" />);
+      expect(localeLink("en")).toHaveAttribute(
+        "href",
+        destination === initial
+          ? "/vi/works?q=history"
+          : "/vi/requests?state=SUBMITTED#previous",
+      );
+    }
+  });
+  it("limits suspended search parameters to the locale link, not the page", () => {
+    const initial = "/en/works?q=title#results";
+    window.history.replaceState(null, "", initial);
+    setRouterLocation(initial);
+    mocks.suspendSearch = true;
+    render(<NavigationCommit url={initial} locale="en" />);
+    expect(
+      screen.getByRole("heading", { name: "Destination content" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("combobox", { name: dictionary("en").theme }),
+    ).toBeEnabled();
+    expect(localeLink("en")).toHaveAttribute("href", "/vi/works");
+    expect(localeLink("en").tagName).toBe("A");
+    expect(localeLink("en")).toHaveAttribute("hreflang", "vi");
+    expect(localeLink("en")).toHaveAttribute("lang", "vi");
+  });
+  it("hydrates the existing clean SSR anchor before restoring query and hash", () => {
+    const initial = "/en/works?q=title%20one&literal=%2B#results";
+    window.history.replaceState(null, "", initial);
+    setRouterLocation(initial);
+    const ui = (
+      <Shell locale="en">
+        <h1>Destination content</h1>
+      </Shell>
+    );
+    const container = document.createElement("div");
+    container.innerHTML = renderToString(ui);
+    expect(container.querySelector('a[lang="vi"]')).toHaveAttribute(
+      "href",
+      "/vi/works",
+    );
+    document.body.appendChild(container);
+    const onRecoverableError = vi.fn();
+    render(ui, { container, hydrate: true, onRecoverableError });
+    expect(localeLink("en")).toHaveAttribute(
+      "href",
+      "/vi/works?q=title%20one&literal=%2B#results",
+    );
+    expect(onRecoverableError).not.toHaveBeenCalled();
   });
 });

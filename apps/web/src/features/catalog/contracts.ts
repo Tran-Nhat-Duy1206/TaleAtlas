@@ -303,6 +303,16 @@ export const visibilityInputSchema = z
       message: "Publication review acknowledgment is required",
     },
   );
+// Read filters accept recorded DB tags exactly; write validation stays narrower.
+export const recordedLanguageFilterSchema = z
+  .string()
+  .regex(/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/)
+  .max(63)
+  // JavaScript's $ also matches before a final newline; DB tags must be exact.
+  .refine(
+    (value) => value === value.trim(),
+    "Use an exact recorded language tag",
+  );
 export const catalogQuerySchema = z
   .object({
     q: z.string().trim().max(200).default(""),
@@ -314,12 +324,35 @@ export const catalogQuerySchema = z
       .regex(/^[a-z0-9-]+$/)
       .max(100)
       .optional(),
+    originalLanguage: recordedLanguageFilterSchema.optional(),
+    releaseStatus: z.enum(RELEASE_STATUSES).optional(),
     locale: z.enum(["en", "vi"]).default("en"),
   })
   .strict()
   .refine((v) => (v.page - 1) * v.pageSize <= 10000, "Offset exceeds limit");
 export type CatalogQuery = z.input<typeof catalogQuerySchema>;
 export type ParsedCatalogQuery = z.output<typeof catalogQuerySchema>;
+export function parseCatalogSearchParams(
+  params: URLSearchParams,
+): ParsedCatalogQuery {
+  const seen = new Set<string>();
+  for (const key of params.keys()) {
+    if (seen.has(key))
+      throw new z.ZodError([
+        {
+          code: "custom",
+          path: [],
+          message: "Duplicate query parameter",
+        },
+      ]);
+    seen.add(key);
+  }
+  return catalogQuerySchema.parse(Object.fromEntries(params));
+}
+export type PublicGenreOptions = {
+  items: Array<{ slug: string; nameEn: string; nameVi: string }>;
+  overflow: boolean;
+};
 export type WorkInputPayload = z.input<typeof workInputSchema>;
 export type AggregateWork = {
   id: string;

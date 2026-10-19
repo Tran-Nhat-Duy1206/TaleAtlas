@@ -48,7 +48,23 @@ jobs:
       - run: pnpm db:migrate
       - run: pnpm db:generate
       - run: git diff --exit-code -- packages/database/drizzle
-      - run: pnpm test:integration
+      - shell: bash
+        run: |
+          set +x
+          umask 077
+          if [[ -z "${RUNNER_TEMP:-}" ]] || ! output="$(mktemp "$RUNNER_TEMP/taleatlas-integration.XXXXXX" 2>/dev/null)"; then
+            printf '%s\n' 'INTEGRATION FAIL'
+            exit 1
+          fi
+          if { pnpm test:integration >"$output" 2>&1; } 2>/dev/null; then
+            status=$?
+            result=PASS
+          else
+            status=$?
+            result=FAIL
+          fi
+          printf 'INTEGRATION %s\n' "$result" || :
+          exit "$status"
       - run: pnpm build
       - run: pnpm typecheck
 
@@ -95,19 +111,27 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       # Original 17 only: existing production config, assertions, deadlines, workers and retries.
       - name: Run complete original 17 on production HTTPS
-        run: node --import tsx scripts/ci-production-native-phase.ts legacy
+        shell: bash
+        run: |
+          set +x
+          umask 077
+          if [[ -z "${RUNNER_TEMP:-}" ]] || ! output="$(mktemp "$RUNNER_TEMP/taleatlas-legacy.XXXXXX" 2>/dev/null)"; then
+            printf '%s\n' 'LEGACY FAIL'
+            exit 1
+          fi
+          if { node --import tsx scripts/ci-production-native-phase.ts legacy >"$output" 2>&1; } 2>/dev/null; then
+            status=$?
+            result=PASS
+          else
+            status=$?
+            result=FAIL
+          fi
+          printf 'LEGACY %s\n' "$result" || :
+          exit "$status"
         env:
           NODE_ENV: development
           TEST_SMTP_PORT: "1025"
           TALEATLAS_TEST_NATIVE_SERVER_MODE: production
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report-legacy
-          path: |
-            playwright-report/
-            test-results/
-          retention-days: 7
 
   e2e_v4:
     name: Native enabled V4 8 (retry zero)
@@ -151,19 +175,27 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       # Enabled 8 only: production config retains original community retries: 0.
       - name: Run complete enabled V4 8 on production HTTPS
-        run: node --import tsx scripts/ci-production-native-phase.ts v4
+        shell: bash
+        run: |
+          set +x
+          umask 077
+          if [[ -z "${RUNNER_TEMP:-}" ]] || ! output="$(mktemp "$RUNNER_TEMP/taleatlas-v4.XXXXXX" 2>/dev/null)"; then
+            printf '%s\n' 'V4 FAIL'
+            exit 1
+          fi
+          if { node --import tsx scripts/ci-production-native-phase.ts v4 >"$output" 2>&1; } 2>/dev/null; then
+            status=$?
+            result=PASS
+          else
+            status=$?
+            result=FAIL
+          fi
+          printf 'V4 %s\n' "$result" || :
+          exit "$status"
         env:
           NODE_ENV: development
           TEST_SMTP_PORT: "1025"
           TALEATLAS_TEST_NATIVE_SERVER_MODE: production
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: playwright-report-v4
-          path: |
-            playwright-report-community/
-            test-results-community/
-          retention-days: 7
 
   audits:
     name: Dependency security audits

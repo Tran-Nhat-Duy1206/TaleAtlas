@@ -37,6 +37,7 @@ import type {
   CatalogPage,
   AggregateWork,
   AdminWork,
+  PublicGenreOptions,
 } from "../../features/catalog/contracts";
 type DB = ReturnType<typeof getDatabase>;
 type Tx = Parameters<Parameters<DB["transaction"]>[0]>[0];
@@ -204,6 +205,40 @@ export async function searchWorks(
     { isolationLevel: "repeatable read", accessMode: "read only" },
   );
 }
+// Public discovery options are catalog facts, not proposal context or facets of
+// the current page. One extra row detects overflow; never return a partial list
+// disguised as a complete selector. A larger chooser requires separate approval.
+async function publishedGenreOptions(
+  db: Executor,
+): Promise<PublicGenreOptions> {
+  const rows = await db
+    .select({ slug: genres.slug, nameEn: genres.nameEn, nameVi: genres.nameVi })
+    .from(genres)
+    .where(
+      sql`exists(select 1 from ${workGenres} inner join ${works} on ${works.id} = ${workGenres.workId} where ${workGenres.genreSlug} = ${genres.slug} and ${works.visibility} = 'PUBLISHED')`,
+    )
+    .orderBy(genres.slug)
+    .limit(201);
+  return rows.length > 200
+    ? { items: [], overflow: true }
+    : { items: rows, overflow: false };
+}
+
+export async function searchPublicDiscovery(query: ParsedCatalogQuery) {
+  const normalized = normalizeTitle(query.q);
+  return getDatabase().transaction(
+    async (tx) => {
+      const result =
+        query.q && !normalized
+          ? { items: [], total: 0, page: query.page, pageSize: query.pageSize }
+          : await searchWorksWithExecutor(tx, query, false, normalized);
+      const genreOptions = await publishedGenreOptions(tx);
+      return { result, genreOptions };
+    },
+    { isolationLevel: "repeatable read", accessMode: "read only" },
+  );
+}
+
 async function searchWorksWithExecutor(
   db: Executor,
   query: ParsedCatalogQuery,
@@ -222,6 +257,12 @@ async function searchWorksWithExecutor(
     query.format ? eq(works.format, query.format) : undefined,
     query.genre
       ? sql`exists(select 1 from ${workGenres} where ${workGenres.workId}=${works.id} and ${workGenres.genreSlug}=${query.genre})`
+      : undefined,
+    query.originalLanguage
+      ? eq(works.originalLanguage, query.originalLanguage)
+      : undefined,
+    query.releaseStatus
+      ? eq(works.releaseStatus, query.releaseStatus)
       : undefined,
     normalized ? sql`(${exact} or ${fts} or ${fuzzy})` : undefined,
   );
