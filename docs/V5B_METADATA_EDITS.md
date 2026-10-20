@@ -1,6 +1,6 @@
 # V5B — Advanced Suggest an Edit
 
-**Current status:** V5B is accepted and merged with V5A–V5C; hosted production remains unverified. V5D Phase 1 is an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). This document describes V5B's approved scope only; the private validation ledger preserves actual results and failures. Local PostgreSQL and publication-deferred notes below retain their historical milestone-time context, not current merge/CI status.
+**Current status:** V5A–V5D, including V5B and maintainer-merged PR #13, have completed source/CI acceptance and are merged; hosted production acceptance remains separate and unverified. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). This document describes V5B's approved scope only; the private validation ledger preserves actual results and failures. Local PostgreSQL and publication-deferred notes below retain their historical milestone-time context, not current merge/CI status.
 
 ## Scope and compatibility
 

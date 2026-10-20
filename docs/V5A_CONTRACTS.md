@@ -1,6 +1,6 @@
 # V5A — metadata contracts and safety foundation
 
-**Current status:** V5A–V5C are accepted and merged; V5D Phase 1 remains an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The contracts-only scope, future V5B wiring/acceptance notes and baseline below describe the historical V5A milestone, not today's integration status.
+**Current status:** V5A–V5D have completed source/CI acceptance and are merged, including maintainer-merged PR #13; hosted production acceptance remains separate and unverified. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The contracts-only scope, future V5B wiring/acceptance notes and baseline below describe the historical V5A milestone, not today's integration status.
 
 **Historical V5A scope: contracts only.** The maintainer approved the conservative operation matrix through session question `v5a-contract-policy-approval` before product code was written. No new endpoint, UI, storage, metadata writer, migration, discovery filter or V5B behavior is delivered. Existing Suggest an Edit remains the six-field V2 workflow.
 

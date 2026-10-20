@@ -2,7 +2,7 @@
 
 ## Current V5 metadata persistence
 
-V5A–V5C are accepted and merged; [source-bound status](<V5_PLAN.md#current-status-receipt>) records PR #12 and successful independent Push/PR/main CI. V5D Phase 1 is an unpublished documentation/test-evidence candidate and changes no schema. The older table totals and migration results below are historical milestone receipts, not current deployment state.
+V5A–V5D have completed source/CI acceptance and are merged; [source-bound status](<V5_PLAN.md#current-status-receipt>) records PR #12 and maintainer-merged PR #13 with successful independent Push/PR/main CI. V5D's documentation, test and confidential CI diagnostic changes introduced no schema change; hosted production acceptance remains separate and unverified. The older table totals and migration results below are historical milestone receipts, not current deployment state.
 
 Approved forward-only [0014_metadata_edits.sql](<../packages/database/drizzle/0014_metadata_edits.sql>) adds `metadata_edit_suggestions`, `metadata_edit_events` and `catalog_metadata_evidence`, with typed intent/lifecycle, immutable delivery identity, bound approval evidence, deferred event consistency and TRUNCATE denial. The [journal](<../packages/database/drizzle/meta/_journal.json>) appends0014; applied0000–0013 SQL/snapshots remain unchanged. Application capability checks fail closed if required guards/columns are absent. See [V5B persistence/erasure](<V5B_METADATA_EDITS.md>) and [real SQL assertions](<../tests/integration/metadata-persistence.test.ts>).
 

@@ -4,7 +4,7 @@ V0 foundation is implemented and local acceptance is complete; hosted SMTP/TLS/p
 
 ## Current V5 source acceptance and remaining boundaries
 
-V5A–V5C are accepted and merged; V5D Phase 1 is an unpublished documentation/test-evidence candidate, not final acceptance. The source-bound PR #12 Push/PR/main receipts and historical-result distinctions are in [V5 status](<V5_PLAN.md#current-status-receipt>). Green synthetic CI is not hosted security or legal certification.
+V5A–V5D have completed source/CI acceptance and are merged, including maintainer-merged PR #13; hosted production acceptance remains separate and unverified. The source-bound PR #12 and PR #13 Push/PR/main receipts and historical-result distinctions are in [V5 status](<V5_PLAN.md#current-status-receipt>). Green synthetic CI is not hosted security or legal certification.
 
 The separate V5 metadata API requires a verified persisted session and persisted catalog administrator for review, with authority before lazy body parsing and transaction-local session/role/expiry checks. One strict operation, exact Work revision/row scope, selective writes and atomic source/audit/evidence preserve the legacy six-scalar API and unrelated children. Moderator powers do not grant catalog authority. See [V5B contracts](<V5B_METADATA_EDITS.md>) and the [service](<../apps/web/src/server/catalog/metadata-suggestions.ts>).
 

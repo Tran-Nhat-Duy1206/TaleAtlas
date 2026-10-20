@@ -1,6 +1,6 @@
 # V5 Metadata & Discovery — proposed domain/security contract
 
-**Historical design context (V5A planning).** Original baseline `main` `b6c0859696d68ea669cbb305c64cfb811204fb30`; this document itself implemented no behavior. Its proposed operations, decisions and sequencing below retain that design-time context. V5A–V5C are now accepted and merged; V5D Phase 1 remains an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt) and the milestone contracts for implemented decisions.
+**Historical design context (V5A planning).** Original baseline `main` `b6c0859696d68ea669cbb305c64cfb811204fb30`; this document itself implemented no behavior. Its proposed operations, decisions and sequencing below retain that design-time context. V5A–V5D have now completed source/CI acceptance and are merged, including maintainer-merged PR #13; hosted production acceptance remains separate and unverified. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt) and the milestone contracts for implemented decisions.
 
 ## 1. Non-negotiable inherited guarantees
 
