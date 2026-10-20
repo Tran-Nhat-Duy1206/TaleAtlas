@@ -1,5 +1,9 @@
 # Roadmap
 
+## V6 — Proposed social discovery direction (documentation only; 2026-10-20)
+
+**V6 is planned, not implemented or approved for public release.** The proposed sequence is UI/staging stabilization (V6A), opt-in social profiles (V6B), permission-reviewed metadata automation (V6C), moderated newsfeed (V6D), explainable recommendations (V6E), and performance-safe motion (V6F). See [V6 plan](V6_PLAN.md), [V6A checklist](V6A_UI_STABILIZATION.md), [social product proposal](V6_SOCIAL_PRODUCT.md), [metadata automation proposal](V6_METADATA_AUTOMATION.md), [recommendations and motion](V6_RECOMMENDATIONS_MOTION.md), and the [V6 validation ledger](V6_VALIDATION.md). This adds no new source capability, migration, provider, hosted V4 activation, spending, deployment, or CI acceptance. All V0–V5 records below remain historical and unchanged.
+
 **Current V5 status:** V5A–V5D have completed source/CI acceptance and are merged, including maintainer-merged PR #13. Production Readiness is a separate planning workstream, not another V5 feature milestone. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). Milestone receipts below preserve their historical context; hosted deployment remains unverified.
 
 ## V0 — foundation (local acceptance complete; hosted validation pending)
