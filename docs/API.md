@@ -66,9 +66,9 @@ Idempotency is per owner/submission key plus exact canonical input hash; conflic
 
 Processing currently normalizes human request input only: a request-before-job transaction fences live owner/token/input revision and database wall-clock expiry, persists one candidate per request/input revision, appends ENRICHING/NEEDS_REVIEW events and completes the job atomically. Stale or disabled discovery jobs do not run network adapters; failure uses a sanitized retry code, not request rejection. The C processing path never creates/merges/publishes a Work or fetches a provider. Its original milestone did not include a V2D approval endpoint; the separately accepted implemented D contracts are below. Manual/offline V2C is accepted at `ae5822c`: both actual PR/push CI passed181 units/66 real SQL/all six Chromium cases together and every mandatory gate, zero retries. Provider authorization and V2D decisions remain outside this acceptance.
 
-## V5 typed metadata proposals (accepted and merged; V5D evidence candidate pending)
+## V5 typed metadata proposals (source/CI accepted and merged)
 
-[Current V5 receipts](<V5_PLAN.md#current-status-receipt>) distinguish accepted PR #12 Push/PR/main source from unpublished V5D work. These routes are separate from the unchanged V2 six-scalar routes below:
+[Current V5 receipts](<V5_PLAN.md#current-status-receipt>) record accepted PR #12 and maintainer-merged PR #13 with successful Push/PR/main CI; hosted production acceptance remains separate and unverified. These routes are separate from the unchanged V2 six-scalar routes below:
 
 | Method/path | Contract |
 | --- | --- |

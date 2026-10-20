@@ -1,6 +1,6 @@
 # V5C — Advanced Story Discovery
 
-**Current status:** V5C is accepted and merged with V5A–V5B; V5D Phase 1 remains an evidence-only candidate, not final accepted or published V5D. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The original V5C baseline `844e53fc9d8e286a5ca7e223104a64b27eb31499`, local results and proposed-commit packaging below are historical. No new migration, index, dependency or hosted operation is implied.
+**Current status:** V5A–V5D, including V5C and maintainer-merged PR #13, have completed source/CI acceptance and are merged; hosted production acceptance remains separate and unverified. See the [canonical current-status receipt](V5_PLAN.md#current-status-receipt). The original V5C baseline `844e53fc9d8e286a5ca7e223104a64b27eb31499`, local results and proposed-commit packaging below are historical. No new migration, index, dependency or hosted operation is implied.
 
 ## Delivered scope
 

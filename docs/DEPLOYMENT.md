@@ -4,7 +4,7 @@ V0 foundation is implemented with local checks; final evidence is in VALIDATION.
 
 ## Current V5 source/CI boundary
 
-V5A–V5C are accepted and merged via PR #12; [current source-bound status](<V5_PLAN.md#current-status-receipt>) links the successful Push, PR and post-merge main CI. V5D Phase 1 remains an unpublished evidence-only candidate. Reviewed source includes the approved forward-only [0014 metadata migration](<../packages/database/drizzle/0014_metadata_edits.sql>), not permission to apply it to a hosted database. Applied0000–0013 migrations remain immutable. No new migration or deployment is part of Phase 1.
+V5A–V5D have completed source/CI acceptance and are merged via PR #12 and maintainer-merged PR #13; [current source-bound status](<V5_PLAN.md#current-status-receipt>) links their successful Push, PR and post-merge main CI. Hosted production acceptance remains separate and unverified. Reviewed source includes the approved forward-only [0014 metadata migration](<../packages/database/drizzle/0014_metadata_edits.sql>), not permission to apply it to a hosted database. Applied0000–0013 migrations remain immutable. No new migration or deployment is part of Phase 1.
 
 Before any separately authorized rollout, an operator must verify the actual migration state, compatible runtime/migration roles, retention/Model B disclosures and backup/restore, SMTP, TLS/proxy/cookies, production data/load and the real public genre count. The accepted200-genre overflow behavior and local performance observations are not hosted sizing or an SLO. V4 remains server-only/default-off; source acceptance does not authorize activation.
 
