@@ -2,7 +2,7 @@
 
 **Initialization status (historical):** INITIALIZED / PLANNING ONLY — 2026-10-20
 **Planning baseline (historical):** main 55ec938228338960f2612206bcf8ca47f3e5d5d0
-**Current A1 state:** FINAL LOCAL PRE-COMMIT CHECKS PASS — see §7. Changes remain uncommitted/unstaged; candidate CI, full V6A and hosted acceptance are not asserted.
+**Current A1 state:** PUBLISHED / DRAFT PR [#16](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/16) — implementation commit [`ff01fdc`](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/commit/ff01fdc6b239dac3bbc138e23ecafbf284e2bef0) passed independent Push and PR CI. This documentation follow-up requires fresh CI on its own HEAD before the amended PR is accepted; see the [publication receipt](#8-a1-publication-and-exact-commit-ci-receipt-2026-10-21-utc). Manual/hosted and whole-V6A acceptance are not claimed; merge/deployment are not authorized.
 **Evidence rule:** This ledger records observed conditions and prospective checks. It does **not** upgrade historical CI evidence to V6 acceptance, claim hosted production readiness, or infer a fixed root cause.
 
 ## 1. Status vocabulary
@@ -21,12 +21,12 @@ Every future execution entry must include precise branch/commit, environment, co
 | Check or observation | Current state | Boundaries and follow-up |
 | --- | --- | --- |
 | Staging project protection | OBSERVED | Vercel Authentication redirected an unauthenticated InPrivate visitor to Vercel sign-in. Recheck after material protection changes. |
-| Vercel Preview and branch | OBSERVED | §staging§ Preview deployment built and owner reported it ran; do not equate this with broad application acceptance. |
-| Database readiness | OBSERVED (transient then OK) | Owner saw §{"status":"unavailable","database":"unavailable"}§, then after reloads §{"status":"ok","database":"ok"}§. Cold Neon start/2s probe is a hypothesis, not confirmed root cause. |
+| Vercel Preview and branch | OBSERVED | `staging` Preview deployment built and owner reported it ran; do not equate this with broad application acceptance. |
+| Database readiness | OBSERVED (transient then OK) | Owner saw `{"status":"unavailable","database":"unavailable"}`, then after reloads `{"status":"ok","database":"ok"}`. Cold Neon start/2s probe is a hypothesis, not confirmed root cause. |
 | Migration state | OPERATOR REPORTED | 15 applied migrations through 0014; 40 app tables and restricted runtime role reported; do not rerun migrations or expose credentials. |
-| SMTP verification | **BLOCKED / UNVERIFIED** | Sign-up POST showed 200, but sanitized §auth.mail§ level 50 error and Mailtrap 0 messages at that time. Preview SMTP variables were later updated. No successful end-to-end verification is yet recorded. |
+| SMTP verification | **BLOCKED / UNVERIFIED** | Sign-up POST showed 200, but sanitized `auth.mail` level 50 error and Mailtrap 0 messages at that time. Preview SMTP variables were later updated. No successful end-to-end verification is yet recorded. |
 | Catalog results | OBSERVED | 0 published Works on shown staging catalog; not by itself a bug or proof ingestion broken. |
-| Library loading locale | **OBSERVED DEFECT** | English route showed literal "Loading / Đang tải…"; source hardcodes it in §apps/web/src/app/[locale]/library/loading.tsx§. |
+| Library loading locale | **OBSERVED DEFECT** | English route showed literal "Loading / Đang tải…"; source hardcodes it in [Library loading](<../apps/web/src/app/[locale]/library/loading.tsx>). |
 | Catalog filter geometry | OBSERVED DEFECT | Original-language helper and uneven row alignment in screenshot. |
 | Library filter geometry | OBSERVED DEFECT | Unbalanced spacing and vertically displaced control area in screenshot. |
 | My Requests page hierarchy | OBSERVED DEFECT | Crowded/overlapping-looking headings and actions in screenshot. |
@@ -66,13 +66,13 @@ Staging screenshots shared privately by the operator are **not** to be committed
 
 STOP on missing rights/permission, ambiguous private/public exposure, schema risk, wrong target database, paid operation, missing protected build, unapproved deployment, changed migration history, unsupported providers, auth regressions, access-control failures or missing moderator staffing for public features.
 
-Existing source/CI acceptance for V0–V5 remains governed by its original append-only records. Do not rewrite old run outcomes or transplant historical test totals as V6 proof. New development must preserve required GitHub §verify§ and all prior test suites. Updates to this ledger must be evidence-backed in the implementing PR.
+Existing source/CI acceptance for V0–V5 remains governed by its original append-only records. Do not rewrite old run outcomes or transplant historical test totals as V6 proof. New development must preserve required GitHub `verify` and all prior test suites. Updates to this ledger must be evidence-backed in the implementing PR.
 
 See [V6_PLAN.md](V6_PLAN.md) and [V6A_UI_STABILIZATION.md](V6A_UI_STABILIZATION.md).
 
 ## 6. V6A Batch A1 — uncommitted local candidate (2026-10-20 UTC)
 
-This entry supersedes the initialization-only state for **A1 only**. The earlier matrix, milestone rows, operator observations and failures retain their receipt-time meaning. No V6A-03 or later implementation, whole-V6A acceptance, publication or deployment is claimed.
+**Historical pre-publication snapshot:** The uncommitted-state statements below apply only to this receipt; current publication/CI evidence is recorded in [section 8](#8-a1-publication-and-exact-commit-ci-receipt-2026-10-21-utc). This entry superseded the initialization-only state for **A1 only** at its receipt time. The earlier matrix, milestone rows, operator observations and failures retain their receipt-time meaning. No V6A-03 or later implementation, whole-V6A acceptance, publication or deployment is claimed.
 
 ### Source and scope
 
@@ -145,12 +145,12 @@ Final read-only preservation verification passed: main remained exact/clean at t
 
 ## 7. A1 final verification and pre-commit review (2026-10-21 UTC)
 
-This is the current **local pre-commit** receipt. §6 retains its earlier source-bound results, NOT RUN states and failed attempts; those are not silently rewritten as passes. The maintainer subsequently authorized the full local gates on fresh owned loopback databases and explicitly confirmed unchanged, isolated test-only V4 fixtures. No operator/hosted V4 setting was enabled.
+**Historical local pre-commit snapshot:** The statements below retain their pre-publication meaning; current publication/CI evidence is recorded in [section 8](#8-a1-publication-and-exact-commit-ci-receipt-2026-10-21-utc). [Section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc) retains its earlier source-bound results, NOT RUN states and failed attempts; those are not silently rewritten as passes. The maintainer subsequently authorized the full local gates on fresh owned loopback databases and explicitly confirmed unchanged, isolated test-only V4 fixtures. No operator/hosted V4 setting was enabled.
 
 ### Candidate and complete diff review
 
 - Existing worktree/branch/base remain `E:\TaleAtlas-v6a-loading-library`, `fix/v6a-loading-library`, `86030bf3926646e4e2490b0883ff224d1e40adbd`; index empty. The same nine files remain the candidate: four product files, four test/helper files and this ledger. All nine initial versions were copied and hash-verified into a fresh ignored review directory before corrections. No worktree was recreated or historical change discarded.
-- Complete tracked diffs plus both untracked files were reviewed. The four product files and three unit files retain the exact hashes recorded in §6: selected-locale status text/central copy, filter-only row CSS, validated filter-state form key/native Reset, and focused regression coverage. No new product change was needed in this review.
+- Complete tracked diffs plus both untracked files were reviewed. The four product files and three unit files retain the exact hashes recorded in [section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc): selected-locale status text/central copy, filter-only row CSS, validated filter-state form key/native Reset, and focused regression coverage. No new product change was needed in this review.
 - Two **fixture-only P2 findings** in the [browser helper](<../scripts/test-v6a-library-ui.mjs>) were minimally corrected: (1) cancellation now fences resource acquisition and closes late browser/context/listener handles instead of relying only on cached cleanup; (2) webpack checks canonical resolved server/database resource paths and forbidden package resources, supplementing the original raw import-prefix guard. The exact pure library-types module remains allowed. No assertion, timeout, retry, test selection or public feature was relaxed/added.
 - [Eleven extracted-function/config contract checks](<../.local/v6a-a1-final-review-b9884510-f7cc-451a-86bb-46987a8fa5a9/helper-contract-results.json>) passed for cancellation/late acquisition and direct, relative/absolute database/server imports. These use synthetic handles/hooks, not an OS signal or process-isolation certification. A targeted independent read-only patch review found no remaining must-fix defect in those corrections; the full browser run below additionally validated the real compiler/normal teardown.
 - Security/portability review: no real hardcoded credentials or project-specific local path in the candidate helper; root/dependency paths are derived, commands use argument arrays, child env is allowlisted, resources/ports are owned loopback-only and writes are exclusive. The helper requires the locked Next16.4.0/Playwright1.63.0 dependency layout, Node24, an installed Chromium and a physical checkout. Windows junction and POSIX symlink/process-group branches were reviewed; **clean Linux execution is not claimed**. Next/Node and same-user local filesystem writers remain trusted: this is not an OS network/filesystem sandbox. Existing CI does not automatically invoke this opt-in helper; no workflow was changed.
@@ -170,7 +170,7 @@ Environment: Windows x64, Node24.19.0, pnpm11.7.0, Next16.4.0, Playwright1.63.0/
 | Gate | Final observed result | Scope / completion (UTC) |
 | --- | --- | --- |
 | Helper syntax + extracted safety contracts | **PASS: 11/11** | Actual helper AST/config, synthetic resource handles; same budgets. |
-| Focused four-file unit selection from §6 | **PASS: 110/110, 4 files** | Both loading locales, SSR/hydration/rebinding/native GET, auth/privacy denial units and EntryControls/library interactions. |
+| Focused four-file unit selection from [section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc) | **PASS: 110/110, 4 files** | Both loading locales, SSR/hydration/rebinding/native GET, auth/privacy denial units and EntryControls/library interactions. |
 | `pnpm test` | **PASS: 2058/2058, 72 files** | Complete final-source unit suite, not the earlier2056 count. |
 | `pnpm lint` | **PASS** | Final product/helper candidate; application ESLint scope unchanged. |
 | `pnpm typecheck` | **PASS** | Entire workspace/test TypeScript. |
@@ -186,13 +186,13 @@ Environment: Windows x64, Node24.19.0, pnpm11.7.0, Next16.4.0, Playwright1.63.0/
 | `pnpm audit --prod --audit-level high --json` | **PASS: 0 vulnerabilities at every severity** | Public registry, empty run-owned npm configs/no copied credentials. |
 | `pnpm audit --audit-level moderate --json` | **PASS: 0 vulnerabilities at every severity** | Both audits completed00:22:24; no dependency changes. |
 
-The final helper hash is `43feb1bf333fbcecfbbb6f7f1a64bea41167f7e3a4a04aab0a793aa445679d81`; the former `8d24…` in §6 correctly identifies its earlier version. All four product and three unit-file hashes still match the initial candidate. Initial versions, all failure receipts and new evidence are retained; no staging/commit/push/PR/merge/deployment occurred.
+The final helper hash is `43feb1bf333fbcecfbbb6f7f1a64bea41167f7e3a4a04aab0a793aa445679d81`; the former `8d24…` in [section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc) correctly identifies its earlier version. All four product and three unit-file hashes still match the initial candidate. Initial versions, all failure receipts and new evidence are retained; no staging/commit/push/PR/merge/deployment occurred.
 
 ### Prior 15-second timeout: investigation and classification
 
 The [original failure](<../.local/v6a-a1-ui-482a76ca-d7d2-4085-a48e-f64e41704db0/evidence/failure.json>) remains **FAIL**: the pending hydration marker did not appear within15000ms at EN/empty/1440/light after EN flow/keyboard groups and12 geometry groups had completed. Its tracked browser-error list was empty. The preserved [development log](<../.local/v6a-a1-ui-482a76ca-d7d2-4085-a48e-f64e41704db0/.next/dev/logs/next-development.log>) shows startup/route compilation, browser activity through+03:34 and no recorded server/client error; the owner readiness and earlier hydration/navigation cases had already succeeded. It was therefore not a failure of the initial startup-readiness gate.
 
-**Classification: unresolved fixture/client-readiness or environmental timing, not a demonstrated A1 language/filter regression.** The old run did not capture the failed DOM/probe state, request timing or resource/scheduler profile, so the exact cause cannot be established or an intermittent product issue categorically excluded. Failure-only diagnostics were added later and cannot retroactively explain it. The later §6 pass, this review's74-group pass and complete native production passes establish later successes only. The safety fixes in this review address separate lifecycle/import-boundary findings, **not** that timeout. No timeout increase, automatic retry or weakened assertion was used. Retain the timing issue as an explicit PR-review risk rather than claim it resolved.
+**Classification: unresolved fixture/client-readiness or environmental timing, not a demonstrated A1 language/filter regression.** The old run did not capture the failed DOM/probe state, request timing or resource/scheduler profile, so the exact cause cannot be established or an intermittent product issue categorically excluded. Failure-only diagnostics were added later and cannot retroactively explain it. The later [section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc) pass, this review's74-group pass and complete native production passes establish later successes only. The safety fixes in this review address separate lifecycle/import-boundary findings, **not** that timeout. No timeout increase, automatic retry or weakened assertion was used. Retain the timing issue as an explicit PR-review risk rather than claim it resolved.
 
 ### Cleanup, limitations and decision
 
@@ -203,3 +203,26 @@ Final00:50:27 preservation checks passed: main exact/clean; all six historical w
 - **NOT RUN:** actual browser-UI 200% zoom, screen reader/manual composed contrast, broad low-end performance, clean Linux/PG17 execution of this candidate, candidate GitHub CI or hosted staging/production acceptance. Existing full native scenarios are not a WCAG certification or a hosted SMTP delivery result. Earlier operator SMTP observations remain unverified; no SMTP product/infrastructure change was made.
 - Existing lazy-placeholder LCP advisories remain non-fatal observations, not an A1 performance fix.
 - **Recommendation: GO for a scoped A1 commit and review PR, only after explicit maintainer approval.** All applicable local gates above passed and no release-blocking A1 product defect was identified. This is not authority to stage/publish now, not merge/deploy approval, not whole-V6A acceptance, and not permission to start A2. Mandatory real PR/main CI, including Linux/PostgreSQL17, still governs merge acceptance; the historical timeout and manual-validation limits must remain disclosed.
+
+## 8. A1 publication and exact-commit CI receipt (2026-10-21 UTC)
+
+GitHub run metadata and each run's attempt-1 job list were independently verified at **2026-10-21T11:52:58Z**; these are actual GitHub results, not an inference from local tests.
+
+- Published A1 implementation: [`ff01fdc6b239dac3bbc138e23ecafbf284e2bef0`](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/commit/ff01fdc6b239dac3bbc138e23ecafbf284e2bef0), branch `fix/v6a-loading-library`, base `86030bf3926646e4e2490b0883ff224d1e40adbd`.
+- [Draft PR #16](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/16) targets `main` and remains open/draft, not merged. The approved A1 change set contains the same nine file paths; this follow-up changes only this ledger.
+- [Section 6](#6-v6a-batch-a1--uncommitted-local-candidate-2026-10-20-utc) and [section 7](#7-a1-final-verification-and-pre-commit-review-2026-10-21-utc) are historical local/pre-commit snapshots. Their earlier uncommitted states, local results, NOT RUN entries and failed attempts retain their receipt-time meaning.
+
+Both independently executed runs below identify the exact published commit `ff01fdc6b239dac3bbc138e23ecafbf284e2bef0`:
+
+| Event | GitHub run | Attempt | Final result | Mandatory jobs |
+| --- | --- | --- | --- | --- |
+| Push | [39525577751](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39525577751) | 1 | **SUCCESS** | **5/5 successful** |
+| Pull request | [39525728895](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39525728895) | 1 | **SUCCESS** | **5/5 successful** |
+
+For each run, all five completed successfully: `Quality foundations`, `Native original 17 (V4 disabled)`, `Native enabled V4 8 (retry zero)`, `Dependency security audits` and aggregate `verify`. These required Ubuntu/PostgreSQL 17 CI gates passed on the published implementation; the Windows/PostgreSQL 18.4 results above remain separate local evidence. The opt-in A1 browser helper is still not automatically invoked by CI.
+
+**Acceptance boundary:** A1 implementation source/CI acceptance is evidenced for **`ff01fdc6b239dac3bbc138e23ecafbf284e2bef0` only**. This documentation-only follow-up requires independently successful new Push and PR CI runs on its own exact HEAD, including all mandatory jobs, before the amended PR is treated as CI-accepted. The earlier green runs do not certify a later commit. Draft publication/source CI is not ready-for-review, merge, deployment or whole-V6A acceptance.
+
+**Still pending:** actual browser-UI 200% zoom, screen-reader/manual composed contrast and broader manual accessibility/performance acceptance; hosted SMTP verification/delivery and protected staging/production runtime validation. Local synthetic HTTPS/STARTTLS and GitHub fixture success do not establish hosted mail or deployment acceptance. No deployment, V4 activation or Batch A2 work is authorized by this receipt.
+
+**Historical failure retained:** the earlier 15000ms hydration-readiness timeout remains **FAIL / UNEXPLAINED**. Neither the later local passes nor these exact-commit CI successes diagnose its cause or prove it fixed. All earlier failed evidence and limitations remain preserved; no timeout, assertion or retry requirement was relaxed.
