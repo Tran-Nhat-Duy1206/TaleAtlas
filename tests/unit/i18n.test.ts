@@ -34,6 +34,16 @@ describe("complete localized interface dictionaries", () => {
       expect(value, key).not.toMatch(/\b(?:TODO|lorem ipsum)\b/i);
     }
   });
+  it.each([
+    ["en", "Loading…", "Checking your session…"],
+    ["vi", "Đang tải…", "Đang kiểm tra phiên đăng nhập…"],
+  ] as const)(
+    "keeps %s route loading separate from existing auth loading",
+    (locale, route, session) => {
+      expect(dictionary(locale).routeLoading).toBe(route);
+      expect(dictionary(locale).loading).toBe(session);
+    },
+  );
   it("localizes account actions, validation, and theme controls", () => {
     const en = dictionary("en"),
       vi = dictionary("vi");

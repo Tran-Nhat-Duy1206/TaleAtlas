@@ -57,6 +57,14 @@ export default async function LibraryPage({
       <h1>{t.title}</h1>
       <p>{t.private}</p>
       <form
+        // Uncontrolled selects must rebind when a reset/new server filter commits.
+        // Paging alone keeps this key, and EntryControls is a separate form.
+        key={JSON.stringify([
+          locale,
+          query.status ?? "",
+          query.favorite ?? "",
+          query.sort,
+        ])}
         action={`/${locale}/library`}
         method="get"
         className={styles.controls}
@@ -95,7 +103,8 @@ export default async function LibraryPage({
           </select>
         </label>
         <button>{t.apply}</button>
-        <Link href={`/${locale}/library`}>{t.reset}</Link>
+        {/* Native navigation also clears unsent selections when the URL is already bare. */}
+        <a href={`/${locale}/library`}>{t.reset}</a>
       </form>
       {!result ? (
         <>
