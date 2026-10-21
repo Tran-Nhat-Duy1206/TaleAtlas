@@ -11,6 +11,11 @@
   align-items: end;
   margin-block: 1.5rem;
 }
+/* Override the global column-form rule only for the Library GET filters.
+   EntryControls uses a div.controls and keeps its existing layout. */
+form.controls {
+  flex-direction: row;
+}
 .controls label {
   display: grid;
   gap: 0.4rem;
