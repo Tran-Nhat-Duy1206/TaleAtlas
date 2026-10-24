@@ -3,7 +3,7 @@
 const path = require("node:path");
 const { globSync: tinyGlobSync, isDynamicPattern } = require("tinyglobby");
 
-// Deliberately NOT a complete fast-glob replacement. Next ESLint 16.4.0's
+// Deliberately NOT a complete fast-glob replacement. Next ESLint 16.4.1's
 // get-root-dirs is its sole consumer: globSync(string, { onlyDirectories: true }).
 // Re-review this adapter and its coupled regression tests before widening scope.
 function globSync(pattern, options) {
