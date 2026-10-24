@@ -49,9 +49,9 @@ function roots(rootDir?: string | string[]) {
 // Expected values were frozen using fast-glob 3.3.1 before substituting the
 // dependency. No vulnerable baseline library is kept as a test dependency.
 // These cases cover the actual private helper, not a parallel reimplementation.
-describe("Next ESLint 16.4.0 root-directory glob compatibility", () => {
+describe("Next ESLint 16.4.1 root-directory glob compatibility", () => {
   it("loads the pinned Next plugin through the narrowly scoped adapter", () => {
-    expect(pluginRequire("../package.json").version).toBe("16.4.0");
+    expect(pluginRequire("../package.json").version).toBe("16.4.1");
     expect(pluginRequire.resolve("fast-glob")).toBe(
       fileURLToPath(
         new URL("../../packages/next-root-glob/index.cjs", import.meta.url),

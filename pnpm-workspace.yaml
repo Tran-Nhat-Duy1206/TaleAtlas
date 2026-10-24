@@ -6,10 +6,14 @@ packages:
 overrides:
   'esbuild@<=0.24.2': 0.25.12
   # No patched braces release is published for GHSA-vfj7-8cjw-p6xm.
-  # Next 16.4.0 uses only globSync(string, { onlyDirectories: true });
+  # Next 16.4.1 uses only globSync(string, { onlyDirectories: true });
   # this development-only adapter preserves root matching without that chain.
   # Re-review the API and baseline tests before changing the Next version/scope.
-  '@next/eslint-plugin-next@16.4.0>fast-glob': link:packages/next-root-glob
+  '@next/eslint-plugin-next@16.4.1>fast-glob': link:packages/next-root-glob
+  # Keep jsdom's declared ^7.21.0 range on the patched release, without changing jsdom.
+  'jsdom@28.1.0>undici': 7.30.1
+  # Patch only the vulnerable Zod resolution retained by auth/ESLint peer snapshots.
+  'zod@4.6.5': 4.6.6
 allowBuilds:
   # Reviewed locked Linux postinstall: restores bundled native/lib symlinks only.
   '@embedded-postgres/linux-x64': true

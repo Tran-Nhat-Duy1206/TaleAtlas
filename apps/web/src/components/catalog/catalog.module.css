@@ -55,6 +55,14 @@
 .filters .field label {
   flex: 0 0 auto;
 }
+/* Full-row descriptions must not raise controls inside bottom-aligned fields. */
+.filters .filterHelp {
+  display: grid;
+  gap: 0.5rem;
+  flex: 0 0 100%;
+  min-width: 0;
+  width: 100%;
+}
 .filters .helper {
   margin: 0;
   color: var(--ink);
@@ -301,7 +309,8 @@
   }
   .filters label,
   .filters .field,
-  .filters .search {
+  .filters .search,
+  .filters .filterHelp {
     flex: 0 0 auto;
   }
   .cover figcaption {

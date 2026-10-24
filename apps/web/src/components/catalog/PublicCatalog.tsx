@@ -54,7 +54,16 @@ export function PublicCatalog({
           {discovery.invalidQuery}
         </p>
       )}
+      {/* Rebind committed visible filters, not pagination or result changes. */}
       <form
+        key={JSON.stringify([
+          locale,
+          query.q,
+          query.format ?? "",
+          query.genre ?? "",
+          query.originalLanguage ?? "",
+          query.releaseStatus ?? "",
+        ])}
         action={`/${locale}/works`}
         method="get"
         className={`feature ${styles.filters}`}
@@ -96,9 +105,6 @@ export function PublicCatalog({
                 </option>
               </select>
               <input type="hidden" name="genre" value={query.genre ?? ""} />
-              <p id="catalog-genre-capacity" className={styles.helper}>
-                {discovery.genreCapacity}
-              </p>
             </>
           ) : (
             <select
@@ -136,9 +142,6 @@ export function PublicCatalog({
             spellCheck={false}
             aria-describedby="catalog-original-language-help"
           />
-          <p id="catalog-original-language-help" className={styles.helper}>
-            {discovery.originalLanguageHelp}
-          </p>
         </div>
         <label>
           {discovery.releaseStatus}
@@ -155,9 +158,20 @@ export function PublicCatalog({
         <button className={`button ${styles.button}`} type="submit">
           {t.apply}
         </button>
-        <Link className={styles.reset} href={`/${locale}/works`}>
+        <a className={styles.reset} href={`/${locale}/works`}>
           {t.reset}
-        </Link>
+        </a>
+        {/* Keep descriptions out of bottom-aligned control wrappers. */}
+        <div className={styles.filterHelp}>
+          <p id="catalog-original-language-help" className={styles.helper}>
+            {discovery.originalLanguageHelp}
+          </p>
+          {genreOptions.overflow && (
+            <p id="catalog-genre-capacity" className={styles.helper}>
+              {discovery.genreCapacity}
+            </p>
+          )}
+        </div>
       </form>
       <p role="status">
         {new Intl.NumberFormat(locale).format(result.total)} {t.results}
