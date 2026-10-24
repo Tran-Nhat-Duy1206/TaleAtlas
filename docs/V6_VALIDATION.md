@@ -1120,3 +1120,44 @@ All six protected historical PG/native evidence sets, recovery files,113 nonsens
 The final seven-path identity and empty index are preserved; only this append changes tracked bytes in this authorization. **The conditional full read-only pre-commit candidate review was NOT performed because mandatory local E2E gates did not pass.** No certificate, private harness, PostgreSQL data or generated report is staged, and the browser helper remains untracked/unstaged. No publication-readiness claim follows from scope preservation alone.
 
 **NO-GO for a scoped A2 commit and Draft PR. STOP.** Required default and V4 production-native phases remain NOT RUN. Review the preserved new startup parentage failure and propose any necessary private-orchestration correction separately; neither a new cluster/run, failed-guard relaxation, fallback nor E2E retry is automatic. Browser-UI200% zoom, assistive-technology certification, PG17/Linux parity, hosted SMTP/TLS acceptance, hosted V4 activation and GitHub candidate CI PASS remain unverified. No staging, commit, push, PR creation, merge, deployment, CI workflow change, A3 work or other implementation is authorized by this report.
+
+## V6A Batch A3 — My Requests information hierarchy (V6A-04)
+
+**Local candidate receipt — 2026-10-24.** Baseline `e42fb9212e0a34008a6ca1a24cfd80129d4164f4`, branch `fix/v6a-my-requests`. Implementation only; no staging, commit, push, PR, deployment or hosted operation. Completed-batch CI/deployment/validation investigations were not reopened.
+
+### Exact five-file scope
+
+- [Requests page](<../apps/web/src/app/[locale]/requests/page.tsx>): semantic header with existing localized edit-suggestions and Request a Story links in original keyboard order; independently named owned/followed sections; page-local message/pagination classes.
+- [Request styles](<../apps/web/src/components/requests/request.module.css>): all new rules opt in through `.myRequests`; header/action wrapping, local heading line heights, section/card/list/message/pagination spacing and narrow-screen wrapping. Shared forms, notices, detail views and globals retain their existing rules.
+- [My Requests page units](<../tests/unit/my-requests-page.test.tsx>): 49 new controlled async server-page cases with the actual page/cards/actions; no jsdom pixel-geometry assertion.
+- [Request browser spec](<../tests/e2e/requests.spec.ts>): two separately bounded EN/VI layout cases for 375/768/1280/1440px and light/dark, empty and populated. An in-file fixture factory reuses original real SMTP verification, cookie sign-in, scoped proxy contexts and guarded cleanup. Four synthetic requests per locale; no large pagination fixture.
+- This ledger: append-only A3 results and limitations; historical prefix preserved.
+
+No backend/API, auth policy, schema/migration, dependency/lockfile, workflow, browser configuration or Vercel changes. No Request Form redesign, provider activation or hosted V4 activation.
+
+### Actual bounded local results
+
+| Command / gate | Result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS, exit 0; lockfile unchanged |
+| New and directly related request units | 89/89 PASS across 4 files, exit 0; includes 49 new cases |
+| `pnpm test` | 2161/2161 PASS across 73 files, exit 0 |
+| `pnpm typecheck` | PASS, exit 0; includes browser-spec compilation |
+| `pnpm lint` | PASS, exit 0 |
+| `pnpm build` | PASS, exit 0; optimized production build completed |
+| A3 browser layout/native E2E | **NOT RUN** |
+| SQL integration/migration execution/fresh audits | **NOT RUN in this bounded A3 local pass**; no new PASS inferred |
+
+Focused command: `pnpm exec vitest run tests/unit/my-requests-page.test.tsx tests/unit/request-ui.test.ts tests/unit/request-return.test.ts tests/unit/request-review-history.test.tsx`.
+
+Focused and full unit runs completed once; full units/typecheck/lint/build each completed one successful pass. No assertions, timeouts, workers or retries were relaxed. Independent read-only review found no blocking candidate findings. Static token comparison confirms the original browser lifecycle helper/assertion span, real signup body and guarded cleanup body are unchanged; original 360s scenario deadline and zero retries are preserved. This is static preservation proof, not browser acceptance.
+
+### Privacy, pagination and evidence boundary
+
+Session guards, force-dynamic/noindex metadata, data services, 20-row pages, `Number(value)` normalization/bounds and independent `page`/`followedPage` URLs are unchanged. Both-locale DOM tests cover default/invalid/bounded/out-of-range pages, retention of the other page parameter, separate error/empty states and no list reads after absent/failed session. Owned lists exclude private notes/evidence/history; nullable followed summaries never fall back to private data and keep existing unfollow. Mocked-service units do not independently prove real authorization or SQL isolation.
+
+The authored browser cases measure actual boxes and text fragments after font readiness, containment/spacing, overflow, long-title wrapping, actual Tab order, theme selection, redacted summaries and persisted unfollow behavior. **They have not executed locally.** No already-working approved disposable browser/database environment was supplied for this isolated worktree, and no ambient database URL was present. No service bootstrap or Windows Observer/TLS/ACL/PostgreSQL provenance investigation was attempted. No Playwright execution, screenshots, real-browser geometry or real-session A3 PASS is claimed. Browser runtime/deadline sufficiency remains unverified until independent execution.
+
+Actual 200% browser-UI zoom, rendered contrast and assistive-technology combinations remain unverified. No WCAG certification or hosted SMTP/TLS/runtime/production acceptance is claimed. Hosted V4 is not enabled by this work.
+
+**Decision:** GO for one separately authorized scoped local A3 commit based on passing bounded local gates. This does not authorize committing now, publishing, merging, deployment, or waiving independent Linux browser/SQL/security CI and any claimed manual acceptance. Unexecuted checks remain NOT RUN.

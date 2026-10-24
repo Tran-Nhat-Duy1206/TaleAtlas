@@ -72,7 +72,7 @@ export default async function MyRequestsPage({ params, searchParams }: Props) {
     }
     return (
       <nav
-        className={styles.actions}
+        className={`${styles.actions} ${styles.pagination}`}
         aria-label={`${kind === "page" ? t.owned : t.followed}: ${t.page}`}
       >
         {current > 1 && <Link href={href(current - 1)}>{t.previous}</Link>}
@@ -86,18 +86,32 @@ export default async function MyRequestsPage({ params, searchParams }: Props) {
     );
   }
   return (
-    <section className={styles.module}>
-      <h1>{t.mine}</h1>
-      <Link href={`/${locale}/edit-suggestions`}>
-        {locale === "vi" ? "Đề xuất chỉnh sửa của tôi" : "My edit suggestions"}
-      </Link>
-      <Link className="button" href={`/${locale}/requests/new`}>
-        {t.new}
-      </Link>
-      <section>
-        <h2>{t.owned}</h2>
+    <section className={`${styles.module} ${styles.myRequests}`}>
+      <header className={styles.pageHeader}>
+        <h1>{t.mine}</h1>
+        <div className={styles.pageActions}>
+          <Link
+            className={styles.secondaryLink}
+            href={`/${locale}/edit-suggestions`}
+          >
+            {locale === "vi"
+              ? "Đề xuất chỉnh sửa của tôi"
+              : "My edit suggestions"}
+          </Link>
+          <Link className="button" href={`/${locale}/requests/new`}>
+            {t.new}
+          </Link>
+        </div>
+      </header>
+      <section
+        className={styles.requestGroup}
+        aria-labelledby="owned-requests-heading"
+      >
+        <h2 id="owned-requests-heading">{t.owned}</h2>
         {!owned ? (
-          <p role="alert">{t.error}</p>
+          <p className={styles.pageMessage} role="alert">
+            {t.error}
+          </p>
         ) : (
           <>
             {owned.items.length ? (
@@ -114,16 +128,21 @@ export default async function MyRequestsPage({ params, searchParams }: Props) {
                 ))}
               </ul>
             ) : (
-              <p>{t.empty}</p>
+              <p className={styles.pageMessage}>{t.empty}</p>
             )}
             {pagination(owned.page, owned.total, "page")}
           </>
         )}
       </section>
-      <section>
-        <h2>{t.followed}</h2>
+      <section
+        className={styles.requestGroup}
+        aria-labelledby="followed-requests-heading"
+      >
+        <h2 id="followed-requests-heading">{t.followed}</h2>
         {!followed ? (
-          <p role="alert">{t.error}</p>
+          <p className={styles.pageMessage} role="alert">
+            {t.error}
+          </p>
         ) : (
           <>
             {followed.items.length ? (
@@ -139,7 +158,7 @@ export default async function MyRequestsPage({ params, searchParams }: Props) {
                 ))}
               </ul>
             ) : (
-              <p>{t.empty}</p>
+              <p className={styles.pageMessage}>{t.empty}</p>
             )}
             {pagination(followed.page, followed.total, "followedPage")}
           </>
