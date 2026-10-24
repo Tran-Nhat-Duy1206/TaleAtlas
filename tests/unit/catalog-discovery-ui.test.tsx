@@ -16,6 +16,8 @@ import {
   WORK_FORMATS,
 } from "../../packages/database/src/catalog-types";
 import { PublicCatalog } from "../../apps/web/src/components/catalog/PublicCatalog";
+import styles from "../../apps/web/src/components/catalog/catalog.module.css";
+import { publicCatalogQueryState } from "../../apps/web/src/components/catalog/query";
 import { publicCopy } from "../../apps/web/src/components/catalog/query";
 import { catalogDiscoveryCopy } from "../../apps/web/src/lib/catalog-discovery-i18n";
 import {
@@ -80,6 +82,30 @@ const work = (title: string, slug: string): AggregateWork => ({
   relations: [],
 });
 
+const submittedFilters = (query: ParsedCatalogQuery) => ({
+  q: query.q,
+  format: query.format ?? "",
+  genre: query.genre ?? "",
+  originalLanguage: query.originalLanguage ?? "",
+  releaseStatus: query.releaseStatus ?? "",
+  pageSize: String(query.pageSize),
+});
+const editUnsentFilters = (form: HTMLFormElement) => {
+  for (const [name, value] of Object.entries({
+    q: "Unsent",
+    format: "MANGA",
+    originalLanguage: "ja",
+    releaseStatus: "COMPLETED",
+  })) {
+    fireEvent.change(form.querySelector(`[name="${name}"]`)!, {
+      target: { value },
+    });
+  }
+  const genre = form.querySelector<HTMLSelectElement>("#catalog-genre")!;
+  if (!genre.disabled)
+    fireEvent.change(genre, { target: { value: "adventure" } });
+};
+
 for (const locale of ["en", "vi"] as const) {
   describe(`${locale} native catalog discovery`, () => {
     const t = catalogDiscoveryCopy[locale];
@@ -100,6 +126,241 @@ for (const locale of ["en", "vi"] as const) {
       genreOptions,
       result: { items: [], total: 0, page: 1, pageSize: 10 },
     };
+
+    it.each([false, true])(
+      "keeps full-width descriptions outside the control wrappers (overflow=%s)",
+      (overflow) => {
+        for (const populated of [false, true]) {
+          const container = document.createElement("div");
+          container.innerHTML = renderToString(
+            <PublicCatalog
+              {...props}
+              genreOptions={{ ...genreOptions, overflow }}
+              result={{
+                items: populated
+                  ? [work("Synthetic result", "synthetic-result")]
+                  : [],
+                total: populated ? 1 : 0,
+                page: 1,
+                pageSize: 10,
+              }}
+            />,
+          );
+          document.body.append(container);
+          serverContainers.push(container);
+          const form = container.querySelector("form")!;
+          const language = within(form).getByRole("textbox", {
+            name: t.originalLanguage,
+          });
+          const help = form.querySelector<HTMLParagraphElement>(
+            "#catalog-original-language-help",
+          )!;
+          expect(
+            form.querySelectorAll("#catalog-original-language-help"),
+          ).toHaveLength(1);
+          expect(language).toHaveAttribute("aria-describedby", help.id);
+          expect(language).toHaveAccessibleDescription(t.originalLanguageHelp);
+          expect(language.parentElement).not.toContainElement(help);
+          const area = help.parentElement!;
+          expect(area).toHaveClass(styles.filterHelp);
+          expect(area.parentElement).toBe(form);
+          expect(form.lastElementChild).toBe(area);
+          const genre = within(form).getByRole("combobox", { name: t.genre });
+          const capacity = form.querySelector<HTMLParagraphElement>(
+            "#catalog-genre-capacity",
+          );
+          if (overflow) {
+            expect(
+              form.querySelectorAll("#catalog-genre-capacity"),
+            ).toHaveLength(1);
+            expect(capacity?.parentElement).toBe(area);
+            expect(genre.parentElement).not.toContainElement(capacity);
+            expect(genre).toBeDisabled();
+            expect(genre).not.toHaveAttribute("name");
+            expect(genre).toHaveAttribute("aria-describedby", capacity!.id);
+            expect(genre).toHaveAccessibleDescription(t.genreCapacity);
+            expect(area.children).toHaveLength(2);
+          } else {
+            expect(capacity).toBeNull();
+            expect(genre).not.toHaveAttribute("aria-describedby");
+            expect(area.children).toHaveLength(1);
+          }
+          container.remove();
+        }
+      },
+    );
+
+    it.each([false, true])(
+      "preserves exact successful filter values and native parser roundtrip (overflow=%s)",
+      (overflow) => {
+        const selected = {
+          ...query,
+          genre: "unlisted-genre",
+          originalLanguage: "ZH-hant",
+        };
+        const { container } = render(
+          <PublicCatalog
+            {...props}
+            query={selected}
+            genreOptions={{ ...genreOptions, overflow }}
+          />,
+        );
+        const form = container.querySelector("form")!;
+        const values = Object.fromEntries(new FormData(form)) as Record<
+          string,
+          string
+        >;
+        expect(values).toEqual({
+          q: selected.q,
+          format: selected.format,
+          genre: selected.genre,
+          originalLanguage: selected.originalLanguage,
+          releaseStatus: selected.releaseStatus,
+          pageSize: "10",
+        });
+        expect(new FormData(form).getAll("genre")).toEqual([selected.genre]);
+        expect(new FormData(form).has("page")).toBe(false);
+        const parsed = publicCatalogQueryState(values, locale);
+        expect(parsed.invalid).toBe(false);
+        expect(parsed.query).toEqual({ ...selected, page: 1 });
+        expect(
+          within(form).getByRole("link", { name: existing.reset }),
+        ).toHaveAttribute("href", `/${locale}/works`);
+      },
+    );
+
+    for (const overflow of [false, true]) {
+      describe(`committed filter identity (overflow=${overflow})`, () => {
+        const changes: [string, Partial<ParsedCatalogQuery>][] = [
+          [
+            "search with delimiters",
+            { q: 'Changed | [query] "quoted" \\ tag' },
+          ],
+          ["format", { format: "MANGA" }],
+          ["genre", { genre: "adventure" }],
+          ["missing genre", { genre: undefined }],
+          ["exact language case", { originalLanguage: "ZH-hant" }],
+          ["missing language", { originalLanguage: undefined }],
+          ["missing status versus UNKNOWN", { releaseStatus: undefined }],
+          ["locale", { locale: locale === "en" ? "vi" : "en" }],
+        ];
+        it.each(changes)(
+          "rebinds all fields when committed %s changes",
+          (_name, change) => {
+            const options = { ...genreOptions, overflow };
+            const { container, rerender } = render(
+              <PublicCatalog {...props} genreOptions={options} />,
+            );
+            const before = container.querySelector("form")!;
+            editUnsentFilters(before);
+            const next = { ...query, ...change };
+            rerender(
+              <PublicCatalog
+                {...props}
+                locale={next.locale}
+                query={next}
+                genreOptions={options}
+              />,
+            );
+            const after = container.querySelector("form")!;
+            expect(after).not.toBe(before);
+            expect(after).toHaveAttribute("action", `/${next.locale}/works`);
+            expect(Object.fromEntries(new FormData(after))).toEqual(
+              submittedFilters(next),
+            );
+            expect(new FormData(after).getAll("genre")).toEqual([
+              next.genre ?? "",
+            ]);
+            expect(new FormData(after).has("page")).toBe(false);
+            const displayedGenre =
+              after.querySelector<HTMLSelectElement>("#catalog-genre")!;
+            expect(displayedGenre.disabled).toBe(overflow);
+            expect(displayedGenre).toHaveValue(next.genre ?? "");
+            if (overflow)
+              expect(
+                within(displayedGenre).getByRole("option"),
+              ).toHaveTextContent(
+                next.genre
+                  ? catalogDiscoveryCopy[next.locale].selectedGenre(next.genre)
+                  : catalogDiscoveryCopy[next.locale].genresUnavailable,
+              );
+          },
+        );
+
+        it.each([
+          ["page", { page: 3 }],
+          ["pageSize", { pageSize: 7 }],
+        ] as const)(
+          "preserves form and drafts when only pagination %s changes",
+          (_name, change) => {
+            const options = { ...genreOptions, overflow };
+            const { container, rerender } = render(
+              <PublicCatalog {...props} genreOptions={options} />,
+            );
+            const before = container.querySelector("form")!;
+            const search = before.querySelector('[name="q"]');
+            editUnsentFilters(before);
+            const draft = Object.fromEntries(new FormData(before));
+            const next = { ...query, ...change };
+            rerender(
+              <PublicCatalog {...props} query={next} genreOptions={options} />,
+            );
+            const after = container.querySelector("form")!;
+            expect(after).toBe(before);
+            expect(after.querySelector('[name="q"]')).toBe(search);
+            expect(Object.fromEntries(new FormData(after))).toEqual({
+              ...draft,
+              pageSize: String(next.pageSize),
+            });
+            expect(new FormData(after).getAll("genre")).toEqual([draft.genre]);
+            expect(new FormData(after).has("page")).toBe(false);
+          },
+        );
+
+        it("distinguishes committed explicit UNKNOWN from an absent release filter in both directions", () => {
+          const options = { ...genreOptions, overflow };
+          const absent = { ...query, releaseStatus: undefined };
+          const { container, rerender } = render(
+            <PublicCatalog {...props} query={absent} genreOptions={options} />,
+          );
+          const first = container.querySelector("form")!;
+          editUnsentFilters(first);
+          rerender(<PublicCatalog {...props} genreOptions={options} />);
+          const explicit = container.querySelector("form")!;
+          expect(explicit).not.toBe(first);
+          expect(Object.fromEntries(new FormData(explicit))).toEqual(
+            submittedFilters(query),
+          );
+          editUnsentFilters(explicit);
+          rerender(
+            <PublicCatalog {...props} query={absent} genreOptions={options} />,
+          );
+          const last = container.querySelector("form")!;
+          expect(last).not.toBe(explicit);
+          expect(Object.fromEntries(new FormData(last))).toEqual(
+            submittedFilters(absent),
+          );
+        });
+      });
+    }
+
+    it("uses a native Reset anchor rather than a same-URL client router transition", () => {
+      const output = PublicCatalog(props);
+      const form = React.Children.toArray(output.props.children).find(
+        (child) => React.isValidElement(child) && child.type === "form",
+      );
+      expect(React.isValidElement(form)).toBe(true);
+      if (!React.isValidElement<{ children: React.ReactNode }>(form))
+        throw new Error("Expected Catalog form element");
+      const reset = React.Children.toArray(form.props.children).find(
+        (child) =>
+          React.isValidElement<{ href?: string }>(child) &&
+          child.props.href === `/${locale}/works`,
+      );
+      expect(React.isValidElement(reset)).toBe(true);
+      if (!React.isValidElement(reset)) throw new Error("Expected Reset link");
+      expect(reset.type).toBe("a");
+    });
 
     it("SSR renders labeled native controls with localized names and exact machine values", () => {
       const container = document.createElement("div");
