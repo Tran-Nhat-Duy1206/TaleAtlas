@@ -64,3 +64,102 @@
   display: grid;
   gap: 1rem;
 }
+
+/* My Requests only: shared request forms, notices and detail views stay intact. */
+.myRequests {
+  box-sizing: border-box;
+  display: grid;
+  gap: 2rem;
+  width: 100%;
+  min-width: 0;
+}
+.myRequests .pageHeader {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.myRequests .pageHeader h1 {
+  margin: 0;
+  font-size: clamp(1.75rem, 4vw, 2.25rem);
+  line-height: 1.25;
+  letter-spacing: -0.025em;
+}
+.myRequests .pageActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  min-width: 0;
+}
+.myRequests .pageActions > a {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.myRequests .secondaryLink {
+  line-height: 1.5;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.myRequests .requestGroup {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.myRequests .requestGroup > h2 {
+  margin: 0;
+  font-size: 1.375rem;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+.myRequests .list {
+  min-width: 0;
+  margin: 0;
+}
+.myRequests .list > li {
+  min-width: 0;
+}
+/* Outrank shared .feature + .feature rules for vertically stacked owned rows. */
+.myRequests .list .card {
+  display: grid;
+  gap: 0.625rem;
+  min-width: 0;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.myRequests .card h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+.myRequests .card h3 a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.myRequests .card p,
+.myRequests .pageMessage {
+  margin: 0;
+}
+.myRequests .pageMessage {
+  line-height: 1.65;
+}
+.myRequests .card .actions,
+.myRequests .pagination {
+  margin: 0;
+}
+.myRequests .pagination {
+  min-width: 0;
+  gap: 0.75rem 1rem;
+}
+.myRequests .actions > :is(a, button) {
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 640px) {
+  .myRequests .list .card {
+    padding: 1rem;
+  }
+}

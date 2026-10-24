@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "../helpers/browser-test";
 import { randomUUID } from "node:crypto";
+import type { Browser, Locator } from "@playwright/test";
 import { createDatabase } from "../../packages/database/src/client";
 import { requireTestDatabase } from "../helpers/test-database";
 import { requestDictionary } from "../../apps/web/src/lib/request-i18n";
@@ -10,21 +11,17 @@ import { dictionary } from "../../apps/web/src/lib/i18n";
 // SQL is confined to guarded UUID-owned fixture inspection, role grant and cleanup.
 // This does not cover approval or a published-result lifecycle.
 test.describe.configure({ retries: 0 });
-test("verified request ownership, reviewed equivalence, following and private lifecycle", async ({
-  browser,
-  page,
-  baseURL,
-}) => {
-  test.setTimeout(360_000);
+async function requestScenario(
+  browser: Browser,
+  page: Page,
+  baseURL: string | undefined,
+) {
   // Match the isolated port selected by the shared config: local 3010, CI 3000.
   expect(baseURL).toBe(
     `${process.env.TALEATLAS_TEST_NATIVE_SERVER_MODE === "production" ? "https" : "http"}://127.0.0.1:${Number(process.env.E2E_PORT ?? "3000")}`,
   );
   const { client: sql } = createDatabase(requireTestDatabase());
   const run = randomUUID();
-  const title = `Đường Hư Cấu ${run}`;
-  const notes = `Synthetic private owner notes ${run}`;
-  const privateTitle = `Đường Riêng Tư ${run}`;
   const accounts: { email: string; id?: string }[] = [];
   const createdIds = new Set<string>();
   // Simulate the configured self-hosted trusted proxy, as the SQL auth fixture
@@ -52,11 +49,6 @@ test("verified request ownership, reviewed equivalence, following and private li
   });
   const other = await otherContext.newPage();
   const anonymous = await anonymousContext.newPage();
-  const vi = requestDictionary("vi");
-  const en = requestDictionary("en");
-  const headers = { Origin: baseURL! };
-  const minimal = { title, format: "UNKNOWN", alternativeTitles: [] };
-
   async function signUp(target: Page) {
     const account: { email: string; id?: string } = {
       email: `requests-${run}-${randomUUID()}@example.invalid`,
@@ -131,6 +123,234 @@ test("verified request ownership, reviewed equivalence, following and private li
     account.id = String(row!.id);
     return account;
   }
+  async function cleanup() {
+    try {
+      requireTestDatabase();
+      // Discover all partial POSTs by this run's registered emails, even when a
+      // response assertion failed before recording its request or account ID.
+      for (const account of accounts) {
+        const users =
+          await sql`select id from users where email = ${account.email}`;
+        for (const user of users) {
+          const userId = String(user.id);
+          if (account.id) expect(userId).toBe(account.id);
+          const requests =
+            await sql`select id from work_requests where owner_user_id = ${userId}`;
+          for (const request of requests) createdIds.add(String(request.id));
+        }
+      }
+      for (const id of createdIds) {
+        await sql`delete from work_request_supporters where request_id = ${id}`;
+        await sql`delete from ingestion_jobs where request_id = ${id}`;
+        await sql`delete from request_events where request_id = ${id}`;
+        await sql`delete from work_requests where id = ${id}`;
+      }
+      for (const account of accounts) {
+        const users =
+          await sql`select id from users where email = ${account.email}`;
+        for (const user of users) {
+          const id = String(user.id);
+          await sql`delete from users where id = ${id} and email = ${account.email}`;
+          await sql`delete from rate_limits where key = ${`catalog.write:${id}`}`;
+        }
+        await sql`delete from verifications where identifier like ${`%${account.email}%`}`;
+      }
+    } finally {
+      await sql.end();
+      await otherContext.close();
+      await anonymousContext.close();
+    }
+  }
+  return { sql, run, accounts, createdIds, other, anonymous, signUp, cleanup };
+}
+
+// Real rendered boxes and text fragments, not screenshots or CSS declarations.
+async function myRequestsLayout(
+  page: Page,
+  locale: "en" | "vi",
+  width: number,
+  longTitles: string[] = [],
+) {
+  const t = requestDictionary(locale);
+  const main = page.getByRole("main");
+  const heading = main.getByRole("heading", {
+    level: 1,
+    name: t.mine,
+    exact: true,
+  });
+  const header = main.locator("header");
+  const edit = header.getByRole("link", {
+    name: locale === "vi" ? "Đề xuất chỉnh sửa của tôi" : "My edit suggestions",
+    exact: true,
+  });
+  const create = header.getByRole("link", { name: t.new, exact: true });
+  const owned = main.getByRole("region", { name: t.owned, exact: true });
+  const followed = main.getByRole("region", { name: t.followed, exact: true });
+  await expect(heading).toBeVisible();
+  await expect(edit).toHaveAttribute("href", `/${locale}/edit-suggestions`);
+  await expect(create).toHaveAttribute("href", `/${locale}/requests/new`);
+  await expect(owned).toHaveAttribute(
+    "aria-labelledby",
+    "owned-requests-heading",
+  );
+  await expect(followed).toHaveAttribute(
+    "aria-labelledby",
+    "followed-requests-heading",
+  );
+  await expect(
+    owned.getByRole("heading", { level: 2, name: t.owned, exact: true }),
+  ).toBeVisible();
+  await expect(
+    followed.getByRole("heading", { level: 2, name: t.followed, exact: true }),
+  ).toBeVisible();
+  expect(
+    await owned.evaluate((element) =>
+      element.nextElementSibling?.getAttribute("aria-labelledby"),
+    ),
+  ).toBe("followed-requests-heading");
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+
+  const bounds = async (locator: Locator) => {
+    const box = await locator.boundingBox();
+    expect(box).not.toBeNull();
+    return box!;
+  };
+  const root = await heading.evaluate((element) => {
+    const rect = element.closest("section")!.getBoundingClientRect();
+    return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  const boxes = await Promise.all(
+    [header, heading, edit, create, owned, followed].map(bounds),
+  );
+  const [headerBox, headingBox, editBox, createBox, ownedBox, followedBox] =
+    boxes;
+  const tolerance = 2;
+  for (const box of [root, ...boxes]) {
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.x).toBeGreaterThanOrEqual(-tolerance);
+    expect(box.x + box.width).toBeLessThanOrEqual(width + tolerance);
+    expect(box.x).toBeGreaterThanOrEqual(root.x - tolerance);
+    expect(box.x + box.width).toBeLessThanOrEqual(
+      root.x + root.width + tolerance,
+    );
+  }
+  const intersects = (a: typeof root, b: typeof root) =>
+    Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x) > tolerance &&
+    Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y) > tolerance;
+  expect(intersects(headingBox!, editBox!)).toBe(false);
+  expect(intersects(headingBox!, createBox!)).toBe(false);
+  expect(intersects(editBox!, createBox!)).toBe(false);
+  expect(ownedBox!.y - (headerBox!.y + headerBox!.height)).toBeGreaterThan(
+    tolerance,
+  );
+  expect(followedBox!.y - (ownedBox!.y + ownedBox!.height)).toBeGreaterThan(
+    tolerance,
+  );
+  const overflow = await page.evaluate(() => ({
+    viewport: window.innerWidth,
+    document: document.documentElement.scrollWidth,
+    body: document.body.scrollWidth,
+  }));
+  expect(overflow.viewport).toBe(width);
+  expect(overflow.document).toBeLessThanOrEqual(width + tolerance);
+  expect(overflow.body).toBeLessThanOrEqual(width + tolerance);
+  for (const region of [owned, followed]) {
+    const regionBox = await bounds(region);
+    for (const card of await region.getByRole("listitem").all()) {
+      const cardBox = await bounds(card);
+      expect(cardBox.x).toBeGreaterThanOrEqual(regionBox.x - tolerance);
+      expect(cardBox.x + cardBox.width).toBeLessThanOrEqual(
+        regionBox.x + regionBox.width + tolerance,
+      );
+      expect(cardBox.y).toBeGreaterThanOrEqual(regionBox.y - tolerance);
+      expect(cardBox.y + cardBox.height).toBeLessThanOrEqual(
+        regionBox.y + regionBox.height + tolerance,
+      );
+    }
+  }
+
+  // Check actual line fragments: a wide element box alone can hide overflowing
+  // or clipped text. Long valid titles must wrap on the narrow viewport.
+  for (const title of longTitles) {
+    const link = main.getByRole("link", { name: title, exact: true });
+    await expect(link).toBeVisible();
+    const text = await link.evaluate((element) => {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const card = element.closest("li, article")!.getBoundingClientRect();
+      return {
+        card: {
+          left: card.left,
+          right: card.right,
+          top: card.top,
+          bottom: card.bottom,
+        },
+        rects: Array.from(range.getClientRects(), (r) => ({
+          left: r.left,
+          right: r.right,
+          top: r.top,
+          bottom: r.bottom,
+        })).filter((r) => r.right > r.left),
+      };
+    });
+    expect(text.rects.length).toBeGreaterThan(0);
+    for (const rect of text.rects) {
+      expect(rect.left).toBeGreaterThanOrEqual(
+        Math.max(0, text.card.left) - tolerance,
+      );
+      expect(rect.right).toBeLessThanOrEqual(
+        Math.min(width, text.card.right) + tolerance,
+      );
+      expect(rect.top).toBeGreaterThanOrEqual(text.card.top - tolerance);
+      expect(rect.bottom).toBeLessThanOrEqual(text.card.bottom + tolerance);
+    }
+    if (width === 375) {
+      const lines = new Set(text.rects.map((rect) => Math.round(rect.top)));
+      expect(
+        lines.size,
+        "Long title has multiple rendered lines",
+      ).toBeGreaterThan(1);
+    }
+  }
+  // Genuine Tab traversal preserves header actions, owned links, then each
+  // followed link/action; focus() only establishes the starting point.
+  await edit.focus();
+  await expect(edit).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(create).toBeFocused();
+  if (longTitles.length) {
+    const ordered = [
+      ...(await owned.getByRole("link").all()),
+      ...(await followed
+        .getByRole("link")
+        .or(followed.getByRole("button"))
+        .all()),
+    ];
+    for (const target of ordered) {
+      await page.keyboard.press("Tab");
+      await expect(target).toBeFocused();
+    }
+  }
+}
+
+test("verified request ownership, reviewed equivalence, following and private lifecycle", async ({
+  browser,
+  page,
+  baseURL,
+}) => {
+  test.setTimeout(360_000);
+  const { sql, run, accounts, createdIds, other, anonymous, signUp, cleanup } =
+    await requestScenario(browser, page, baseURL);
+  const title = `Đường Hư Cấu ${run}`;
+  const notes = `Synthetic private owner notes ${run}`;
+  const privateTitle = `Đường Riêng Tư ${run}`;
+  const vi = requestDictionary("vi");
+  const en = requestDictionary("en");
+  const headers = { Origin: baseURL! };
+  const minimal = { title, format: "UNKNOWN", alternativeTitles: [] };
+
   async function uiMutation(
     target: Page,
     path: string,
@@ -688,41 +908,200 @@ test("verified request ownership, reviewed equivalence, following and private li
       anonymous.getByRole("combobox", { name: en.format, exact: true }),
     ).toHaveValue("UNKNOWN");
   } finally {
-    try {
-      requireTestDatabase();
-      // Discover all partial POSTs by this run's registered emails, even when a
-      // response assertion failed before recording its request or account ID.
-      for (const account of accounts) {
-        const users =
-          await sql`select id from users where email = ${account.email}`;
-        for (const user of users) {
-          const userId = String(user.id);
-          if (account.id) expect(userId).toBe(account.id);
-          const requests =
-            await sql`select id from work_requests where owner_user_id = ${userId}`;
-          for (const request of requests) createdIds.add(String(request.id));
-        }
-      }
-      for (const id of createdIds) {
-        await sql`delete from work_request_supporters where request_id = ${id}`;
-        await sql`delete from ingestion_jobs where request_id = ${id}`;
-        await sql`delete from request_events where request_id = ${id}`;
-        await sql`delete from work_requests where id = ${id}`;
-      }
-      for (const account of accounts) {
-        const users =
-          await sql`select id from users where email = ${account.email}`;
-        for (const user of users) {
-          const id = String(user.id);
-          await sql`delete from users where id = ${id} and email = ${account.email}`;
-          await sql`delete from rate_limits where key = ${`catalog.write:${id}`}`;
-        }
-        await sql`delete from verifications where identifier like ${`%${account.email}%`}`;
-      }
-    } finally {
-      await sql.end();
-      await otherContext.close();
-      await anonymousContext.close();
-    }
+    await cleanup();
   }
 });
+
+for (const locale of ["en", "vi"] as const) {
+  test(`A3 My requests real layout, themes and focus order (${locale})`, async ({
+    browser,
+    page,
+    baseURL,
+  }) => {
+    test.setTimeout(360_000);
+    const { sql, run, createdIds, other, signUp, cleanup } =
+      await requestScenario(browser, page, baseURL);
+    const t = requestDictionary(locale);
+    const headers = { Origin: baseURL! };
+    const widths = [375, 768, 1280, 1440];
+    const themes = ["light", "dark"] as const;
+    const englishTitle = `Synthetic journey through the forgotten libraries and distant kingdoms ${"a reader returns with another unwritten story ".repeat(5)}${run}`;
+    const vietnameseTitle = `Hành trình hư cấu qua những thư viện xa xôi ${"người đọc tìm lại câu chuyện chưa được kể ".repeat(5)}${run}`;
+    const privateTitle = `Synthetic private withdrawn title ${run}`;
+    const notes = `Synthetic private layout notes ${run}`;
+
+    async function showMine(width: number, theme: "light" | "dark") {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`/${locale}/requests`);
+      const selector = page.getByLabel(dictionary(locale).theme, {
+        exact: true,
+      });
+      await selector.selectOption(theme);
+      await expect(selector).toHaveValue(theme);
+      if (theme === "dark")
+        await expect(page.locator("html")).toHaveClass(/dark/);
+      else await expect(page.locator("html")).not.toHaveClass(/dark/);
+    }
+    async function submit(target: Page, title: string) {
+      const response = await target.request.post("/api/requests", {
+        headers,
+        data: {
+          submitKey: randomUUID(),
+          details: { title, format: "UNKNOWN", alternativeTitles: [], notes },
+        },
+      });
+      expect(response.status()).toBe(200);
+      const request = await response.json();
+      createdIds.add(request.id);
+      return request;
+    }
+    async function review(id: string, title: string) {
+      const response = await other.request.post(
+        `/api/admin/requests/${id}/summary`,
+        {
+          headers,
+          data: {
+            revision: 1,
+            title,
+            format: "UNKNOWN",
+            alternativeTitles: [],
+            sourceUrl: "https://example.org/synthetic-a3-layout",
+            reason: `Synthetic A3 layout equivalence review ${run}`,
+            equivalenceReviewAcknowledged: true,
+          },
+        },
+      );
+      expect(response.status()).toBe(200);
+      const reviewed = await response.json();
+      const support = await page.request.post(`/api/requests/${id}/support`, {
+        headers,
+        data: { equivalenceAcknowledged: true },
+      });
+      expect(support.status()).toBe(200);
+      return reviewed;
+    }
+
+    try {
+      await signUp(page);
+      // Both named sections remain distinct and well-spaced with no rows.
+      for (const width of widths) {
+        for (const theme of themes) {
+          await showMine(width, theme);
+          const main = page.getByRole("main");
+          for (const name of [t.owned, t.followed]) {
+            const region = main.getByRole("region", { name, exact: true });
+            await expect(
+              region.getByText(t.empty, { exact: true }),
+            ).toBeVisible();
+            await expect(region.getByRole("listitem")).toHaveCount(0);
+          }
+          await myRequestsLayout(page, locale, width);
+        }
+      }
+
+      const reviewer = await signUp(other);
+      // Only the original guarded synthetic role-grant pattern; authentication
+      // and all requests/summary/follow mutations use real verified cookies.
+      requireTestDatabase();
+      await sql`update users set role = 'admin' where id = ${reviewer.id!} and email = ${reviewer.email} and email_verified = true`;
+      await submit(page, englishTitle);
+      await submit(page, vietnameseTitle);
+      const publicTitle = `${vietnameseTitle} — public`;
+      const publicRequest = await submit(other, publicTitle);
+      await review(publicRequest.id, publicTitle);
+      const withdrawn = await submit(
+        other,
+        `Synthetic reviewed summary ${run}`,
+      );
+      const reviewed = await review(
+        withdrawn.id,
+        `Synthetic reviewed summary ${run}`,
+      );
+      const amendment = await other.request.patch(
+        `/api/requests/${withdrawn.id}`,
+        {
+          headers,
+          data: {
+            revision: reviewed.revision,
+            details: {
+              title: privateTitle,
+              format: "UNKNOWN",
+              alternativeTitles: [],
+              notes,
+            },
+          },
+        },
+      );
+      expect(amendment.status()).toBe(200);
+      const redacted = await page.request.get(`/api/requests/${withdrawn.id}`);
+      expect(redacted.status()).toBe(200);
+      const dto = await redacted.json();
+      expect(dto).toMatchObject({
+        kind: "FOLLOWED",
+        request: { title: null, format: null },
+      });
+      expect(JSON.stringify(dto)).not.toContain(privateTitle);
+      expect(JSON.stringify(dto)).not.toContain(notes);
+
+      for (const width of widths) {
+        for (const theme of themes) {
+          await showMine(width, theme);
+          const main = page.getByRole("main");
+          const owned = main.getByRole("region", {
+            name: t.owned,
+            exact: true,
+          });
+          const followed = main.getByRole("region", {
+            name: t.followed,
+            exact: true,
+          });
+          await expect(owned.getByRole("listitem")).toHaveCount(2);
+          await expect(followed.getByRole("listitem")).toHaveCount(2);
+          const placeholder = followed.getByRole("link", {
+            name: t.unknown,
+            exact: true,
+          });
+          await expect(placeholder).toHaveAttribute(
+            "href",
+            `/${locale}/requests/${withdrawn.id}`,
+          );
+          await expect(followed).not.toContainText(privateTitle);
+          await expect(followed).not.toContainText(notes);
+          await expect(
+            followed.getByRole("button", { name: t.unfollow, exact: true }),
+          ).toHaveCount(2);
+          await myRequestsLayout(page, locale, width, [
+            englishTitle,
+            vietnameseTitle,
+            publicTitle,
+          ]);
+        }
+      }
+
+      // Exercise the existing redacted-card action, not just its presence.
+      const followed = page
+        .getByRole("main")
+        .getByRole("region", { name: t.followed, exact: true });
+      const card = followed.getByRole("article").filter({
+        has: page.getByRole("link", { name: t.unknown, exact: true }),
+      });
+      const pending = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname ===
+            `/api/requests/${withdrawn.id}/support` &&
+          response.request().method() === "DELETE",
+      );
+      await card.getByRole("button", { name: t.unfollow, exact: true }).click();
+      expect((await pending).status()).toBe(200);
+      await expect(followed.getByRole("listitem")).toHaveCount(1);
+      await expect(
+        followed.getByRole("link", { name: t.unknown, exact: true }),
+      ).toHaveCount(0);
+      expect(
+        (await page.request.get(`/api/requests/${withdrawn.id}`)).status(),
+      ).toBe(404);
+    } finally {
+      await cleanup();
+    }
+  });
+}
