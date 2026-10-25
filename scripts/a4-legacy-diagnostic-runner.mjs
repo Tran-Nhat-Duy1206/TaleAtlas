@@ -216,7 +216,6 @@ async function run() {
     SMTP_PORT: "1025",
     TEST_SMTP_PORT: "1025",
     SMTP_FROM: "TaleAtlas <test@example.invalid>",
-    NODE_ENV: "development",
     V4_COMMUNITIES_ENABLED: "false",
     TALEATLAS_TEST_NATIVE_SERVER_MODE: "production",
     A4_DIAG_SUT: sut,
@@ -317,7 +316,7 @@ async function run() {
       "phase",
     ],
     sut,
-    env,
+    { ...env, NODE_ENV: "development" },
   );
   stage = "safe-result";
   if (!existsSync(env.A4_DIAG_RESULT_FILE)) {
