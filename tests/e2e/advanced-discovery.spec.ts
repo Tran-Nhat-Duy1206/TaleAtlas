@@ -51,7 +51,7 @@ test("advanced discovery composes exact public filters across bilingual native n
       .selectOption("COMPLETED");
     await page.getByLabel(publicCopy.en.search).press("Enter");
     await expect(page.locator('select[name="genre"]')).toHaveValue(genre);
-    await expect(page.getByRole("status")).toContainText("3");
+    await expect(page.getByRole("main").getByRole("status")).toContainText("3");
     await expect(page.locator('select[name="genre"]')).not.toContainText(
       privateLabel,
     );
@@ -109,12 +109,12 @@ test("advanced discovery composes exact public filters across bilingual native n
     await expect(page).toHaveURL(/page=2/);
     await page.getByLabel(publicCopy.vi.search).press("Enter");
     expect(new URL(page.url()).searchParams.has("page")).toBe(false);
-    await expect(page.getByRole("status")).toContainText("3");
+    await expect(page.getByRole("main").getByRole("status")).toContainText("3");
 
     // Exact original language: ja-JP is not inferred to be ja.
     await page.getByLabel(vi.originalLanguage, { exact: true }).fill("ja-JP");
     await page.getByLabel(publicCopy.vi.search).press("Enter");
-    await expect(page.getByRole("status")).toContainText("1");
+    await expect(page.getByRole("main").getByRole("status")).toContainText("1");
     await page.getByLabel(vi.originalLanguage, { exact: true }).fill("zz");
     await page.getByLabel(publicCopy.vi.search).press("Enter");
     await expect(
@@ -165,7 +165,7 @@ test("advanced discovery composes exact public filters across bilingual native n
       await page.goto(
         `/${locale}/works?${new URLSearchParams({ ...criteria, page: "100" })}`,
       );
-      await expect(page.getByRole("status")).toContainText("3");
+      await expect(page.getByRole("main").getByRole("status")).toContainText("3");
       await expect(
         page.getByRole("heading", { name: discovery.emptyPage, exact: true }),
       ).toBeVisible();
@@ -257,7 +257,7 @@ test("advanced discovery composes exact public filters across bilingual native n
         await page.goto(
           `/${locale}/works?${new URLSearchParams({ genre, originalLanguage: "zz", q: "   " })}`,
         );
-        await expect(page.getByRole("status")).toContainText("0");
+        await expect(page.getByRole("main").getByRole("status")).toContainText("0");
         await expect(
           page.getByRole("heading", { name: copy.empty, exact: true }),
         ).toBeVisible();
