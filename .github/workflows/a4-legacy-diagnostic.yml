@@ -1,0 +1,73 @@
+name: A4 exact-source legacy diagnostic (one execution)
+
+# Maintainer-authorized diagnostic only; not acceptance and never merged.
+on:
+  push:
+    branches: [diagnostics/v6a-a4-legacy-5d9a402]
+    paths:
+      - .github/workflows/a4-legacy-diagnostic.yml
+      - scripts/a4-legacy-diagnostic-runner.mjs
+      - scripts/a4-legacy-diagnostic-reporter.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  a4-legacy-diagnostic:
+    if: github.event_name == 'push' && github.run_attempt == 1
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout diagnostic tools only
+        uses: actions/checkout@v4
+        with:
+          path: diagnostic
+          persist-credentials: false
+      - name: Checkout exact approved A4 source into isolated SUT
+        uses: actions/checkout@v4
+        with:
+          ref: 5d9a40207ea6b5969296c17d072c4ab090eda245
+          path: sut
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+          package_json_file: sut/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Fail-closed sanitizer hostile-input self-test (no browser)
+        shell: bash
+        run: |
+          set +x
+          umask 077
+          output="$(mktemp "$RUNNER_TEMP/a4-sanitizer.XXXXXX")" || exit 1
+          if node diagnostic/scripts/a4-legacy-diagnostic-reporter.mjs --self-test >"$output" 2>&1; then
+            if [[ "$(<"$output")" == "SANITIZER_SELF_TEST_PASS" ]]; then
+              printf '%s\n' 'SANITIZER_SELF_TEST_PASS'
+            else
+              printf '%s\n' 'SANITIZER_SELF_TEST_FAIL'
+              exit 1
+            fi
+          else
+            printf '%s\n' 'SANITIZER_SELF_TEST_FAIL'
+            exit 1
+          fi
+      - name: One complete legacy run; private output and sanitized summary only
+        shell: bash
+        run: |
+          set +x
+          umask 077
+          output="$(mktemp "$RUNNER_TEMP/a4-launch-private.XXXXXX")" || exit 1
+          if node diagnostic/scripts/a4-legacy-diagnostic-runner.mjs >"$output" 2>&1; then
+            status=0
+            printf '%s\n' 'A4_DIAGNOSTIC_PASS'
+          else
+            status=$?
+            printf '%s\n' 'A4_DIAGNOSTIC_FAIL'
+          fi
+          exit "$status"
+        env:
+          CI: "true"
+# No workflow_dispatch, artifacts, raw-log publishing, deployment or test overrides.
+# The runner creates only a fresh PG17 loopback container on this Ubuntu runner.
+# Runtime credentials remain private in memory; all child output is mode0600.
