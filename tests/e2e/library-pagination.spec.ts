@@ -39,6 +39,63 @@ test("owner library native pagination and filters preserve unavailable facts wit
       sql,
       accounts,
     );
+    // This real newly verified actor has no library rows before the existing
+    // fixture seed. A shared public catalog is not assumed to be empty.
+    const unseeded =
+      await sql`select count(*)::int as total from library_entries where user_id=${actor.id!}`;
+    expect(unseeded[0]!.total).toBe(0);
+    for (const locale of ["en", "vi"] as const) {
+      const copy = libraryCopy[locale];
+      await page.setViewportSize({
+        width: locale === "en" ? 320 : 390,
+        height: 844,
+      });
+      // Sorting is not an active filter and must still classify genuine empty.
+      await page.goto(`/${locale}/library?sort=TITLE_ASC`);
+      await expect(page.locator("main")).toContainText(copy.emptyLibrary);
+      await expect(page.locator("main")).toContainText(copy.emptyLibraryText);
+      await expect(page.locator("main")).not.toContainText(copy.empty);
+      await expect(page.locator("main")).not.toContainText(copy.emptyPage);
+      await expect(page.locator("main")).not.toContainText(copy.loadError);
+      await expect(page.locator("main")).not.toContainText(
+        copy.accessUnconfirmed,
+      );
+      await expect(
+        page.getByRole("link", { name: copy.detail, exact: true }),
+      ).toHaveCount(0);
+      const browseCatalog = page.getByRole("link", {
+        name: copy.browseCatalog,
+        exact: true,
+      });
+      await expect(browseCatalog).toHaveCount(1);
+      await expect(browseCatalog).toHaveAttribute("href", `/${locale}/works`);
+      await expect(
+        page.getByRole("link", { name: copy.showFullLibrary, exact: true }),
+      ).toHaveCount(0);
+      for (const theme of ["light", "dark"]) {
+        await page.evaluate((value) => {
+          document.documentElement.classList.toggle("dark", value === "dark");
+        }, theme);
+        await browseCatalog.focus();
+        await expect(browseCatalog).toBeFocused();
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth <=
+              document.documentElement.clientWidth + 1,
+          ),
+        ).toBe(true);
+      }
+      await browseCatalog.click();
+      await expect(page).toHaveURL(new RegExp(`/${locale}/works$`));
+      // On this still-unseeded actor false alone must select filtered empty.
+      await page.goto(`/${locale}/library?favorite=false`);
+      await expect(page.locator("main")).toContainText(copy.empty);
+      await expect(page.locator("main")).not.toContainText(copy.emptyLibrary);
+      await expect(
+        page.getByRole("link", { name: copy.showFullLibrary, exact: true }),
+      ).toHaveAttribute("href", `/${locale}/library`);
+    }
     requireTestDatabase();
     // Owned synthetic setup only, not native catalog publication or 52 mutations
     // that would evade the unchanged shared 30/minute authenticated budget.
@@ -97,6 +154,102 @@ test("owner library native pagination and filters preserve unavailable facts wit
     await expect(
       page.getByRole("link", { name: t.detail, exact: true }),
     ).toHaveCount(0);
+    for (const locale of ["en", "vi"] as const) {
+      const copy = libraryCopy[locale];
+      await page.setViewportSize({
+        width: locale === "en" ? 320 : 390,
+        height: 844,
+      });
+      // false is an active favorite filter, not equivalent to no filter. All 52
+      // owned rows are Plan to read, so READING is a real filtered-zero result.
+      await page.goto(
+        `/${locale}/library?status=READING&favorite=false&sort=TITLE_ASC`,
+      );
+      await expect(page.locator("main")).toContainText(copy.empty);
+      await expect(page.locator("main")).not.toContainText(copy.emptyLibrary);
+      await expect(page.locator("main")).not.toContainText(copy.emptyPage);
+      await expect(page.locator("main")).not.toContainText(hidden);
+      await expect(
+        page.getByRole("link", { name: copy.detail, exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("combobox", { name: copy.favorite, exact: true }),
+      ).toHaveValue("false");
+      const fullLibrary = page.getByRole("link", {
+        name: copy.showFullLibrary,
+        exact: true,
+      });
+      await expect(fullLibrary).toHaveCount(1);
+      await expect(fullLibrary).toHaveAttribute("href", `/${locale}/library`);
+      for (const theme of ["light", "dark"]) {
+        await page.evaluate((value) => {
+          document.documentElement.classList.toggle("dark", value === "dark");
+        }, theme);
+        await fullLibrary.focus();
+        await expect(fullLibrary).toBeFocused();
+        expect(
+          await page.evaluate(
+            () =>
+              document.documentElement.scrollWidth <=
+              document.documentElement.clientWidth + 1,
+          ),
+        ).toBe(true);
+      }
+      await fullLibrary.click();
+      await expect(page).toHaveURL(new RegExp(`/${locale}/library$`));
+      await expect(
+        page.getByRole("combobox", { name: copy.status, exact: true }),
+      ).toHaveValue("");
+      await expect(
+        page.getByRole("combobox", { name: copy.favorite, exact: true }),
+      ).toHaveValue("");
+      await expect(
+        page.getByRole("combobox", { name: copy.sort, exact: true }),
+      ).toHaveValue("UPDATED_DESC");
+      await expect(
+        page.getByRole("link", { name: copy.detail, exact: true }),
+      ).toHaveCount(50);
+
+      // Valid page 3 is beyond both the known 52-row library and this real
+      // 26-row subset. Keep status, false and sort in first-page recovery.
+      await page.goto(
+        `/${locale}/library?page=3&status=WANT_TO_READ&favorite=false&sort=TITLE_ASC`,
+      );
+      await expect(page.locator("main")).toContainText(copy.emptyPage);
+      await expect(page.locator("main")).not.toContainText(copy.empty);
+      await expect(page.locator("main")).not.toContainText(copy.emptyLibrary);
+      await expect(page.locator("main")).not.toContainText(hidden);
+      await expect(
+        page.getByRole("link", { name: copy.detail, exact: true }),
+      ).toHaveCount(0);
+      const firstPage = page.getByRole("link", {
+        name: copy.firstPage,
+        exact: true,
+      });
+      await expect(firstPage).toHaveCount(1);
+      const href = await firstPage.getAttribute("href");
+      expect(href).not.toBeNull();
+      const recovery = new URL(href!, page.url());
+      expect(recovery.pathname).toBe(`/${locale}/library`);
+      expect(Object.fromEntries(recovery.searchParams)).toEqual({
+        page: "1",
+        status: "WANT_TO_READ",
+        favorite: "false",
+        sort: "TITLE_ASC",
+      });
+      await firstPage.click();
+      await expect(page).toHaveURL(recovery.href);
+      await expect(
+        page.getByRole("link", { name: copy.detail, exact: true }),
+      ).toHaveCount(26);
+      await expect(
+        page.getByRole("link", { name: copy.unavailable, exact: true }),
+      ).toHaveCount(26);
+      await expect(
+        page.getByRole("link", { name: copy.catalog, exact: true }),
+      ).toHaveCount(0);
+      await expect(page.locator("main")).not.toContainText(hidden);
+    }
     await page.goto("/vi/library?favorite=true&favorite=false");
     await expect(page.locator("main").getByRole("alert")).toHaveText(t.invalid);
     await expect(page.locator("main")).not.toContainText(hidden);

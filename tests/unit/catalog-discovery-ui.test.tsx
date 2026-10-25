@@ -36,7 +36,7 @@ vi.mock("next/link", () => ({
     href,
     ...props
   }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
-    <a href={href} {...props}>
+    <a href={href} {...props} data-next-link="true">
       {children}
     </a>
   ),
@@ -544,6 +544,76 @@ for (const locale of ["en", "vi"] as const) {
       expect(screen.getByText(existing.emptyText)).toBeVisible();
       expect(screen.queryByRole("heading", { name: t.emptyPage })).toBeNull();
       expect(screen.queryByRole("note")).toBeNull();
+    });
+
+    it.each([
+      ["search", { q: "Only title" }],
+      ["format", { format: "NOVEL" }],
+      ["genre", { genre: "science-fiction" }],
+      ["original language", { originalLanguage: "ZH-hant" }],
+      ["release status", { releaseStatus: "UNKNOWN" }],
+    ] satisfies [string, Partial<ParsedCatalogQuery>][])(
+      "classifies %s alone as restrictive without duplicating clear filters",
+      (_name, criterion) => {
+        render(
+          <PublicCatalog
+            {...props}
+            query={{ locale, q: "", page: 1, pageSize: 10, ...criterion }}
+          />,
+        );
+        const heading = screen.getByRole("heading", {
+          level: 2,
+          name: existing.empty,
+        });
+        expect(heading.closest("section")).not.toHaveAttribute("role", "alert");
+        expect(screen.getByText(existing.emptyText)).toBeVisible();
+        expect(screen.queryByText(existing.catalogEmpty)).toBeNull();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(
+          screen.getAllByRole("link", { name: existing.reset }),
+        ).toHaveLength(1);
+        const browse = screen.getByRole("link", { name: existing.browseAll });
+        expect(browse).toHaveAttribute("href", `/${locale}/works`);
+        expect(browse).not.toHaveAttribute("data-next-link");
+      },
+    );
+
+    it.each([
+      { q: "", page: 1, pageSize: 10 },
+      { q: "   ", page: 1, pageSize: 10 },
+      { q: "", page: 20, pageSize: 10 },
+      { q: "", page: 1, pageSize: 7 },
+      { q: "", page: 20, pageSize: 7 },
+    ])(
+      "does not classify blank search or pagination alone as filters: %j",
+      (pagination) => {
+        render(<PublicCatalog {...props} query={{ locale, ...pagination }} />);
+        const heading = screen.getByRole("heading", {
+          level: 2,
+          name: existing.catalogEmpty,
+        });
+        expect(heading.closest("section")).not.toHaveAttribute("role", "alert");
+        expect(screen.getByText(existing.catalogEmptyText)).toBeVisible();
+        expect(
+          screen.queryByRole("heading", { name: existing.empty }),
+        ).toBeNull();
+        expect(screen.queryByText(existing.emptyText)).toBeNull();
+        expect(screen.queryByRole("heading", { name: t.emptyPage })).toBeNull();
+        expect(screen.queryByRole("alert")).toBeNull();
+      },
+    );
+
+    it("preserves a provided request prompt for a nonblank filtered query", () => {
+      render(
+        <PublicCatalog
+          {...props}
+          requestPrompt={<aside>Existing request prompt</aside>}
+        />,
+      );
+      expect(screen.getByText("Existing request prompt")).toBeVisible();
+      expect(
+        screen.getByRole("heading", { name: existing.empty }),
+      ).toBeVisible();
     });
 
     it("offers first-page recovery with filters for page 20 of 3 instead of misleading pagination", () => {

@@ -13,10 +13,13 @@ import { isLocale } from "../../../lib/i18n";
 import { getPublicCatalogPage } from "../../../server/catalog/service";
 import { PublicCatalog } from "../../../components/catalog/PublicCatalog";
 import {
+  catalogPageHref,
   publicCatalogQueryState,
   publicCopy,
   type PublicSearchParams,
 } from "../../../components/catalog/query";
+import { catalogDiscoveryCopy } from "../../../lib/catalog-discovery-i18n";
+import styles from "../../../components/catalog/catalog.module.css";
 export const dynamic = "force-dynamic";
 type Props = {
   params: Promise<{ locale: string }>;
@@ -41,7 +44,33 @@ export default async function WorksPage({ params, searchParams }: Props) {
     await searchParams,
     locale,
   );
-  const { result, genreOptions } = await getPublicCatalogPage(query);
+  // Catch only the data read: rendering failures still reach the generic boundary.
+  const catalog = await getPublicCatalogPage(query).catch(() => null);
+  if (!catalog) {
+    const t = publicCopy[locale];
+    return (
+      <section className={styles.catalog}>
+        <h1>{t.title}</h1>
+        {invalid && (
+          <p role="note" className={styles.notice}>
+            {catalogDiscoveryCopy[locale].invalidQuery}
+          </p>
+        )}
+        <p role="alert" className={styles.notice}>
+          {t.loadError}
+        </p>
+        <div className={styles.pagination}>
+          <a
+            className={`button ${styles.button}`}
+            href={catalogPageHref(locale, query, query.page)}
+          >
+            {t.retryLoad}
+          </a>
+        </div>
+      </section>
+    );
+  }
+  const { result, genreOptions } = catalog;
   let authenticated = false;
   let requestError = false;
   let summaries: RequestSummary[] = [];

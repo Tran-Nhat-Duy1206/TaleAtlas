@@ -1205,3 +1205,82 @@ No approved already-working disposable browser/database environment was supplied
 Actual 200% browser-UI zoom, rendered contrast, assistive technology, hosted SMTP/TLS/runtime and production behavior remain unverified. No WCAG certification, CI PASS, real database/privacy acceptance or application deployment is claimed. Existing mandatory CI/security/integration/browser gates are not waived.
 
 **Decision:** GO for one separately authorized scoped local A4 commit based on this bounded local evidence. No commit is authorized by this receipt itself; no publication, merge, deployment or hosted activation. Browser/manual and other unexecuted checks remain NOT RUN.
+
+## V6A Batch A5 — V6A-07 honest empty/error states (local implementation)
+
+- Worktree: `E:\TaleAtlas-v6a-empty-error-states`.
+- Branch: `fix/v6a-honest-empty-error-states`.
+- Exact approved main baseline and unchanged HEAD: `96762d9d64179173f154d71adc94434ea58f68f5`.
+- Evidence applies to this uncommitted A5 working-tree change, not to a published commit, GitHub CI or a deployed system. No earlier-batch revalidation or diagnostic-history review was performed.
+
+### Exact approved changed-file inventory (11)
+
+```text
+apps/web/src/app/[locale]/works/page.tsx
+apps/web/src/components/catalog/PublicCatalog.tsx
+apps/web/src/components/catalog/query.ts
+apps/web/src/app/[locale]/library/page.tsx
+apps/web/src/components/library/copy.ts
+tests/unit/catalog-discovery-ui.test.tsx
+tests/unit/library-pages.test.tsx
+tests/unit/public-catalog-page-states.test.tsx (new)
+tests/e2e/advanced-discovery.spec.ts
+tests/e2e/library-pagination.spec.ts
+docs/V6_VALIDATION.md (this append only)
+```
+
+### Implemented behavior and contract limits
+
+- Successful catalog zero without restrictive criteria: approved EN/VI no-published-works copy, with one localized request action using the existing guarded route. Zero matches with search/format/genre/original-language/release-status criteria: approved no-match copy and native Browse All Works, preserving the existing unique Clear Filters action. Blank search and page/page-size alone are not restrictive. Nonblank searches retain their existing request prompt and prefill; no duplicate request action is added. Blank-query filtered results do not acquire a new request CTA.
+- Existing nonzero-total catalog empty-page recovery, query invalid notices, form GET behavior, pagination limits and locale behavior remain intact. The entire catalog query module prefix before its copy object is byte unchanged: no parser, schema or URL-builder modification.
+- Private library: zero matches with status or any defined favorite (including false) are filtered empty; unfiltered zero is genuine current-library empty; nonzero total with no requested-page items is empty-page with native first-page recovery preserving status/favorite/sort. Sorting/page alone are not restrictive. The existing owner-scoped result total is used; no runtime/service count query was added.
+- Primary catalog/library load failure is an explicit null failure branch, not a fabricated empty DTO, zero count or empty array. Approved sanitized EN/VI load messages have native GET retries using existing validated-query URL builders. Invalid catalog requests retain the existing fallback notice; retry uses the same validated/defaulted query that was sent to the service, rather than replaying invalid raw parameters. Secondary request-summary failure remains isolated from successful catalog cards/counts.
+- Unresolved library guard access remains before private parsing/read, with approved neutral access-unconfirmed copy, verified-account guidance and a native retry to the existing safe local destination. No assertion of definite sign-out or backend outage. Guard/service/auth/verification contracts and redirects are unchanged.
+- Empty sections are ordinary named semantic content, not alerts. Actual failures are sanitized alerts; existing loading/status semantics and generic error boundary are untouched. Existing CSS, focus/theme and wrapping patterns are reused; no new style, dependency, shared abstraction or route. No invented records/ratings/statistics or private diagnostic values.
+- Browser coverage is additive to existing real fixtures/accounts: catalog EN/VI filtered-zero and nonzero empty-page recovery; fresh verified-owner library empty before the existing seed, favorite=false and sort-only distinctions, nonzero empty-page recovery and locale-preserving links. Existing assertions, mutation/privacy projections, deadlines/retries and guarded cleanup remain. Shared public data is not assumed globally empty. Responsive/theme/focus checks are authored, not observed runtime results.
+
+### Actual bounded local validation
+
+| Check | Actual outcome |
+| --- | --- |
+| Node / pnpm | 24.19.0 / 11.7.0 |
+| Frozen installation | PASS; exact lockfile reused, dependency manifests/lockfile unchanged |
+| Initial focused three-file unit run | 195 passed, 2 failed, 197 total; two English list copy checks compared raw HTML substrings rather than rendered alert text |
+| Focused correction | Same approved messages retained; those checks now assert semantic alert text, preserving private-read denial and raw-error non-disclosure assertions. Only the affected library-page unit file rerun: 59 passed, 0 failed |
+| Final focused coverage inside actual full run | PASS: 197 passed, 0 failed across the three A5-focused files |
+| Full unit suite, one execution | FAIL: 2295 passed, 4 failed, 0 pending, 2299 total across 74 files |
+| Isolate only current failed files, unchanged settings | FAIL: 43 passed, 5 failed across 2 files; no consumer/config/assertion/deadline/retry change |
+| Typecheck | PASS; `pnpm typecheck`, exit 0, one execution |
+| Lint | PASS; `pnpm lint`, exit 0, one execution |
+| Production build | PASS; `pnpm build`, exit 0, one execution, explicit production/compile-only loopback environment |
+| Scope and preservation checks | PASS; exactly 11 approved paths, catalog parser/URL prefix byte unchanged, all original browser lines preserved in order, historical ledger byte prefix exact, no staged changes |
+| Independent read-only scope/contract review | NoBlock; source review only, not test or browser certification |
+| Native browser / responsive / real auth / real SSR database outage | NOT RUN; no approved functioning disposable native environment available. No Windows/PG/TLS/ACL restart or hosted fault injection attempted |
+
+Executed commands (result/log receipts remain ignored locally, not published):
+
+```text
+pnpm install --frozen-lockfile
+pnpm exec vitest run tests/unit/catalog-discovery-ui.test.tsx tests/unit/library-pages.test.tsx tests/unit/public-catalog-page-states.test.tsx --reporter=json --outputFile=.local/v6a-a5-focused-unit.json
+pnpm exec vitest run tests/unit/library-pages.test.tsx --reporter=json --outputFile=.local/v6a-a5-library-fixed-unit.json
+pnpm test --reporter=json --outputFile=.local/v6a-a5-full-unit.json
+pnpm exec vitest run tests/unit/library-entry-revision-scope-ui.test.tsx tests/unit/library-personal-ui.test.tsx --reporter=json --outputFile=.local/v6a-a5-failed-files-isolation.json
+pnpm typecheck
+pnpm lint
+pnpm build
+```
+
+The production build uses explicit production mode and compile-only synthetic loopback configuration; it does not start a DB/SMTP/TLS service, prove a backend connection or constitute browser/production acceptance. No raw errors/stacks, screenshots, traces, credentials or private payloads are published here. Existing generic boundary behavior is not replaced, and browser API interception is not presented as proof of an SSR database outage.
+
+### Remaining blocker and decision
+
+The actual full suite failed in these unchanged files, outside the authorized A5 edit inventory:
+
+```text
+tests/unit/library-entry-revision-scope-ui.test.tsx
+tests/unit/library-personal-ui.test.tsx
+```
+
+The full-run failed identities cover EN sibling revision fencing, EN/VI all-nine personal-rating mapping, and EN nullable rating/empty-note clearing. The isolated run additionally failed VI sibling fencing; its clearing failure was VI rather than EN. Causes remain unconfirmed. Untouched source does not prove that a failure is pre-existing, unrelated or harmless. These files and their controls were not changed, no assertions were skipped/weakened, and no timeout/retry was altered. No further unit/config attempts or out-of-scope fixes were made.
+
+**NO-GO for an A5 commit while the full-unit gate remains failed.** Maintainer assessment/separate authorization is needed before expanding investigation or changing these consumers. Browser coverage remains NOT RUN for independent Linux execution only after separately approved publication. No commit, staging, push, PR, merge, deployment, hosted service operation, V4 activation or cleanup occurred. All historical ledger content is preserved before this append.

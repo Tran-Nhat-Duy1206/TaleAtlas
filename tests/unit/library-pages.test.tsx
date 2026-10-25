@@ -3,7 +3,8 @@
 import React from "react";
 import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { hydrateRoot, type Root } from "react-dom/client";
-import { act } from "@testing-library/react";
+import { act, within } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   headers: vi.fn(),
@@ -12,6 +13,17 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   detail: vi.fn(),
   controls: vi.fn(),
+}));
+vi.mock("next/link", () => ({
+  default: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+    <a href={href} {...props} data-next-link="true">
+      {children}
+    </a>
+  ),
 }));
 vi.mock("next/headers", () => ({ headers: mocks.headers }));
 vi.mock("next/navigation", () => ({
@@ -136,7 +148,11 @@ describe("private library pages", () => {
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(html).toContain(t.denied);
+      const holder = document.createElement("div");
+      holder.innerHTML = html;
+      expect(within(holder).getByRole("alert")).toHaveTextContent(
+        t.accessUnconfirmed,
+      );
       expect(mocks.list).not.toHaveBeenCalled();
       mocks.session.mockRejectedValue(new Error("SECRET authentication error"));
       html = renderToStaticMarkup(
@@ -179,7 +195,7 @@ describe("private library pages", () => {
         `/${locale}/library`,
       );
       expect(form.querySelector("a")?.textContent).toBe(t.reset);
-      expect(holder.textContent).toContain(t.empty);
+      expect(holder.textContent).toContain(t.emptyLibrary);
       expect(holder.querySelectorAll("ul > li")).toHaveLength(0);
     });
 
@@ -367,6 +383,224 @@ describe("private library pages", () => {
         },
       });
     });
+    it.each([
+      ["status", { status: "READING" }],
+      ["favorite true", { favorite: "true" }],
+      ["favorite false", { favorite: "false" }],
+    ] as const)(
+      `classifies restrictive %s alone as no matches ${locale}`,
+      async (_name, filters) => {
+        const holder = document.createElement("div");
+        holder.innerHTML = renderToStaticMarkup(
+          await List({
+            params: Promise.resolve({ locale }),
+            searchParams: Promise.resolve({ ...filters }),
+          }),
+        );
+        const ui = within(holder);
+        const heading = ui.getByRole("heading", { level: 2, name: t.empty });
+        expect(heading.closest("section")).not.toHaveAttribute("role", "alert");
+        expect(ui.queryByRole("alert")).toBeNull();
+        expect(ui.queryByText(t.emptyLibrary)).toBeNull();
+        expect(ui.queryByText(t.emptyLibraryText)).toBeNull();
+        expect(ui.queryByText(t.emptyPage)).toBeNull();
+        const full = ui.getByRole("link", { name: t.showFullLibrary });
+        expect(full).toHaveAttribute("href", `/${locale}/library`);
+        expect(full).not.toHaveAttribute("data-next-link");
+        const reset = ui.getByRole("link", { name: t.reset });
+        expect(reset).toHaveAttribute("href", `/${locale}/library`);
+        expect(reset).not.toHaveAttribute("data-next-link");
+      },
+    );
+
+    it.each([
+      {},
+      { sort: "TITLE_ASC" },
+      { page: "400" },
+      { sort: "RATING_DESC", page: "2" },
+    ])(
+      `classifies sort/page alone as genuinely empty ${locale}: %j`,
+      async (filters) => {
+        const holder = document.createElement("div");
+        holder.innerHTML = renderToStaticMarkup(
+          await List({
+            params: Promise.resolve({ locale }),
+            searchParams: Promise.resolve(filters),
+          }),
+        );
+        const ui = within(holder);
+        const heading = ui.getByRole("heading", {
+          level: 2,
+          name: t.emptyLibrary,
+        });
+        expect(heading.closest("section")).not.toHaveAttribute("role", "alert");
+        expect(ui.getByText(t.emptyLibraryText)).toHaveTextContent(
+          t.emptyLibraryText,
+        );
+        expect(ui.queryByText(t.empty)).toBeNull();
+        expect(ui.queryByText(t.emptyPage)).toBeNull();
+        expect(ui.queryByRole("alert")).toBeNull();
+        const browse = ui.getByRole("link", { name: t.browseCatalog });
+        expect(browse).toHaveAttribute("href", `/${locale}/works`);
+        expect(browse).not.toHaveAttribute("data-next-link");
+      },
+    );
+
+    it(`recovers a nonzero-total empty page with exact native first-page filters ${locale}`, async () => {
+      mocks.list.mockResolvedValue({
+        items: [],
+        total: 51,
+        page: 400,
+        pageSize: 50,
+        hasNext: false,
+      });
+      const holder = document.createElement("div");
+      holder.innerHTML = renderToStaticMarkup(
+        await List({
+          params: Promise.resolve({ locale }),
+          searchParams: Promise.resolve({
+            status: "READING",
+            favorite: "false",
+            sort: "TITLE_ASC",
+            page: "400",
+          }),
+        }),
+      );
+      const ui = within(holder);
+      const heading = ui.getByRole("heading", { level: 2, name: t.emptyPage });
+      expect(heading.closest("section")).not.toHaveAttribute("role", "alert");
+      expect(ui.queryByRole("alert")).toBeNull();
+      expect(ui.queryByText(t.empty)).toBeNull();
+      expect(ui.queryByText(t.emptyLibrary)).toBeNull();
+      const first = ui.getByRole("link", { name: t.firstPage });
+      expect(first).toHaveAttribute(
+        "href",
+        `/${locale}/library?page=1&sort=TITLE_ASC&status=READING&favorite=false`,
+      );
+      expect(first).not.toHaveAttribute("data-next-link");
+      expect(mocks.list).toHaveBeenCalledWith(
+        {
+          page: 400,
+          locale,
+          status: "READING",
+          favorite: false,
+          sort: "TITLE_ASC",
+        },
+        h,
+      );
+    });
+
+    it.each([
+      { page: ["1", "2"] },
+      { favorite: ["false", "true"] },
+      { status: ["READING", "READING"] },
+      { sort: ["TITLE_ASC", "TITLE_ASC"] },
+      { page: "0" },
+      { page: "401" },
+      { favorite: "no" },
+      { sort: "PRIVATE_DRIVER_SORT" },
+    ])(
+      `retains invalid-query rejection and bare reset ${locale}: %j`,
+      async (filters) => {
+        const holder = document.createElement("div");
+        holder.innerHTML = renderToStaticMarkup(
+          await List({
+            params: Promise.resolve({ locale }),
+            searchParams: Promise.resolve(filters),
+          }),
+        );
+        const ui = within(holder);
+        expect(ui.getByRole("alert")).toHaveTextContent(t.invalid);
+        expect(ui.getByRole("link", { name: t.reset })).toHaveAttribute(
+          "href",
+          `/${locale}/library`,
+        );
+        expect(mocks.session).toHaveBeenCalledWith(h);
+        expect(mocks.list).not.toHaveBeenCalled();
+        expect(holder.textContent).not.toContain(t.empty);
+        expect(holder.textContent).not.toContain(t.emptyLibrary);
+      },
+    );
+
+    it.each([false, "failure"] as const)(
+      `guards before invalid parsing and private reads (${locale}, %s)`,
+      async (access) => {
+        if (access === false)
+          mocks.session.mockResolvedValue({
+            user: { id, emailVerified: false },
+          });
+        else
+          mocks.session.mockRejectedValue(
+            new Error("PRIVATE_DRIVER privateData"),
+          );
+        const holder = document.createElement("div");
+        holder.innerHTML = renderToStaticMarkup(
+          await List({
+            params: Promise.resolve({ locale }),
+            searchParams: Promise.resolve({ page: ["1", "2"] }),
+          }),
+        );
+        const ui = within(holder);
+        expect(ui.getByText(t.accessUnconfirmed)).toHaveTextContent(
+          t.accessUnconfirmed,
+        );
+        expect(ui.getByText(t.accessGuidance)).toHaveTextContent(
+          t.accessGuidance,
+        );
+        expect(holder.textContent).not.toContain(t.invalid);
+        expect(holder.textContent).not.toContain(t.empty);
+        expect(holder.textContent).not.toContain(t.emptyLibrary);
+        expect(holder.textContent).not.toContain("PRIVATE_DRIVER");
+        expect(holder.textContent).not.toContain("privateData");
+        expect(mocks.redirect).not.toHaveBeenCalled();
+        expect(mocks.list).not.toHaveBeenCalled();
+        const recovery = holder.querySelector("a")!;
+        expect(recovery).not.toBeNull();
+        expect(recovery).not.toHaveAttribute("data-next-link");
+        expect(recovery.getAttribute("href")).toBe(`/${locale}/library`);
+      },
+    );
+
+    it(`retries sanitized load failure with canonical validated filters and no empty statistics ${locale}`, async () => {
+      mocks.list.mockRejectedValue(
+        new Error("PRIVATE_DRIVER privateData SECRET database query"),
+      );
+      const holder = document.createElement("div");
+      holder.innerHTML = renderToStaticMarkup(
+        await List({
+          params: Promise.resolve({ locale }),
+          searchParams: Promise.resolve({
+            status: "READING",
+            favorite: "false",
+            sort: "TITLE_ASC",
+            page: "3",
+          }),
+        }),
+      );
+      const ui = within(holder);
+      expect(ui.getByRole("alert")).toHaveTextContent(t.loadError);
+      for (const text of [
+        t.empty,
+        t.emptyLibrary,
+        t.emptyLibraryText,
+        t.emptyPage,
+        "PRIVATE_DRIVER",
+        "privateData",
+        "SECRET",
+      ]) {
+        expect(holder.textContent).not.toContain(text);
+      }
+      expect(ui.queryByRole("status")).toBeNull();
+      expect(ui.queryByRole("navigation", { name: t.page })).toBeNull();
+      expect(holder.querySelector("ul")).toBeNull();
+      const retry = ui.getByRole("link", { name: t.retryLoad });
+      expect(retry).toHaveAttribute(
+        "href",
+        `/${locale}/library?page=3&sort=TITLE_ASC&status=READING&favorite=false`,
+      );
+      expect(retry).not.toHaveAttribute("data-next-link");
+    });
+
     it(`service error is localized and never rendered raw ${locale}`, async () => {
       mocks.list.mockRejectedValue(new Error("SECRET database query"));
       const html = renderToStaticMarkup(
@@ -375,7 +609,9 @@ describe("private library pages", () => {
           searchParams: Promise.resolve({}),
         }),
       );
-      expect(html).toContain(t.error);
+      const holder = document.createElement("div");
+      holder.innerHTML = html;
+      expect(within(holder).getByRole("alert")).toHaveTextContent(t.loadError);
       expect(html).not.toContain("SECRET");
     });
   }

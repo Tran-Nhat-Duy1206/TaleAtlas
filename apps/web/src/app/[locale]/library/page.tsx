@@ -32,7 +32,14 @@ export default async function LibraryPage({
   if (!h)
     return (
       <section className={styles.library}>
-        <p role="alert">{t.denied}</p>
+        <h1>{t.title}</h1>
+        <p role="alert">{t.accessUnconfirmed}</p>
+        <p>{t.accessGuidance}</p>
+        <div className={styles.actions}>
+          <a className="button" href={destination}>
+            {t.retryLoad}
+          </a>
+        </div>
       </section>
     );
   const query = libraryPageQuery(raw, locale);
@@ -52,6 +59,10 @@ export default async function LibraryPage({
     sort: query.sort,
   };
   const result = await listLibraryEntries(input, h).catch(() => null);
+  const restrictive =
+    query.status !== undefined || query.favorite !== undefined;
+  const emptyPage =
+    result !== null && result.total > 0 && result.items.length === 0;
   return (
     <section className={styles.library}>
       <h1>{t.title}</h1>
@@ -108,14 +119,51 @@ export default async function LibraryPage({
       </form>
       {!result ? (
         <>
-          <p role="alert">{t.error}</p>
-          <Link href={libraryPageHref(locale, query, query.page)}>
-            {t.refresh}
-          </Link>
+          <p role="alert">{t.loadError}</p>
+          <div className={styles.actions}>
+            <a
+              className="button"
+              href={libraryPageHref(locale, query, query.page)}
+            >
+              {t.retryLoad}
+            </a>
+          </div>
         </>
       ) : (
         <>
-          {!result.items.length && <p>{t.empty}</p>}
+          {!result.items.length && (
+            <section
+              className={styles.card}
+              aria-labelledby="library-empty-heading"
+            >
+              <h2 id="library-empty-heading">
+                {emptyPage
+                  ? t.emptyPage
+                  : restrictive
+                    ? t.empty
+                    : t.emptyLibrary}
+              </h2>
+              {!emptyPage && !restrictive && <p>{t.emptyLibraryText}</p>}
+              <div className={styles.actions}>
+                {emptyPage ? (
+                  <a
+                    className="button"
+                    href={libraryPageHref(locale, query, 1)}
+                  >
+                    {t.firstPage}
+                  </a>
+                ) : restrictive ? (
+                  <a className="button" href={`/${locale}/library`}>
+                    {t.showFullLibrary}
+                  </a>
+                ) : (
+                  <a className="button" href={`/${locale}/works`}>
+                    {t.browseCatalog}
+                  </a>
+                )}
+              </div>
+            </section>
+          )}
           <ul className={styles.list}>
             {result.items.map((entry) => (
               <li key={entry.id} className={styles.card}>

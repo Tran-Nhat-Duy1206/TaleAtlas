@@ -17,6 +17,7 @@ import {
   releaseLabels,
 } from "../../lib/catalog-i18n";
 import { catalogDiscoveryCopy } from "../../lib/catalog-discovery-i18n";
+import { requestDictionary } from "../../lib/request-i18n";
 import { WorkCard } from "./WorkCard";
 import { catalogPageHref, publicCopy } from "./query";
 import styles from "./catalog.module.css";
@@ -39,6 +40,13 @@ export function PublicCatalog({
   const discovery = catalogDiscoveryCopy[locale];
   const pages = Math.max(1, Math.ceil(result.total / result.pageSize));
   const emptyPage = result.total > 0 && result.items.length === 0;
+  const restrictive = Boolean(
+    query.q.trim() ||
+    query.format ||
+    query.genre ||
+    query.originalLanguage ||
+    query.releaseStatus,
+  );
   const missingGenre =
     query.genre &&
     !genreOptions.items.some((item) => item.slug === query.genre);
@@ -194,9 +202,33 @@ export function PublicCatalog({
           </Link>
         </section>
       ) : (
-        <section className={`feature ${styles.empty}`}>
-          <h2>{t.empty}</h2>
-          <p>{t.emptyText}</p>
+        <section
+          className={`feature ${styles.empty}`}
+          aria-labelledby="catalog-empty-heading"
+        >
+          <h2 id="catalog-empty-heading">
+            {restrictive ? t.empty : t.catalogEmpty}
+          </h2>
+          <p>{restrictive ? t.emptyText : t.catalogEmptyText}</p>
+          <div className={styles.pagination}>
+            {restrictive && (
+              <a
+                className={`button ${styles.button}`}
+                href={`/${locale}/works`}
+              >
+                {t.browseAll}
+              </a>
+            )}
+            {/* Filtered searches retain the existing guarded request prompt below. */}
+            {!restrictive && (
+              <Link
+                className={`button ${styles.button}`}
+                href={`/${locale}/requests/new`}
+              >
+                {requestDictionary(locale).new}
+              </Link>
+            )}
+          </div>
         </section>
       )}
       {requestPrompt}
