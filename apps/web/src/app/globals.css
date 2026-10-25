@@ -80,7 +80,8 @@ main {
   margin: auto;
 }
 .site-header {
-  height: 104px;
+  height: auto;
+  min-height: 104px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -123,14 +124,42 @@ main {
 }
 .site-header nav {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   gap: 28px;
   align-items: center;
   font-size: 13px;
   font-weight: 600;
 }
-.nav-account {
+.site-header .nav-account {
   border-left: 1px solid var(--line);
   padding-left: 28px;
+  /* One stable slot now contains checking/error text and an optional retry. */
+  display: grid;
+  align-content: center;
+  gap: 0.5rem;
+  flex: 0 1 18ch;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  min-block-size: 2.75rem;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.site-header .nav-account .header-session-retry {
+  justify-self: start;
+  padding: 0.4rem 0.65rem;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  font: inherit;
+  white-space: normal;
+  transition: none;
+}
+.site-header .nav-account .header-session-retry:hover {
+  transform: none;
+}
+.site-header .nav-account .header-session-retry[aria-disabled="true"] {
+  cursor: wait;
+  opacity: 0.65;
 }
 .site-header a:hover,
 .text-link:hover,
@@ -675,7 +704,7 @@ label small {
     flex-wrap: wrap;
     gap: 16px;
   }
-  .nav-account {
+  .site-header .nav-account {
     padding-left: 16px;
   }
   .hero {

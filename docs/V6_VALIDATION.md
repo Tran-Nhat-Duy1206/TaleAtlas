@@ -1284,3 +1284,95 @@ tests/unit/library-personal-ui.test.tsx
 The full-run failed identities cover EN sibling revision fencing, EN/VI all-nine personal-rating mapping, and EN nullable rating/empty-note clearing. The isolated run additionally failed VI sibling fencing; its clearing failure was VI rather than EN. Causes remain unconfirmed. Untouched source does not prove that a failure is pre-existing, unrelated or harmless. These files and their controls were not changed, no assertions were skipped/weakened, and no timeout/retry was altered. No further unit/config attempts or out-of-scope fixes were made.
 
 **NO-GO for an A5 commit while the full-unit gate remains failed.** Maintainer assessment/separate authorization is needed before expanding investigation or changing these consumers. Browser coverage remains NOT RUN for independent Linux execution only after separately approved publication. No commit, staging, push, PR, merge, deployment, hosted service operation, V4 activation or cleanup occurred. All historical ledger content is preserved before this append.
+
+## V6A Batch A6 — V6A-08 session/header stability (local implementation)
+
+- Worktree: `E:\TaleAtlas-v6a-session-header-stability`.
+- Branch: `fix/v6a-session-header-stability`.
+- Exact main parent baseline and unchanged HEAD: `1f0df17743a75881146c9793a87cf364f6ebebc3`.
+- Evidence applies to the uncommitted A6 working-tree source, not a published commit, GitHub CI, browser acceptance or a deployment. No earlier-batch CI/history, baseline-install or infrastructure investigation was repeated.
+
+### Exact changed-file inventory (5)
+
+```text
+apps/web/src/components/shell.tsx
+apps/web/src/app/globals.css
+tests/unit/ui.test.tsx
+tests/e2e/foundation.spec.ts
+docs/V6_VALIDATION.md (this append only)
+```
+
+### Regression-led evidence, not an observed runtime incident
+
+Before any Shell/style change, only the newly added EN/VI header regression group ran against the exact baseline. It returned 34 expected failures, 0 passes; 23 existing tests were excluded by the explicit test-name filter, not skipped or weakened in source. Functional checks preceded new-wrapper structure checks: pending null/error null snapshots exposed the same-locale Sign-in link; retained cached-admin refetch/error snapshots exposed Settings. Other new cases also specify the neutral SSR/stable-wrapper/retry contract. This is mocked source/DOM evidence, not proof of an actual browser flash, persistent race, live account switch or measured layout shift.
+
+After the presentation-only change, the entire approved UI unit file passed: 57 tests, 0 failed, 0 pending (34 new A6 cases and all 23 existing cases). Existing auth-form navigation ownership, Settings behavior and locale/path/query/hash/Suspense/hydration assertions remain intact. Canonical AST checks verified all original expect-call sequences in both edited test files remain in order (114 pre-existing unit call nodes; 46 browser call nodes; these are call-node counts, not distinct test counts).
+
+### Implemented session presentation matrix
+
+| SDK/presentation state | Header behavior |
+| --- | --- |
+| SSR / first hydration / incomplete snapshot | Neutral localized checking text, no account-dependent links; no server-session seeding |
+| `isPending` or explicit `isRefetching`, including retained cached data | Same neutral noninteractive status, no Sign-in/Settings/Library/My Requests/Admin; branding/Browse/native locale navigation/content remain available |
+| Lookup error after pending has completed | Existing sanitized localized session-error copy and a native SDK retry button; neither anonymous assumption nor cached privilege navigation |
+| Successful resolved null session | Existing localized Sign-in link |
+| Successful resolved session | Existing Settings/Library/My Requests; Admin only for the unchanged existing admin role condition |
+| Resolved unverified-session fixture | Remains authenticated for presentation under existing semantics; server verification/authorization remains authoritative |
+
+The installed, locked Better Auth 1.7.7 session atom exposes a first-class `isRefetching` flag, independently of `isPending` when cached data exists. Its error paths may retain cached data. The header now considers those flags/error before using data. It does not infer freshness from timers, alter SDK options/return values or add a provider, custom session cache, polling, redirects, custom authentication transports or navigation effects.
+
+The existing hydration snapshot pattern is reused so SSR and initial hydration stay neutral even when a client hook snapshot already contains cached account data. Existing Providers, Preferences, locale anchor/router helpers and locale Suspense implementations are byte unchanged. Their native locale/query/hash behavior, document-language effect and original navigation order are preserved.
+
+### EN/VI, retry and accessibility
+
+Existing dictionary loading/sessionError/retry strings are reused without dictionary edits. Pending content is noninteractive; errors are sanitized notices with no raw exception text. No name, email, session token or account identifier is rendered in header status. The account/status wrapper remains the same DOM span across transitions.
+
+Normal/background checking uses aria-live off to avoid repeating checking announcements; an explicit user retry announces checking politely. Real errors retain alert semantics. Retry invokes only the existing SDK refetch() with no extra arguments. A synchronous ref lock plus a local in-flight presentation flag prevent duplicate activation, including same-tick clicks. The native button remains mounted/focusable while busy, with aria-disabled and an activation guard instead of disabling away its focus; busy/failure focus and node identity are covered by both locales. Rejected refetch promises are handled without rendering raw errors or inventing another authenticated state. On success, ordinary resolved links replace recovery controls; no automatic focus move is introduced.
+
+Conservative suppression can remove an account link that was focused when a background check begins; retaining it as a valid privilege link would contradict the unresolved-state requirement. There is no programmatic focus jump. Busy retry stability is unit-tested, while actual browser focus behavior across all transitions remains NOT RUN.
+
+### Concrete layout need and evidence boundary
+
+The prior account area was a single link inside a fixed 104px desktop header. It now contains localized multiline checking/error text and an optional retry control. Header-only CSS changes make 104px a minimum instead of a clipping fixed height, allow nav wrapping, and use a shrinking relative 18ch account grid slot with zero minimum inline size, max100%, readable wrapping and a 44px minimum block/control target. Existing mobile minimum/header padding remains; retry hover movement/transition is suppressed only in the header. No non-header CSS rule or broad typography/theme/layout change was made.
+
+Observed unit evidence proves stable wrapper identity, preserved DOM navigation order, neutral SSR/hydration and retry focus while busy/failure. These tests do NOT measure browser geometry. No mathematically zero layout-shift claim is made. Vietnamese wrapping, 200% zoom, pixel bounds, light/dark rendering and conservative-refetch visual movement require an independently executed browser environment.
+
+### Browser regression source — AUTHORED / NOT RUN
+
+The existing foundation scenarios are extended without new accounts, fabricated cookies/session JSON, new infrastructure, altered deadlines/retries or weakened lifecycle assertions. Anonymous EN/VI and the original verified reader's fresh Settings reload hold the real same-origin client GET session request, assert neutral header/public controls, then release the actual request and check the real resolved navigation. The EN anonymous path additionally aborts one client session lookup, checks safe recovery, initiates the real SDK retry and checks busy focus before releasing the real response. That is a client-transport fault scenario, not an SSR/database-outage test.
+
+The route hold is released and the targeted handler removed in finally; pending continuations are drained. Header suppression selectors target exact same-locale account paths, deliberately allowing the native other-locale Settings link to remain usable. Existing registration, captured email verification, sign-in, account identity, logout, protected-route denial, themes, health and metadata assertions remain. Authored 375/768 viewport/focus/order/overflow and safe runtime/hydration error-name checks are not execution evidence.
+
+### Actual bounded local validation
+
+| Check | Actual outcome |
+| --- | --- |
+| Node / pnpm | 24.19.0 / 11.7.0 |
+| Frozen installation | PASS, one execution; dependency manifests/lockfile unchanged |
+| Mocked baseline A6 regression group | RED: 34 failed, 0 passed; 23 nonmatching existing tests filtered out; Shell/style/auth source still exact baseline |
+| Complete UI file after implementation | GREEN: 57 passed, 0 failed, 0 pending |
+| Full unit suite | PASS: 2333 passed, 0 failed, 0 pending, 74 files; one normal full-suite execution |
+| Typecheck | PASS, exit 0, one execution |
+| Lint | PASS, exit 0, one execution |
+| Production build | PASS, exit 0, one execution; production mode with compile-only synthetic loopback configuration |
+| Read-only source review / preservation | NoBlock; auth/SDK configuration/Settings/dictionaries/server and test budgets unchanged; original assertions preserved; header-only styling |
+| Native browser E2E / visual layout / real auth / SSR outage | NOT RUN; no existing approved functioning disposable environment was supplied or started |
+| Actual runtime authentication flash | NOT REPRODUCED; no browser execution authorized through a functioning environment |
+
+Executed commands (receipts/logs remain ignored locally, not published):
+
+```text
+pnpm install --frozen-lockfile
+pnpm exec vitest run tests/unit/ui.test.tsx -t "A6 header session presentation" --reporter=json --outputFile=.local/v6a-a6-red.json
+pnpm exec vitest run tests/unit/ui.test.tsx --reporter=json --outputFile=.local/v6a-a6-green-ui.json
+pnpm test --reporter=json --outputFile=.local/v6a-a6-full-unit.json
+pnpm typecheck
+pnpm lint
+pnpm build
+```
+
+The build used explicit production mode and synthetic compile-only loopback DB/SMTP configuration. No database, SMTP, TLS, browser or other service was started, and the build is not backend connectivity or native acceptance evidence. No additional unit investigations/reruns, timeout/retry increases, Windows E2E/PG/TLS/ACL/WSL/Docker setup, hosted operations or private diagnostic publication occurred.
+
+### Decision and remaining limitations
+
+**GO for one scoped local A6 commit only after separate maintainer authorization.** Local required gates passed and the approved five-file implementation is ready for review. This is NOT publication, merge, browser/visual acceptance or deployment authorization. Native browser/layout validation remains NOT RUN, and a real-world flash has not been reproduced or claimed fixed. Independent Linux/native coverage is reserved for separately approved publication. No source outside the approved inventory, auth contract/provider/cache/role policy, SDK, endpoint, dictionary, dependency, schema, workflow, hosted/Vercel/V4 setting or prior worktree was modified. No staging, commit, push, PR, merge, deployment, cleanup or A7 work occurred. All historical ledger bytes precede this append unchanged.
