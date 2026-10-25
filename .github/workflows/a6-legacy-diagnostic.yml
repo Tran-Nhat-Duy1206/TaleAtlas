@@ -1,0 +1,46 @@
+name: A6 pinned legacy diagnostic
+
+# One authorized push produces one diagnostic; no dispatch, PR or schedule trigger.
+on:
+  push:
+    branches: [diagnostics/v6a-a6-legacy-2951947]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    if: github.run_attempt == '1'
+    runs-on: ubuntu-latest
+    # Runner privately provisions the identical PostgreSQL 17 container/options.
+    # Actions service startup otherwise prints literal --env credentials publicly.
+    steps:
+      - name: Checkout diagnostic adapter only
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: diagnostic
+          persist-credentials: false
+      - name: Checkout exact application under test
+        uses: actions/checkout@v4
+        with:
+          ref: 2951947123005cb849b86367b87477b9690ff0d0
+          path: sut
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: sut/pnpm-lock.yaml
+      - name: Identical legacy preparation then one safely reported native execution
+        working-directory: sut
+        shell: bash
+        run: |
+          set +x
+          umask 077
+          private_boot="$(mktemp "$RUNNER_TEMP/a6-diag-bootstrap.XXXXXX")"
+          node ../diagnostic/scripts/a6-legacy-diagnostic-runner.mjs 2>"$private_boot"
+      # No artifacts: reports, traces, screenshots, SMTP and TLS stay runner-local.
