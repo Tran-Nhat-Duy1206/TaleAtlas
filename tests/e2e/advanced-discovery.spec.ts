@@ -5,6 +5,7 @@ import { requireTestDatabase } from "../helpers/test-database";
 import { normalizeTitle } from "../../apps/web/src/features/catalog/contracts";
 import { publicCopy } from "../../apps/web/src/components/catalog/query";
 import { catalogDiscoveryCopy } from "../../apps/web/src/lib/catalog-discovery-i18n";
+import { requestDictionary } from "../../apps/web/src/lib/request-i18n";
 
 // Public read scenario: real SQL-owned synthetic catalog facts and real SSR/GET
 // navigation. No fabricated sessions, route interception, providers or fixtures
@@ -122,6 +123,18 @@ test("advanced discovery composes exact public filters across bilingual native n
     await expect(page.getByText(vi.invalidQuery, { exact: true })).toHaveCount(
       0,
     );
+    const requestStory = page.getByRole("link", {
+      name: requestDictionary("vi").new,
+      exact: true,
+    });
+    await expect(requestStory).toHaveCount(1);
+    const requestHref = new URL(
+      (await requestStory.getAttribute("href"))!,
+      page.url(),
+    );
+    expect(requestHref.pathname).toBe("/vi/requests/new");
+    expect(requestHref.searchParams.get("q")).toBe(run);
+    expect(requestHref.searchParams.get("format")).toBe("NOVEL");
 
     await page.goto(`/vi/works?releaseStatus=NOT_A_STATUS&genre=${genre}`);
     await expect(
@@ -135,6 +148,49 @@ test("advanced discovery composes exact public filters across bilingual native n
       .click();
     await expect(page).toHaveURL(/\/vi\/works$/);
     await expect(page.locator('input[name="pageSize"]')).toHaveValue("20");
+
+    // Three exact matches are owned by this run; a valid high page is not a
+    // zero-result catalog and recovery must retain every committed criterion.
+    for (const locale of ["en", "vi"] as const) {
+      const copy = publicCopy[locale];
+      const discovery = catalogDiscoveryCopy[locale];
+      const criteria = {
+        q: run,
+        format: "NOVEL",
+        genre,
+        originalLanguage: "ja",
+        releaseStatus: "COMPLETED",
+        pageSize: "1",
+      };
+      await page.goto(
+        `/${locale}/works?${new URLSearchParams({ ...criteria, page: "100" })}`,
+      );
+      await expect(page.getByRole("status")).toContainText("3");
+      await expect(
+        page.getByRole("heading", { name: discovery.emptyPage, exact: true }),
+      ).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: copy.empty, exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("heading", { name: copy.catalogEmpty, exact: true }),
+      ).toHaveCount(0);
+      const firstPage = page.getByRole("link", {
+        name: discovery.firstPage,
+        exact: true,
+      });
+      const href = await firstPage.getAttribute("href");
+      expect(href).not.toBeNull();
+      const recovery = new URL(href!, page.url());
+      expect(recovery.pathname).toBe(`/${locale}/works`);
+      expect(recovery.searchParams.get("page")).toBe("1");
+      for (const [key, value] of Object.entries(criteria)) {
+        expect(recovery.searchParams.get(key)).toBe(value);
+      }
+      await firstPage.click();
+      await expect(page).toHaveURL(recovery.href);
+      await expect(page.locator("article h2")).toHaveCount(1);
+    }
 
     // Existing related and genre browsing remain functional, never hidden links.
     await page.goto(`/en/works/${slugs[0]!}`);
@@ -194,6 +250,62 @@ test("advanced discovery composes exact public filters across bilingual native n
             element.style.fontSize = "";
           });
         }
+
+        // Reuse this viewport/theme matrix for honest filtered-zero recovery.
+        // q is blank: the existing request prompt must not acquire a new CTA.
+        const copy = publicCopy[locale];
+        await page.goto(
+          `/${locale}/works?${new URLSearchParams({ genre, originalLanguage: "zz", q: "   " })}`,
+        );
+        await expect(page.getByRole("status")).toContainText("0");
+        await expect(
+          page.getByRole("heading", { name: copy.empty, exact: true }),
+        ).toBeVisible();
+        await expect(
+          page.getByRole("heading", { name: copy.catalogEmpty, exact: true }),
+        ).toHaveCount(0);
+        await expect(
+          page.getByRole("link", {
+            name: requestDictionary(locale).new,
+            exact: true,
+          }),
+        ).toHaveCount(0);
+        const browseAll = page.getByRole("link", {
+          name: copy.browseAll,
+          exact: true,
+        });
+        await expect(browseAll).toHaveCount(1);
+        await expect(browseAll).toHaveAttribute("href", `/${locale}/works`);
+        await expect(
+          page.getByRole("link", { name: copy.reset, exact: true }),
+        ).toHaveCount(1);
+        for (const theme of ["light", "dark"]) {
+          await page.evaluate((value) => {
+            document.documentElement.classList.toggle("dark", value === "dark");
+          }, theme);
+          await browseAll.focus();
+          await expect(browseAll).toBeFocused();
+          expect(
+            await page.evaluate(
+              () =>
+                document.documentElement.scrollWidth <=
+                document.documentElement.clientWidth + 1,
+            ),
+          ).toBe(true);
+        }
+        await browseAll.click();
+        await expect(page).toHaveURL(new RegExp(`/${locale}/works$`));
+        await expect(page.locator('input[name="q"]')).toHaveValue("");
+        await expect(page.locator('select[name="genre"]')).toHaveValue("");
+        await expect(page.locator('select[name="format"]')).toHaveValue("");
+        await expect(page.locator('select[name="releaseStatus"]')).toHaveValue(
+          "",
+        );
+        await expect(page.locator('input[name="pageSize"]')).toHaveValue("20");
+        await expect(
+          page.locator('input[name="originalLanguage"]'),
+        ).toHaveValue("");
+        await expect(page.locator("article h2").first()).toBeVisible();
       }
     }
     expect(errors).toEqual([]);
