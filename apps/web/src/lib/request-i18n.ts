@@ -49,6 +49,33 @@ const en = {
   unavailable: "This request is unavailable.",
   optional:
     "Only title and format are required. Leave unknown optional information blank.",
+  basicInformation: "Basic information (required)",
+  moreDetails: "More details (optional)",
+  moreDetailsHelp:
+    "Add only information you know. Leave unknown details blank.",
+  privateNotesHelp:
+    "Private notes are not included in public request summaries.",
+  validationSummary: "Check the marked fields and the required acknowledgment.",
+  titleError:
+    "Enter a title of 1–600 characters containing letters or numbers.",
+  formatError: "Choose a listed format. Unknown is allowed.",
+  alternativeTitlesError:
+    "Enter up to 12 alternative titles, 1–600 characters each.",
+  originalTitleError: "Use up to 600 characters, or leave this blank.",
+  authorError: "Use up to 300 characters, or leave this blank.",
+  sourceUrlError:
+    "Use a public http(s) citation URL of up to 2000 characters, without credentials or a port.",
+  originalLanguageError:
+    "Use a language code such as en or vi, or leave this blank.",
+  publicationLanguageError:
+    "Use a language code such as en or vi, or leave this blank.",
+  publicationYearError:
+    "Enter a whole year from 1 to 9999, or leave this blank.",
+  descriptionError: "Use up to 4000 characters, or leave this blank.",
+  additionalEvidenceError: "Use up to 3000 characters, or leave this blank.",
+  notesError: "Use up to 2000 characters, or leave this blank.",
+  disclaimerError:
+    "Acknowledge that a request does not guarantee approval or publication.",
 };
 const vi: typeof en = {
   mine: "Yêu cầu của tôi",
@@ -100,6 +127,28 @@ const vi: typeof en = {
   unavailable: "Yêu cầu này không khả dụng.",
   optional:
     "Chỉ cần tên truyện và định dạng. Để trống thông tin tùy chọn chưa rõ.",
+  basicInformation: "Thông tin cơ bản (bắt buộc)",
+  moreDetails: "Thông tin thêm (không bắt buộc)",
+  moreDetailsHelp:
+    "Chỉ thêm thông tin bạn biết. Để trống các chi tiết chưa rõ.",
+  privateNotesHelp:
+    "Ghi chú riêng tư không xuất hiện trong bản tóm tắt yêu cầu công khai.",
+  validationSummary: "Kiểm tra các trường được đánh dấu và xác nhận bắt buộc.",
+  titleError: "Nhập tên từ 1–600 ký tự, có chứa chữ hoặc số.",
+  formatError: "Chọn định dạng trong danh sách. Có thể chọn Chưa rõ.",
+  alternativeTitlesError: "Nhập tối đa 12 tên khác, mỗi tên từ 1–600 ký tự.",
+  originalTitleError: "Dùng tối đa 600 ký tự hoặc để trống.",
+  authorError: "Dùng tối đa 300 ký tự hoặc để trống.",
+  sourceUrlError:
+    "Dùng URL trích dẫn http(s) công khai, tối đa 2000 ký tự, không kèm thông tin đăng nhập hoặc cổng.",
+  originalLanguageError: "Dùng mã ngôn ngữ như en hoặc vi, hoặc để trống.",
+  publicationLanguageError: "Dùng mã ngôn ngữ như en hoặc vi, hoặc để trống.",
+  publicationYearError: "Nhập năm nguyên từ 1 đến 9999 hoặc để trống.",
+  descriptionError: "Dùng tối đa 4000 ký tự hoặc để trống.",
+  additionalEvidenceError: "Dùng tối đa 3000 ký tự hoặc để trống.",
+  notesError: "Dùng tối đa 2000 ký tự hoặc để trống.",
+  disclaimerError:
+    "Xác nhận rằng gửi yêu cầu không đảm bảo được duyệt hoặc xuất bản.",
 };
 export function requestDictionary(locale: Locale) {
   return locale === "vi" ? vi : en;

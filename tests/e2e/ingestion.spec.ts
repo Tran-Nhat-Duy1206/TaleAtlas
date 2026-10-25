@@ -208,6 +208,10 @@ test("private submitted-metadata processing through the admin browser", async ({
     await page
       .getByRole("combobox", { name: en.format, exact: true })
       .selectOption("UNKNOWN");
+    const moreDetails = page.locator("form details");
+    await expect(moreDetails).not.toHaveAttribute("open");
+    await moreDetails.locator("summary").click();
+    await expect(moreDetails).toHaveAttribute("open", "");
     await page.locator('[name="alternativeTitles"]').fill(aliases.join("\n"));
     await page.locator('[name="author"]').fill(author);
     await page.getByLabel(en.disclaimer, { exact: true }).check();

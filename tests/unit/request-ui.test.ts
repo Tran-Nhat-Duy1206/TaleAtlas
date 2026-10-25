@@ -8,6 +8,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 const mocks = vi.hoisted(() => ({
@@ -73,6 +74,50 @@ function acknowledge(locale: Locale) {
 }
 function body(call = 0): unknown {
   return JSON.parse(fetchStub.mock.calls[call][1].body);
+}
+const optionalNames = [
+  "alternativeTitles",
+  "originalTitle",
+  "author",
+  "sourceUrl",
+  "originalLanguage",
+  "publicationLanguage",
+  "publicationYear",
+  "description",
+  "additionalEvidence",
+  "notes",
+] as const;
+function moreDetails(locale: Locale): HTMLDetailsElement {
+  const summary = screen.getByText(requestDictionary(locale).moreDetails, {
+    selector: "summary",
+  });
+  return summary.closest("details")!;
+}
+function toggleDetails(panel: HTMLDetailsElement, open: boolean) {
+  // Explicit DOM events exercise React state, not native browser keyboard behavior.
+  panel.open = open;
+  fireEvent(panel, new Event("toggle"));
+}
+function openDetails(locale: Locale) {
+  toggleDetails(moreDetails(locale), true);
+}
+function expectFieldError(field: HTMLElement, message: string) {
+  expect(field).toHaveAttribute("aria-invalid", "true");
+  const ids = (field.getAttribute("aria-describedby") ?? "")
+    .split(/\s+/)
+    .filter(Boolean);
+  expect(ids.length).toBeGreaterThan(0);
+  const descriptions = ids.map((descriptionId) => {
+    const description = document.getElementById(descriptionId);
+    expect(description).not.toBeNull();
+    expect(description?.closest("label")).toBeNull();
+    return description!;
+  });
+  const error = descriptions.find((description) =>
+    description.textContent?.includes(message),
+  );
+  expect(error).toBeDefined();
+  expect(error).toBeVisible();
 }
 
 describe("real request form rendering and payloads", () => {
@@ -157,6 +202,7 @@ describe("real request form rendering and payloads", () => {
         prefillTitle: "Bibliography",
       }),
     );
+    openDetails("en");
     fireEvent.change(screen.getByLabelText(t.alternativeTitles), {
       target: { value: " First alias\n\n Second alias " },
     });
@@ -200,6 +246,7 @@ describe("real request form rendering and payloads", () => {
           prefillTitle: "Valid title",
         }),
       );
+      openDetails(locale);
       fireEvent.change(screen.getByLabelText(t.sourceUrl), {
         target: { value: "http://localhost/private" },
       });
@@ -236,6 +283,7 @@ describe("real request form rendering and payloads", () => {
         prefillTitle: "Tên hợp lệ",
       }),
     );
+    openDetails("vi");
     // Each optional field fits its individual character limit; UTF-8 total exceeds 12 KB.
     fireEvent.change(screen.getByLabelText(t.description), {
       target: { value: "界".repeat(3000) },
@@ -284,6 +332,7 @@ describe("real request form rendering and payloads", () => {
     [401, "signIn"],
     [400, "invalid"],
     [413, "size"],
+    [500, "error"],
   ] as const)(
     "maps HTTP %s without rendering source/driver strings",
     async (status, key) => {
@@ -310,6 +359,435 @@ describe("real request form rendering and payloads", () => {
       expect(mocks.replace).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("progressive native request details", () => {
+  const initialCases = [
+    { name: "empty", initialDetails: undefined, expanded: false },
+    {
+      name: "title and format only",
+      initialDetails: {
+        title: "Title only",
+        format: "NOVEL" as const,
+        alternativeTitles: [],
+      },
+      expanded: false,
+    },
+    {
+      name: "whitespace optional values",
+      initialDetails: {
+        title: "Whitespace",
+        format: "UNKNOWN" as const,
+        alternativeTitles: [" ", "\t"],
+        originalTitle: " ",
+        author: "\t",
+        sourceUrl: " ",
+        originalLanguage: " ",
+        publicationLanguage: " ",
+        description: "\n",
+        additionalEvidence: " ",
+        notes: " ",
+      },
+      expanded: false,
+    },
+    {
+      name: "alternative title prefill",
+      initialDetails: {
+        title: "Aliases",
+        format: "UNKNOWN" as const,
+        alternativeTitles: [" ", "Alias"],
+      },
+      expanded: true,
+    },
+    {
+      name: "private notes prefill",
+      initialDetails: {
+        title: "Notes",
+        format: "UNKNOWN" as const,
+        alternativeTitles: [],
+        notes: "Saved note",
+      },
+      expanded: true,
+    },
+    {
+      name: "numeric year prefill",
+      initialDetails: {
+        title: "Year",
+        format: "UNKNOWN" as const,
+        alternativeTitles: [],
+        publicationYear: 2024,
+      },
+      expanded: true,
+    },
+  ];
+  describe.each(["en", "vi"] as const)("%s", (locale) => {
+    describe.each(["create", "edit"] as const)("%s", (mode) => {
+      it.each(initialCases)(
+        "initializes $name without hiding the basic controls",
+        ({ initialDetails, expanded }) => {
+          const t = requestDictionary(locale);
+          render(
+            React.createElement(NewRequestForm, {
+              locale,
+              initialDetails,
+              ...(mode === "edit" ? { requestId: id, revision: 7 } : {}),
+            }),
+          );
+          const panel = moreDetails(locale);
+          const form = panel.closest("form")!;
+          expect(form.className).toMatch(/progressiveForm/);
+          expect(panel.className).toMatch(/moreDetails/);
+          expect(panel.open).toBe(expanded);
+          const basics = screen.getByRole("group", {
+            name: t.basicInformation,
+          });
+          expect(within(basics).getByLabelText(t.title)).toBeVisible();
+          expect(
+            within(basics).getByRole("combobox", { name: t.format }),
+          ).toBeVisible();
+          expect(
+            basics.querySelectorAll("input, select, textarea"),
+          ).toHaveLength(2);
+          expect(basics.closest("details")).toBeNull();
+          expect(
+            screen
+              .getByRole("checkbox", { name: t.disclaimer })
+              .closest("details"),
+          ).toBeNull();
+          expect(
+            screen
+              .getByRole("button", {
+                name: mode === "edit" ? t.save : t.submit,
+              })
+              .closest("details"),
+          ).toBeNull();
+          for (const name of optionalNames) {
+            const control = screen.getByLabelText(t[name]);
+            expect(panel).toContainElement(control);
+            expect(control).toBeEnabled();
+            expect(control).toHaveAttribute("name", name);
+          }
+          expect(fetchStub).not.toHaveBeenCalled();
+        },
+      );
+    });
+
+    it("retains mounted optional values through collapse, reopen and collapsed POST", async () => {
+      const t = requestDictionary(locale);
+      render(
+        React.createElement(NewRequestForm, {
+          locale,
+          prefillTitle: "Retained title",
+        }),
+      );
+      const panel = moreDetails(locale);
+      const form = panel.closest("form")!;
+      const controls = optionalNames.map((name) =>
+        screen.getByLabelText(t[name]),
+      );
+      openDetails(locale);
+      const values = {
+        alternativeTitles: "Alias one\nAlias two",
+        originalTitle: "Original",
+        author: "Author",
+        sourceUrl: "https://example.org/book",
+        originalLanguage: "en",
+        publicationLanguage: "vi",
+        publicationYear: "2024",
+        description: "Description",
+        additionalEvidence: "Evidence",
+        notes: "Private note",
+      };
+      for (const name of optionalNames)
+        fireEvent.change(screen.getByLabelText(t[name]), {
+          target: { value: values[name] },
+        });
+      toggleDetails(panel, false);
+      expect(panel.open).toBe(false);
+      const data = new FormData(form);
+      for (const [index, name] of optionalNames.entries()) {
+        expect(screen.getByLabelText(t[name])).toBe(controls[index]);
+        expect(controls[index]).toBeEnabled();
+        expect(data.get(name)).toBe(values[name]);
+      }
+      toggleDetails(panel, true);
+      for (const name of optionalNames)
+        expect(screen.getByLabelText(t[name])).toHaveValue(
+          name === "publicationYear" ? 2024 : values[name],
+        );
+      toggleDetails(panel, false);
+      acknowledge(locale);
+      submit(locale);
+      await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+      expect(submitRequestSchema.parse(body())).toEqual({
+        submitKey,
+        details: {
+          ...values,
+          title: "Retained title",
+          format: "UNKNOWN",
+          alternativeTitles: ["Alias one", "Alias two"],
+          publicationYear: 2024,
+        },
+      });
+      expect(fetchStub.mock.calls[0][1].method).toBe("POST");
+    });
+
+    it("PATCHes retained collapsed edit details with revision and UNKNOWN format", async () => {
+      const t = requestDictionary(locale);
+      render(
+        React.createElement(NewRequestForm, {
+          locale,
+          requestId: id,
+          revision: 11,
+          initialDetails: {
+            title: "Edit title",
+            format: "UNKNOWN",
+            alternativeTitles: ["Edit alias"],
+            notes: "Original private note",
+          },
+        }),
+      );
+      const panel = moreDetails(locale);
+      expect(panel.open).toBe(true);
+      fireEvent.change(screen.getByLabelText(t.notes), {
+        target: { value: "Changed private note" },
+      });
+      toggleDetails(panel, false);
+      acknowledge(locale);
+      fireEvent.submit(
+        screen.getByRole("button", { name: t.save }).closest("form")!,
+      );
+      await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(1));
+      expect(fetchStub.mock.calls[0][0]).toBe(`/api/requests/${id}`);
+      expect(fetchStub.mock.calls[0][1].method).toBe("PATCH");
+      expect(updateRequestSchema.parse(body())).toEqual({
+        revision: 11,
+        details: {
+          title: "Edit title",
+          format: "UNKNOWN",
+          alternativeTitles: ["Edit alias"],
+          notes: "Changed private note",
+        },
+      });
+    });
+
+    it("reveals a single schema-invalid optional field before focusing and associates its localized error", async () => {
+      const t = requestDictionary(locale);
+      render(
+        React.createElement(NewRequestForm, {
+          locale,
+          prefillTitle: "Valid title",
+        }),
+      );
+      const panel = moreDetails(locale);
+      openDetails(locale);
+      const field = screen.getByLabelText(t.sourceUrl);
+      fireEvent.change(field, {
+        target: { value: "http://localhost/private" },
+      });
+      toggleDetails(panel, false);
+      let openAtFocus = false;
+      field.addEventListener("focus", () => {
+        openAtFocus = panel.open;
+      });
+      acknowledge(locale);
+      submit(locale);
+      await waitFor(() => expect(field).toHaveFocus());
+      expect(openAtFocus).toBe(true);
+      expect(panel.open).toBe(true);
+      expectFieldError(field, t.sourceUrlError);
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(t.invalid);
+      expect(alert.closest("details")).toBeNull();
+      expect(fetchStub).not.toHaveBeenCalled();
+      expect(uuid).not.toHaveBeenCalled();
+    });
+
+    it("reveals multiple schema errors and keeps user toggle state on later renders", async () => {
+      const t = requestDictionary(locale);
+      const props = { locale, prefillTitle: "Valid title" };
+      const view = render(React.createElement(NewRequestForm, props));
+      const panel = moreDetails(locale);
+      openDetails(locale);
+      for (const name of ["originalLanguage", "publicationLanguage"] as const)
+        fireEvent.change(screen.getByLabelText(t[name]), {
+          target: { value: "invalid language" },
+        });
+      toggleDetails(panel, false);
+      acknowledge(locale);
+      submit(locale);
+      await waitFor(() => expect(panel.open).toBe(true));
+      const alert = screen.getByRole("alert");
+      expect(alert).toHaveTextContent(t.invalid);
+      for (const name of ["originalLanguage", "publicationLanguage"] as const) {
+        const field = screen.getByLabelText(t[name]);
+        expectFieldError(field, t[`${name}Error`]);
+        expect(
+          within(alert).getByRole("link", { name: t[name] }),
+        ).toHaveAttribute("href", `#${field.id}`);
+      }
+      toggleDetails(panel, false);
+      view.rerender(React.createElement(NewRequestForm, props));
+      expect(panel.open).toBe(false);
+      expect(screen.getByLabelText(t.originalLanguage)).toHaveValue(
+        "invalid language",
+      );
+      toggleDetails(panel, true);
+      expectFieldError(
+        screen.getByLabelText(t.originalLanguage),
+        t.originalLanguageError,
+      );
+      expect(fetchStub).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ["sourceUrl", "not a URL", "typeMismatch"],
+      ["publicationYear", "10000", "rangeOverflow"],
+      ["publicationYear", "0", "rangeUnderflow"],
+    ] as const)(
+      "handles native invalid %s %s without cancelling constraint validation",
+      (name, value, validityKey) => {
+        const t = requestDictionary(locale);
+        render(
+          React.createElement(NewRequestForm, {
+            locale,
+            prefillTitle: "Native validation",
+          }),
+        );
+        const panel = moreDetails(locale);
+        const form = panel.closest("form")!;
+        openDetails(locale);
+        const field = screen.getByLabelText(t[name]) as HTMLInputElement;
+        fireEvent.change(field, { target: { value } });
+        expect(field.willValidate).toBe(true);
+        expect(field.validity[validityKey]).toBe(true);
+        expect(field.validity.customError).toBe(false);
+        expect(form.noValidate).toBe(false);
+        toggleDetails(panel, false);
+        // jsdom validity + explicit invalid dispatch; not actual native keyboard/focus evidence.
+        let openAtTarget = false;
+        field.addEventListener(
+          "invalid",
+          () => {
+            openAtTarget = panel.open;
+          },
+          { once: true },
+        );
+        expect(fireEvent.invalid(field, { cancelable: true })).toBe(true);
+        expect(openAtTarget).toBe(true);
+        expect(panel.open).toBe(true);
+        expectFieldError(field, t[`${name}Error`]);
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          t.validationSummary,
+        );
+        expect(screen.getByRole("alert").closest("details")).toBeNull();
+        expect(field.validity[validityKey]).toBe(true);
+        expect(field.validity.customError).toBe(false);
+        expect(fetchStub).not.toHaveBeenCalled();
+        expect(uuid).not.toHaveBeenCalled();
+      },
+    );
+
+    it("keeps values and the allocated key after a schema-invalid retry", async () => {
+      const t = requestDictionary(locale);
+      fetchStub.mockRejectedValueOnce(new Error("PRIVATE_TRANSPORT"));
+      render(
+        React.createElement(NewRequestForm, { locale, prefillTitle: "Retry" }),
+      );
+      openDetails(locale);
+      fireEvent.change(screen.getByLabelText(t.notes), {
+        target: { value: "Keep private note" },
+      });
+      acknowledge(locale);
+      submit(locale);
+      await waitFor(() =>
+        expect(screen.getByRole("alert")).toHaveTextContent(t.error),
+      );
+      fireEvent.change(screen.getByLabelText(t.originalLanguage), {
+        target: { value: "bad language" },
+      });
+      toggleDetails(moreDetails(locale), false);
+      submit(locale);
+      expect(fetchStub).toHaveBeenCalledTimes(1);
+      expect(screen.getByLabelText(t.notes)).toHaveValue("Keep private note");
+      expect(screen.getByLabelText(t.originalLanguage)).toHaveValue(
+        "bad language",
+      );
+      expect(
+        screen.getByRole("checkbox", { name: t.disclaimer }),
+      ).toBeChecked();
+      expect(uuid).toHaveBeenCalledTimes(1);
+      fireEvent.change(screen.getByLabelText(t.originalLanguage), {
+        target: { value: "en" },
+      });
+      submit(locale);
+      await waitFor(() => expect(fetchStub).toHaveBeenCalledTimes(2));
+      expect(submitRequestSchema.parse(body(0)).submitKey).toBe(
+        submitRequestSchema.parse(body(1)).submitKey,
+      );
+      expect(submitRequestSchema.parse(body(1)).details).toMatchObject({
+        notes: "Keep private note",
+        originalLanguage: "en",
+      });
+      expect(screen.queryByText(/PRIVATE_TRANSPORT/)).not.toBeInTheDocument();
+      expect(uuid).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("uses unique stable IDs and exact field labels across two forms, with help outside labels", () => {
+    const forms = () =>
+      React.createElement(
+        React.Fragment,
+        null,
+        React.createElement(NewRequestForm, {
+          locale: "en",
+          prefillTitle: "English",
+        }),
+        React.createElement(NewRequestForm, {
+          locale: "vi",
+          prefillTitle: "Vietnamese",
+        }),
+      );
+    const view = render(forms());
+    const before = Array.from(
+      view.container.querySelectorAll("[id]"),
+      (element) => element.id,
+    );
+    expect(before.length).toBeGreaterThan(0);
+    expect(new Set(before).size).toBe(before.length);
+    for (const locale of ["en", "vi"] as const) {
+      const t = requestDictionary(locale);
+      openDetails(locale);
+      for (const name of [
+        "title",
+        "format",
+        ...optionalNames,
+        "disclaimer",
+      ] as const) {
+        const field = screen.getByLabelText(t[name]);
+        expect(field.id).not.toBe("");
+        const label = Array.from(view.container.querySelectorAll("label")).find(
+          (candidate) => candidate.htmlFor === field.id,
+        );
+        expect(label).toBeDefined();
+        expect(field).toHaveAccessibleName(t[name]);
+      }
+      for (const help of [t.moreDetailsHelp, t.privateNotesHelp]) {
+        expect(screen.getByText(help)).toBeVisible();
+        expect(screen.getByText(help).closest("label")).toBeNull();
+      }
+      expect(screen.getByLabelText(t.notes)).toHaveAccessibleDescription(
+        t.privateNotesHelp,
+      );
+    }
+    view.rerender(forms());
+    expect(
+      Array.from(
+        view.container.querySelectorAll("[id]"),
+        (element) => element.id,
+      ),
+    ).toEqual(before);
+  });
 });
 
 describe("explicit equivalence and safe followed summaries", () => {
@@ -476,6 +954,14 @@ describe("request dictionary coverage", () => {
     for (const dictionary of [en, vi])
       for (const value of Object.values(dictionary))
         expect(value.trim().length).toBeGreaterThan(0);
+    for (const dictionary of [en, vi])
+      for (const field of [
+        "title",
+        "format",
+        ...optionalNames,
+        "disclaimer",
+      ] as const)
+        expect(dictionary[`${field}Error`].trim().length).toBeGreaterThan(0);
   });
   it.each(["en", "vi"] as const)(
     "labels every state instead of exposing raw codes in %s",

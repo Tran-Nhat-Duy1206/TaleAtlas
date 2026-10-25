@@ -1161,3 +1161,47 @@ The authored browser cases measure actual boxes and text fragments after font re
 Actual 200% browser-UI zoom, rendered contrast and assistive-technology combinations remain unverified. No WCAG certification or hosted SMTP/TLS/runtime/production acceptance is claimed. Hosted V4 is not enabled by this work.
 
 **Decision:** GO for one separately authorized scoped local A3 commit based on passing bounded local gates. This does not authorize committing now, publishing, merging, deployment, or waiving independent Linux browser/SQL/security CI and any claimed manual acceptance. Unexecuted checks remain NOT RUN.
+
+## V6A Batch A4 — Progressive Request a Story form (V6A-06)
+
+**Local implementation receipt — 2026-10-24.** Baseline `f919c78b8c5a090dcc3dd1201079e02376e9b614`, branch `fix/v6a-progressive-request-form`. Exact approved six-file scope; no staging, commit, push, PR, merge, deployment or hosted operations. Earlier-batch CI/results and Windows infrastructure were not revisited.
+
+### Scope and implemented behavior
+
+- [NewRequestForm](<../apps/web/src/components/requests/NewRequestForm.tsx>): native details/summary with always-visible required title/format, valid UNKNOWN, existing disclaimer, error summary and submit outside optional details. Both create/edit start collapsed for blank/whitespace-only optional data or title-only prefill, expanded for any populated optional value. All ten optional controls remain mounted and enabled when collapsed; normal user toggle state survives rerenders/errors. No draft storage, new route or wizard.
+- [Request styles](<../apps/web/src/components/requests/request.module.css>): new rules exclusively under `.progressiveForm`; grouped basic/optional controls, responsive fields, full-width multiline controls, long-label wrapping and inherited theme colors. The pre-existing stylesheet prefix is byte-identical; unrelated request screens/forms/cards/actions retain their rules.
+- [Request dictionary](<../apps/web/src/lib/request-i18n.ts>): additive flat EN/VI strings for grouping, hints and field errors, preserving existing field labels/options. Notes are described as excluded from public request summaries, not as visible only to their owner.
+- [Request UI units](<../tests/unit/request-ui.test.ts>): original 22 cases/assertions retained; 41 progressive cases and one HTTP-500 sanitization case added, 64 total. Cover both locales/create-edit initialization, collapsed FormData/POST/PATCH retention, disclosure state, schema/native-invalid reveal, localized error associations, IDs, retained inputs/retry keys and existing private-summary boundaries.
+- [Request browser spec](<../tests/e2e/requests.spec.ts>): adapt original optional editing to open the disclosure, retaining prior assertions/deadlines/retries; add two EN/VI cases, one verified synthetic actor and one real create/edit pair per locale. Authored keyboard/native-invalid/schema/draft/payload and 375/768/1280/1440px light/dark create/edit geometry coverage. These cases were not executed locally.
+- This ledger: A4-only append; historical content remains byte-identical.
+
+### Accessible validation and preserved contracts
+
+Stable React IDs connect labels, relevant help and localized field errors. Native invalid capture opens optional details synchronously before native focus without preventing the invalid event, setting custom validity or disabling constraints. Schema failures reveal optional fields before single-field focus; multi-field errors have focusable summary links. Global payload/transport/conflict/server failures remain sanitized and visible outside the disclosure. No raw backend response or diagnostic text is rendered.
+
+Static token comparisons confirm unchanged optional field names/limits, trimming/blank omission/alternative-title parsing, UTF-8 12000-byte condition, UUID/retry and revision payload construction, POST/PATCH endpoint/method/headers/body, sanitized HTTP mappings and success navigation. The shared schema, authenticated route wrappers, dependencies/lockfile and test configurations match their baseline hashes. Actual units verify controlled UI/payload behavior; they do not independently prove real authentication, SQL isolation or browser keyboard behavior.
+
+### Observed bounded local verification
+
+| Gate | Actual result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS, exit 0; frozen graph unchanged |
+| Focused request form and related units | 82/82 PASS across 3 files, exit 0; includes all 64 request-UI cases |
+| `pnpm test` | 2203/2203 PASS across 73 files, exit 0 |
+| `pnpm typecheck` | PASS, exit 0; includes browser-spec compilation |
+| `pnpm lint` | PASS, exit 0 |
+| `pnpm build` | PASS, exit 0; optimized production build completed |
+| Local browser/native E2E | **NOT RUN** |
+| Local SQL integration/migrations/fresh audits | **NOT RUN in this bounded local pass**; no new PASS inferred |
+
+Focused command: `pnpm exec vitest run tests/unit/request-ui.test.ts tests/unit/request-return.test.ts tests/unit/request-review-history.test.tsx`.
+
+Frozen install, focused run and each full gate completed once successfully. No assertions, workers, timeouts or retry policies were weakened; no successful full gate was repeated. Independent read-only source review found no blocking candidate findings. No API/auth/service/schema/migration, dependency, CI workflow, Vercel or global-style changes. No hosted SMTP work or V4 activation.
+
+### NOT RUN boundaries and decision
+
+No approved already-working disposable browser/database environment was supplied, and ambient database URLs were absent. No browser/service bootstrap, Windows Observer, PostgreSQL provenance, ACL, TLS or historical harness investigation was attempted. New real-session browser tests remain for independent GitHub Linux CI after separately authorized publication. Authored coverage and jsdom validity/invalid-event checks do not establish actual browser focus timing, keyboard traversal, layout geometry or theme rendering. Browser case runtime/deadline sufficiency is unverified.
+
+Actual 200% browser-UI zoom, rendered contrast, assistive technology, hosted SMTP/TLS/runtime and production behavior remain unverified. No WCAG certification, CI PASS, real database/privacy acceptance or application deployment is claimed. Existing mandatory CI/security/integration/browser gates are not waived.
+
+**Decision:** GO for one separately authorized scoped local A4 commit based on this bounded local evidence. No commit is authorized by this receipt itself; no publication, merge, deployment or hosted activation. Browser/manual and other unexecuted checks remain NOT RUN.
