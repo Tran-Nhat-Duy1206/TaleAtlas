@@ -335,6 +335,109 @@ async function myRequestsLayout(
   }
 }
 
+// Scope geometry to the actual create/edit form, never the My requests index.
+async function progressiveRequestLayout(
+  page: Page,
+  form: Locator,
+  width: number,
+) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+  });
+  const geometry = await form.evaluate((element) => {
+    const rect = (node: Element) => {
+      const box = node.getBoundingClientRect();
+      return {
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+        width: box.width,
+      };
+    };
+    return {
+      form: rect(element),
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      body: document.body.scrollWidth,
+      controls: Array.from(element.querySelectorAll("input, select, textarea"))
+        .filter((control) => control.getClientRects().length > 0)
+        .map((control) => ({
+          box: rect(control),
+          container: rect(control.closest("label") ?? control.parentElement!),
+          textarea: control.tagName === "TEXTAREA",
+        })),
+      // Measure actual wrapped label text fragments, not just their container.
+      labels: Array.from(element.querySelectorAll("label")).flatMap((label) => {
+        if (!label.getClientRects().length) return [];
+        const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+        const fragments = [];
+        let node: Node | null;
+        while ((node = walker.nextNode())) {
+          if (
+            !node.textContent?.trim() ||
+            node.parentElement?.closest("textarea, select")
+          )
+            continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          fragments.push(
+            ...Array.from(range.getClientRects(), (box) => ({
+              left: box.left,
+              right: box.right,
+              top: box.top,
+              bottom: box.bottom,
+            })).filter((box) => box.right > box.left),
+          );
+        }
+        return [{ box: rect(label), fragments }];
+      }),
+    };
+  });
+  const tolerance = 2;
+  expect(geometry.viewport).toBe(width);
+  expect(geometry.document).toBeLessThanOrEqual(width + tolerance);
+  expect(geometry.body).toBeLessThanOrEqual(width + tolerance);
+  expect(geometry.form.left).toBeGreaterThanOrEqual(-tolerance);
+  expect(geometry.form.right).toBeLessThanOrEqual(width + tolerance);
+  expect(geometry.controls.length).toBeGreaterThanOrEqual(3);
+  for (const { box, container, textarea } of geometry.controls) {
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.left).toBeGreaterThanOrEqual(
+      Math.max(0, geometry.form.left, container.left) - tolerance,
+    );
+    expect(box.right).toBeLessThanOrEqual(
+      Math.min(width, geometry.form.right, container.right) + tolerance,
+    );
+    expect(box.top).toBeGreaterThanOrEqual(container.top - tolerance);
+    expect(box.bottom).toBeLessThanOrEqual(container.bottom + tolerance);
+    if (textarea)
+      expect(box.width).toBeGreaterThanOrEqual(container.width - tolerance);
+  }
+  if (width === 375) {
+    expect(
+      geometry.labels.some(
+        ({ fragments }) =>
+          new Set(fragments.map((fragment) => Math.round(fragment.top))).size >
+          1,
+      ),
+    ).toBe(true);
+  }
+  for (const { box, fragments } of geometry.labels) {
+    expect(fragments.length).toBeGreaterThan(0);
+    for (const fragment of fragments) {
+      expect(fragment.left).toBeGreaterThanOrEqual(
+        Math.max(0, box.left) - tolerance,
+      );
+      expect(fragment.right).toBeLessThanOrEqual(
+        Math.min(width, box.right) + tolerance,
+      );
+      expect(fragment.top).toBeGreaterThanOrEqual(box.top - tolerance);
+      expect(fragment.bottom).toBeLessThanOrEqual(box.bottom + tolerance);
+    }
+  }
+}
+
 test("verified request ownership, reviewed equivalence, following and private lifecycle", async ({
   browser,
   page,
@@ -544,6 +647,11 @@ test("verified request ownership, reviewed equivalence, following and private li
       page.getByLabel(dictionary("vi").theme, { exact: true }),
     ).toHaveValue("dark", { timeout: 15_000 });
     await overflow(page);
+    await expect(page.locator("form details")).not.toHaveAttribute("open");
+    await page
+      .locator("form summary")
+      .filter({ hasText: vi.moreDetails })
+      .click();
     await page
       .getByRole("textbox", { name: vi.notes, exact: true })
       .fill(notes);
@@ -913,6 +1021,298 @@ test("verified request ownership, reviewed equivalence, following and private li
 });
 
 for (const locale of ["en", "vi"] as const) {
+  test(`A4 progressive request form keyboard, validation and responsive geometry (${locale})`, async ({
+    browser,
+    page,
+    baseURL,
+  }) => {
+    test.setTimeout(360_000);
+    const { run, createdIds, signUp, cleanup } = await requestScenario(
+      browser,
+      page,
+      baseURL,
+    );
+    const t = requestDictionary(locale);
+    const title = `Synthetic progressive request ${run}`;
+    const optional = {
+      alternativeTitles: `Synthetic alias ${run}`,
+      originalTitle: "Synthetic original title",
+      author: "Synthetic author",
+      sourceUrl: "https://example.org/synthetic-progressive",
+      originalLanguage: "en",
+      publicationLanguage: "vi",
+      publicationYear: "2024",
+      description:
+        "Synthetic description retained while details are collapsed.",
+      additionalEvidence:
+        "Synthetic citation context, not fetched by the application.",
+      notes: `Synthetic private draft ${run}`,
+    };
+    const details = {
+      title,
+      format: "UNKNOWN",
+      ...optional,
+      alternativeTitles: [optional.alternativeTitles],
+      publicationYear: 2024,
+    };
+    const form = page
+      .locator("form")
+      .filter({ has: page.locator('input[name="title"]') });
+    const disclosure = form.locator("details");
+    const summary = disclosure.locator("summary");
+    const field = (name: keyof typeof optional) =>
+      form.locator(`[name="${name}"]`);
+    let mutations = 0;
+    page.on("request", (request) => {
+      if (
+        /^\/api\/requests(?:\/[0-9a-f-]{36})?$/.test(
+          new URL(request.url()).pathname,
+        ) &&
+        ["POST", "PATCH"].includes(request.method())
+      )
+        mutations++;
+    });
+    async function outsideDetails(locator: Locator) {
+      await expect(locator).toBeVisible();
+      expect(
+        await locator.evaluate(
+          (element) => element.closest("details") === null,
+        ),
+      ).toBe(true);
+    }
+    async function retained() {
+      await expect(form.getByLabel(t.title, { exact: true })).toHaveValue(
+        title,
+      );
+      for (const [name, value] of Object.entries(optional))
+        await expect(field(name as keyof typeof optional)).toHaveValue(value);
+      await expect(
+        form.getByLabel(t.disclaimer, { exact: true }),
+      ).toBeChecked();
+    }
+    async function layouts() {
+      for (const width of [375, 768, 1280, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        for (const theme of ["light", "dark"] as const) {
+          const selector = page.getByLabel(dictionary(locale).theme, {
+            exact: true,
+          });
+          await selector.selectOption(theme);
+          await expect(selector).toHaveValue(theme);
+          if (theme === "dark")
+            await expect(page.locator("html")).toHaveClass(/dark/);
+          else await expect(page.locator("html")).not.toHaveClass(/dark/);
+          await progressiveRequestLayout(page, form, width);
+          await summary.click();
+          await expect(disclosure).not.toHaveAttribute("open");
+          await progressiveRequestLayout(page, form, width);
+          await summary.click();
+          await expect(disclosure).toHaveAttribute("open", "");
+        }
+      }
+    }
+    try {
+      await signUp(page); // One real verified cookie actor per locale.
+      await page.goto(`/${locale}/requests/new`);
+      await expect(disclosure).toHaveCount(1);
+      expect(
+        await form.evaluate((element: HTMLFormElement) => element.noValidate),
+      ).toBe(false);
+      await expect(summary).toHaveText(t.moreDetails);
+      await expect(disclosure).not.toHaveAttribute("open");
+      await expect(form.getByLabel(t.title, { exact: true })).toHaveValue("");
+      await expect(form.getByLabel(t.format, { exact: true })).toHaveValue(
+        "UNKNOWN",
+      );
+      await outsideDetails(form.getByText(t.basicInformation, { exact: true }));
+      await outsideDetails(form.getByLabel(t.title, { exact: true }));
+      await outsideDetails(form.getByLabel(t.format, { exact: true }));
+      await outsideDetails(form.getByLabel(t.disclaimer, { exact: true }));
+      await outsideDetails(
+        form.getByRole("button", { name: t.submit, exact: true }),
+      );
+      for (const name of Object.keys(optional) as (keyof typeof optional)[]) {
+        await expect(field(name)).toHaveCount(1);
+        await expect(field(name)).toBeEnabled();
+        await expect(field(name)).not.toHaveAttribute("required");
+        await expect(field(name)).toBeHidden();
+        await expect(field(name)).toHaveValue("");
+      }
+      await form.getByLabel(t.title, { exact: true }).fill(title);
+      // Keep the native required acknowledgement and UNKNOWN behavior intact.
+      await form.getByRole("button", { name: t.submit, exact: true }).click();
+      await expect(
+        form.getByLabel(t.disclaimer, { exact: true }),
+      ).toBeFocused();
+      expect(mutations).toBe(0);
+      await form.getByLabel(t.disclaimer, { exact: true }).check();
+      await summary.focus();
+      await page.keyboard.press("Enter");
+      await expect(disclosure).toHaveAttribute("open", "");
+      await page.keyboard.press("Space");
+      await expect(disclosure).not.toHaveAttribute("open");
+      await page.keyboard.press("Enter");
+      await expect(disclosure).toHaveAttribute("open", "");
+      await expect(
+        form.getByText(t.privateNotesHelp, { exact: true }),
+      ).toBeVisible();
+      for (const [name, value] of Object.entries(optional))
+        await form
+          .getByLabel(t[name as keyof typeof optional], { exact: true })
+          .fill(value);
+      await summary.focus();
+      await page.keyboard.press("Space");
+      await expect(disclosure).not.toHaveAttribute("open");
+      await retained();
+      for (const name of Object.keys(optional) as (keyof typeof optional)[])
+        await expect(field(name)).toBeEnabled();
+      await page.keyboard.press("Enter");
+      await expect(disclosure).toHaveAttribute("open", "");
+      await retained();
+      await layouts(); // Both disclosure states on the actual create form.
+      await page.setViewportSize({ width: 375, height: 900 });
+
+      // Genuine browser validation must reveal the hidden invalid control before
+      // its default focus, without disabling native constraints or sending a POST.
+      for (const [name, value, validity] of [
+        ["sourceUrl", "not a URL", "typeMismatch"],
+        ["publicationYear", "10000", "rangeOverflow"],
+      ] as const) {
+        await field(name).fill(value);
+        await summary.click();
+        await expect(disclosure).not.toHaveAttribute("open");
+        await form.getByRole("button", { name: t.submit, exact: true }).click();
+        await expect(disclosure).toHaveAttribute("open", "");
+        await expect(field(name)).toBeVisible();
+        await expect(field(name)).toBeFocused();
+        await outsideDetails(form.getByRole("alert"));
+        await expect(form.getByRole("alert")).toContainText(
+          t.validationSummary,
+        );
+        expect(
+          await field(name).evaluate(
+            (element: HTMLInputElement, key) => element.validity[key],
+            validity,
+          ),
+        ).toBe(true);
+        expect(mutations).toBe(0);
+        await field(name).fill(optional[name]);
+        await retained();
+      }
+
+      // These values pass native URL/text constraints but fail the real schema.
+      await field("sourceUrl").fill("http://127.0.0.1/private");
+      await summary.click();
+      await form.getByRole("button", { name: t.submit, exact: true }).click();
+      await expect(disclosure).toHaveAttribute("open", "");
+      await expect(field("sourceUrl")).toBeVisible();
+      await expect(field("sourceUrl")).toBeFocused();
+      await expect(field("sourceUrl")).toHaveAttribute("aria-invalid", "true");
+      await expect(
+        form.getByText(t.sourceUrlError, { exact: true }),
+      ).toBeVisible();
+      await outsideDetails(form.getByRole("alert"));
+      await expect(form.getByRole("alert")).toContainText(t.invalid);
+      await progressiveRequestLayout(page, form, 375);
+      expect(mutations).toBe(0);
+      await expect(field("sourceUrl")).toHaveValue("http://127.0.0.1/private");
+      await expect(field("originalLanguage")).toHaveValue(
+        optional.originalLanguage,
+      );
+      await expect(field("notes")).toHaveValue(optional.notes);
+      await expect(form.getByLabel(t.title, { exact: true })).toHaveValue(
+        title,
+      );
+      await field("sourceUrl").fill(optional.sourceUrl);
+      await field("originalLanguage").fill("not a language");
+      await summary.click();
+      await expect(disclosure).not.toHaveAttribute("open");
+      await form.getByRole("button", { name: t.submit, exact: true }).click();
+      await expect(disclosure).toHaveAttribute("open", "");
+      await expect(field("originalLanguage")).toBeVisible();
+      await expect(field("originalLanguage")).toBeFocused();
+      await expect(field("originalLanguage")).toHaveAttribute(
+        "aria-invalid",
+        "true",
+      );
+      await expect(field("originalLanguage")).toHaveValue("not a language");
+      await expect(
+        form.getByText(t.originalLanguageError, { exact: true }),
+      ).toBeVisible();
+      await expect(field("notes")).toHaveValue(optional.notes);
+      expect(mutations).toBe(0);
+      await field("originalLanguage").fill(optional.originalLanguage);
+      await retained();
+      await summary.click();
+      await expect(disclosure).not.toHaveAttribute("open");
+      const posted = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/requests" &&
+          response.request().method() === "POST",
+        { timeout: 45_000 },
+      );
+      await form.getByRole("button", { name: t.submit, exact: true }).click();
+      const post = await posted;
+      expect(post.status()).toBe(200);
+      expect(post.request().postDataJSON().details).toEqual(details);
+      await expect(page).toHaveURL(
+        new RegExp(`/${locale}/requests/[0-9a-f-]{36}$`),
+        { timeout: 45_000 },
+      );
+      const id = new URL(page.url()).pathname.split("/").at(-1)!;
+      createdIds.add(id);
+      const createdResponse = await page.request.get(`/api/requests/${id}`);
+      expect(createdResponse.status()).toBe(200);
+      expect(await createdResponse.json()).toMatchObject({
+        kind: "OWNED",
+        request: { id, revision: 1, details },
+      });
+      // A persisted nonblank optional value initializes the actual edit form open.
+      await expect(disclosure).toHaveAttribute("open", "");
+      await expect(field("notes")).toHaveValue(optional.notes);
+      await outsideDetails(
+        form.getByRole("button", { name: t.save, exact: true }),
+      );
+      await outsideDetails(form.getByLabel(t.disclaimer, { exact: true }));
+      await layouts();
+      const revisedTitle = `${title} revised`;
+      await form.getByLabel(t.title, { exact: true }).fill(revisedTitle);
+      await form.getByLabel(t.disclaimer, { exact: true }).check();
+      await summary.click();
+      await expect(disclosure).not.toHaveAttribute("open");
+      const patched = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === `/api/requests/${id}` &&
+          response.request().method() === "PATCH",
+        { timeout: 45_000 },
+      );
+      await form.getByRole("button", { name: t.save, exact: true }).click();
+      const patch = await patched;
+      expect(patch.status()).toBe(200);
+      expect(patch.request().postDataJSON()).toEqual({
+        revision: 1,
+        details: { ...details, title: revisedTitle },
+      });
+      await expect(page.getByRole("heading", { level: 1 })).toHaveText(
+        revisedTitle,
+        { timeout: 15_000 },
+      );
+      const amendedResponse = await page.request.get(`/api/requests/${id}`);
+      expect(amendedResponse.status()).toBe(200);
+      expect(await amendedResponse.json()).toMatchObject({
+        kind: "OWNED",
+        request: {
+          id,
+          revision: 2,
+          details: { ...details, title: revisedTitle },
+        },
+      });
+      expect(mutations).toBe(2);
+    } finally {
+      await cleanup();
+    }
+  });
+
   test(`A3 My requests real layout, themes and focus order (${locale})`, async ({
     browser,
     page,

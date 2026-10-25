@@ -163,3 +163,96 @@
     padding: 1rem;
   }
 }
+
+/* Progressive create/edit form only; other request components do not opt in. */
+.progressiveForm {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.progressiveForm .basicFields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.progressiveForm .basicFields > legend {
+  max-width: 100%;
+  margin-bottom: 0.75rem;
+  padding: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.progressiveForm .fields,
+.progressiveForm .formField {
+  min-width: 0;
+}
+.progressiveForm .formField {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+.progressiveForm .multilineField {
+  grid-column: 1 / -1;
+}
+.progressiveForm label {
+  line-height: 1.5;
+}
+.progressiveForm p {
+  margin: 0;
+  line-height: 1.6;
+}
+.progressiveForm .basicFields > .formHelp,
+.progressiveForm .moreDetails > .formHelp {
+  margin-bottom: 1rem;
+}
+.progressiveForm .formHelp {
+  font-size: 0.9375rem;
+}
+.progressiveForm .moreDetails {
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+}
+.progressiveForm .moreDetails > summary {
+  box-sizing: border-box;
+  min-height: 44px;
+  padding-block: 0.5rem;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.progressiveForm .moreDetails[open] > summary {
+  margin-bottom: 0.75rem;
+}
+.progressiveForm .fieldError {
+  border-inline-start: 2px solid currentColor;
+  padding-inline-start: 0.625rem;
+}
+.progressiveForm
+  :is(input:not([type="checkbox"]), select, textarea)[aria-invalid="true"] {
+  border-width: 2px;
+}
+.progressiveForm .check {
+  line-height: 1.5;
+}
+.progressiveForm .check input {
+  flex: 0 0 auto;
+  margin-block-start: 0.25em;
+}
+.progressiveForm .error ul {
+  margin: 0.5rem 0 0;
+  padding-inline-start: 1.25rem;
+  line-height: 1.6;
+}
+.progressiveForm .error a {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+.progressiveForm > button {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
