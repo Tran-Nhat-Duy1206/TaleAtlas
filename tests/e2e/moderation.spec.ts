@@ -74,6 +74,10 @@ test("human candidate review publishes a verified searchable Work without exposi
     await page
       .getByRole("combobox", { name: "Format", exact: true })
       .selectOption("NOVEL");
+    const moreDetails = page.locator("form details");
+    await expect(moreDetails).not.toHaveAttribute("open");
+    await moreDetails.locator("summary").click();
+    await expect(moreDetails).toHaveAttribute("open", "");
     await page.locator('[name="notes"]').fill(privateNote);
     await page.getByRole("checkbox").check();
     const destination = page.waitForResponse(
