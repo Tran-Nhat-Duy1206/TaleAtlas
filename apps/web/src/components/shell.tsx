@@ -2,7 +2,14 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ThemeProvider, useTheme } from "next-themes";
-import { Suspense, useCallback, useEffect, useSyncExternalStore } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 const subscribeHydration = () => () => {};
 const clientSnapshot = () => true;
 const serverSnapshot = () => false;
@@ -109,7 +116,50 @@ export function Shell({
   }, [locale]);
   const t = dictionary(locale);
   const pathname = usePathname();
-  const { data: session } = authClient.useSession();
+  const {
+    data: session,
+    isPending,
+    isRefetching,
+    error,
+    refetch,
+  } = authClient.useSession();
+  const hydrated = useSyncExternalStore(
+    subscribeHydration,
+    clientSnapshot,
+    serverSnapshot,
+  );
+  const [retrying, setRetrying] = useState(false);
+  const retryLock = useRef(false);
+  // Cached data is not a resolved presentation while the SDK is checking it.
+  // The server and first hydration render stay neutral without session seeding.
+  const pending =
+    !hydrated ||
+    isPending !== false ||
+    isRefetching ||
+    session === undefined ||
+    retrying;
+  const presentation = pending
+    ? "pending"
+    : error
+      ? "error"
+      : session
+        ? "authenticated"
+        : "anonymous";
+  const resolvedSession = presentation === "authenticated" ? session : null;
+  async function retrySession() {
+    if (retryLock.current || isPending !== false || isRefetching) return;
+    retryLock.current = true;
+    setRetrying(true);
+    try {
+      await refetch();
+    } catch {
+      // The existing SDK reports lookup failures through its error snapshot.
+      // Never render a rejected request's message or create another auth state.
+    } finally {
+      retryLock.current = false;
+      setRetrying(false);
+    }
+  }
   return (
     <>
       <a className="skip-link" href="#main">
@@ -132,13 +182,13 @@ export function Shell({
           aria-label={locale === "vi" ? "Điều hướng chính" : "Main navigation"}
         >
           <a href={`/${locale}/works`}>{catalogDictionary(locale).browse}</a>
-          {session && <a href={`/${locale}/library`}>{t.library}</a>}
-          {session && (
+          {resolvedSession && <a href={`/${locale}/library`}>{t.library}</a>}
+          {resolvedSession && (
             <a href={`/${locale}/requests`}>
               {locale === "vi" ? "Yêu cầu của tôi" : "My requests"}
             </a>
           )}
-          {session?.user.role === "admin" && (
+          {resolvedSession?.user.role === "admin" && (
             <a href={`/${locale}/admin/works`}>
               {catalogDictionary(locale).admin}
             </a>
@@ -148,13 +198,39 @@ export function Shell({
           >
             <RouterLocaleLink locale={locale} pathname={pathname} />
           </Suspense>
-          <a
-            className="nav-account"
-            href={`/${locale}/${session ? "settings" : "login"}`}
-          >
-            {session ? t.settings : t.login}
-            <span aria-hidden="true"> ↗</span>
-          </a>
+          <span className="nav-account" data-session-state={presentation}>
+            {presentation === "pending" || presentation === "error" ? (
+              <span
+                role={presentation === "pending" ? "status" : "alert"}
+                // Background checks remain readable without repeated announcements.
+                aria-live={
+                  presentation === "pending"
+                    ? retrying
+                      ? "polite"
+                      : "off"
+                    : undefined
+                }
+              >
+                {presentation === "pending" ? t.loading : t.sessionError}
+              </span>
+            ) : (
+              <a href={`/${locale}/${resolvedSession ? "settings" : "login"}`}>
+                {resolvedSession ? t.settings : t.login}
+                <span aria-hidden="true"> ↗</span>
+              </a>
+            )}
+            {(presentation === "error" || retrying) && (
+              <button
+                type="button"
+                className="button header-session-retry"
+                // Keep a focused retry mounted and focusable while guarding activation.
+                aria-disabled={pending}
+                onClick={() => void retrySession()}
+              >
+                {t.retry}
+              </button>
+            )}
+          </span>
         </nav>
       </header>
       <main id="main">{children}</main>

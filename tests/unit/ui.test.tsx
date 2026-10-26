@@ -9,6 +9,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
@@ -85,6 +86,7 @@ beforeEach(() => {
   mocks.useSession.mockReturnValue({
     data: null,
     isPending: true,
+    isRefetching: false,
     error: null,
     refetch: mocks.refetch,
   });
@@ -532,5 +534,381 @@ describe("router-synchronized native locale links", () => {
       "/vi/works?q=title%20one&literal=%2B#results",
     );
     expect(onRecoverableError).not.toHaveBeenCalled();
+  });
+});
+
+describe("A6 header session presentation", () => {
+  beforeEach(() => {
+    mocks.refetch.mockReset();
+  });
+  function session(role = "user", emailVerified = true, id = "account-a") {
+    return {
+      user: {
+        id,
+        role,
+        emailVerified,
+        name: `PRIVATE_NAME_${id}`,
+        email: `${id}@private.invalid`,
+      },
+      session: { id: `PRIVATE_SESSION_${id}`, token: `PRIVATE_TOKEN_${id}` },
+    };
+  }
+  type Snapshot = {
+    data: ReturnType<typeof session> | null | undefined;
+    isPending: boolean | undefined;
+    isRefetching: boolean;
+    error: null | { message: string; stack?: string };
+  };
+  function setSession(overrides: Partial<Snapshot> = {}) {
+    mocks.useSession.mockReturnValue({
+      data: null,
+      isPending: false,
+      isRefetching: false,
+      error: null,
+      refetch: mocks.refetch,
+      ...overrides,
+    });
+  }
+  function header() {
+    return within(screen.getByRole("banner"));
+  }
+  function account(state: string) {
+    const node = screen.getByRole("banner").querySelector(".nav-account");
+    expect(node).not.toBeNull();
+    expect(node!.tagName).toBe("SPAN");
+    expect(node).toHaveAttribute("data-session-state", state);
+    return node!;
+  }
+  function noAccountLinks(locale: "en" | "vi") {
+    const t = dictionary(locale);
+    for (const name of [
+      t.login,
+      t.settings,
+      t.library,
+      locale === "vi" ? "Yêu cầu của tôi" : "My requests",
+      catalogDictionary(locale).admin,
+    ]) {
+      expect(header().queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+  }
+  function noPrivateText() {
+    expect(screen.getByRole("banner").innerHTML).not.toMatch(
+      /PRIVATE_NAME_|PRIVATE_SESSION_|PRIVATE_TOKEN_|@private\.invalid|RAW_SESSION_SENTINEL|RAW_STACK_SENTINEL/,
+    );
+  }
+  function page(locale: "en" | "vi") {
+    return (
+      <Shell locale={locale}>
+        <h1>Public content</h1>
+        <p role="status">Unrelated content status</p>
+      </Shell>
+    );
+  }
+  function publicControls(locale: "en" | "vi") {
+    expect(
+      header().getByRole("link", { name: catalogDictionary(locale).browse }),
+    ).toHaveAttribute("href", `/${locale}/works`);
+    expect(
+      header().getByRole("link", {
+        name: new RegExp(`— ${dictionary(locale).home}$`),
+      }),
+    ).toHaveAttribute("href", `/${locale}`);
+    expect(
+      header().getByRole("link", {
+        name: locale === "en" ? "Language: Tiếng Việt" : "Ngôn ngữ: English",
+      }),
+    ).toHaveAttribute("lang", locale === "en" ? "vi" : "en");
+    expect(
+      screen.getByRole("heading", { name: "Public content" }),
+    ).toBeVisible();
+  }
+  function pending(locale: "en" | "vi") {
+    // Reproduce the wrong authentication claim before testing new wrapper structure.
+    noAccountLinks(locale);
+    const node = account("pending");
+    expect(node).toHaveTextContent(dictionary(locale).loading);
+    expect(
+      within(node as HTMLElement).queryByRole("link"),
+    ).not.toBeInTheDocument();
+    expect(
+      within(node as HTMLElement).queryByRole("button"),
+    ).not.toBeInTheDocument();
+    expect(header().getByRole("status")).toHaveAttribute("aria-live", "off");
+    expect(header().queryByRole("alert")).not.toBeInTheDocument();
+    noAccountLinks(locale);
+    noPrivateText();
+    publicControls(locale);
+  }
+  function authenticated(locale: "en" | "vi", admin: boolean) {
+    const t = dictionary(locale);
+    account("authenticated");
+    expect(header().getByRole("link", { name: t.settings })).toHaveAttribute(
+      "href",
+      `/${locale}/settings`,
+    );
+    expect(header().getByRole("link", { name: t.library })).toHaveAttribute(
+      "href",
+      `/${locale}/library`,
+    );
+    expect(
+      header().getByRole("link", {
+        name: locale === "en" ? "My requests" : "Yêu cầu của tôi",
+      }),
+    ).toHaveAttribute("href", `/${locale}/requests`);
+    expect(
+      header().queryByRole("link", { name: t.login }),
+    ).not.toBeInTheDocument();
+    if (admin)
+      expect(
+        header().getByRole("link", { name: catalogDictionary(locale).admin }),
+      ).toHaveAttribute("href", `/${locale}/admin/works`);
+    else
+      expect(
+        header().queryByRole("link", { name: catalogDictionary(locale).admin }),
+      ).not.toBeInTheDocument();
+    noPrivateText();
+    publicControls(locale);
+  }
+  describe.each(["en", "vi"] as const)("%s", (locale) => {
+    it.each([
+      ["null pending", { data: null, isPending: true }],
+      ["retained ordinary pending", { data: session(), isPending: true }],
+      ["retained admin pending", { data: session("admin"), isPending: true }],
+      ["undefined data", { data: undefined }],
+      [
+        "unresolved pending flag",
+        { data: session("admin"), isPending: undefined },
+      ],
+      [
+        "background admin refetch",
+        { data: session("admin"), isRefetching: true },
+      ],
+      [
+        "pending takes priority over error",
+        {
+          data: session("admin"),
+          isPending: true,
+          error: { message: "RAW_SESSION_SENTINEL" },
+        },
+      ],
+      [
+        "refetch takes priority over error",
+        {
+          data: session("admin"),
+          isRefetching: true,
+          error: { message: "RAW_SESSION_SENTINEL" },
+        },
+      ],
+    ] satisfies [string, Partial<Snapshot>][])(
+      "suppresses account links for %s",
+      (_label, snapshot) => {
+        setSession(snapshot);
+        render(page(locale));
+        pending(locale);
+      },
+    );
+    it.each([
+      ["null data", null],
+      ["cached admin", session("admin")],
+    ] as const)(
+      "shows only safe recovery UI on error with %s",
+      (_label, data) => {
+        setSession({
+          data,
+          error: {
+            message: "RAW_SESSION_SENTINEL",
+            stack: "RAW_STACK_SENTINEL",
+          },
+        });
+        render(page(locale));
+        noAccountLinks(locale);
+        account("error");
+        expect(header().getByRole("alert")).toHaveTextContent(
+          dictionary(locale).sessionError,
+        );
+        const retry = header().getByRole("button", {
+          name: dictionary(locale).retry,
+        });
+        expect(retry.tagName).toBe("BUTTON");
+        expect(retry).not.toBeDisabled();
+        noAccountLinks(locale);
+        noPrivateText();
+        publicControls(locale);
+      },
+    );
+    it("shows sign-in only for resolved anonymous state", () => {
+      setSession();
+      render(page(locale));
+      const node = account("anonymous");
+      expect(
+        within(node as HTMLElement).getByRole("link", {
+          name: dictionary(locale).login,
+        }),
+      ).toHaveAttribute("href", `/${locale}/login`);
+      expect(
+        header()
+          .getAllByRole("link")
+          .map((link) => link.getAttribute("href")),
+      ).toEqual([
+        `/${locale}`,
+        `/${locale}/works`,
+        locale === "en" ? "/vi/settings" : "/en/settings",
+        `/${locale}/login`,
+      ]);
+      noPrivateText();
+    });
+    it.each([
+      ["ordinary", "user", true],
+      ["admin", "admin", true],
+      ["unverified", "user", false],
+    ] as const)(
+      "preserves resolved %s session semantics and navigation order",
+      (_label, role, verified) => {
+        mocks.pathname = `/${locale}/settings`;
+        setSession({ data: session(role, verified) });
+        render(page(locale));
+        authenticated(locale, role === "admin");
+        expect(
+          header()
+            .getAllByRole("link")
+            .map((link) => link.getAttribute("href")),
+        ).toEqual([
+          `/${locale}`,
+          `/${locale}/works`,
+          `/${locale}/library`,
+          `/${locale}/requests`,
+          ...(role === "admin" ? [`/${locale}/admin/works`] : []),
+          locale === "en" ? "/vi/settings" : "/en/settings",
+          `/${locale}/settings`,
+        ]);
+      },
+    );
+    it("keeps the wrapper while A becomes unresolved then B and roles change", () => {
+      setSession({ data: session("admin") });
+      const view = render(page(locale));
+      authenticated(locale, true);
+      const wrapper = account("authenticated");
+      setSession({ data: session("admin"), isRefetching: true });
+      view.rerender(page(locale));
+      pending(locale);
+      expect(account("pending")).toBe(wrapper);
+      setSession({ data: session("user", true, "account-b") });
+      view.rerender(page(locale));
+      authenticated(locale, false);
+      expect(account("authenticated")).toBe(wrapper);
+      setSession({ data: session("admin", true, "account-b") });
+      view.rerender(page(locale));
+      authenticated(locale, true);
+      setSession({ data: session("user", true, "account-b") });
+      view.rerender(page(locale));
+      authenticated(locale, false);
+      expect(account("authenticated")).toBe(wrapper);
+    });
+    it("deduplicates explicit retry, retains native button focus through rejection, and recovers", async () => {
+      let rejectFirst!: (reason: Error) => void;
+      let resolveSecond!: () => void;
+      const first = new Promise<void>((_resolve, reject) => {
+        rejectFirst = reject;
+      });
+      const second = new Promise<void>((resolve) => {
+        resolveSecond = resolve;
+      });
+      mocks.refetch.mockReturnValueOnce(first).mockReturnValueOnce(second);
+      const error = {
+        message: "RAW_SESSION_SENTINEL",
+        stack: "RAW_STACK_SENTINEL",
+      };
+      setSession({ data: session("admin"), error });
+      const view = render(page(locale));
+      const retry = header().getByRole("button", {
+        name: dictionary(locale).retry,
+      });
+      retry.focus();
+      act(() => {
+        fireEvent.click(retry);
+        fireEvent.click(retry);
+      });
+      expect(mocks.refetch).toHaveBeenCalledTimes(1);
+      expect(mocks.refetch).toHaveBeenNthCalledWith(1);
+      expect(account("pending")).toHaveTextContent(dictionary(locale).loading);
+      expect(header().getByRole("status")).toHaveAttribute(
+        "aria-live",
+        "polite",
+      );
+      expect(retry).toHaveAttribute("aria-disabled", "true");
+      expect(retry).not.toBeDisabled();
+      expect(retry).toHaveFocus();
+      noAccountLinks(locale);
+      setSession({ data: session("admin"), isRefetching: true, error });
+      view.rerender(page(locale));
+      expect(header().getByRole("button")).toBe(retry);
+      fireEvent.click(retry);
+      expect(mocks.refetch).toHaveBeenCalledTimes(1);
+      setSession({ data: session("admin"), error });
+      await act(async () => {
+        rejectFirst(new Error("RAW_SESSION_SENTINEL"));
+        await first.catch(() => {});
+      });
+      view.rerender(page(locale));
+      account("error");
+      expect(header().getByRole("alert")).toHaveTextContent(
+        dictionary(locale).sessionError,
+      );
+      expect(
+        header().getByRole("button", { name: dictionary(locale).retry }),
+      ).toBe(retry);
+      expect(retry).not.toHaveAttribute("aria-disabled", "true");
+      expect(retry).toHaveFocus();
+      noPrivateText();
+      fireEvent.click(retry);
+      expect(mocks.refetch).toHaveBeenCalledTimes(2);
+      expect(mocks.refetch).toHaveBeenNthCalledWith(2);
+      setSession({ data: session("user", true, "account-b") });
+      view.rerender(page(locale));
+      expect(account("pending")).toHaveTextContent(dictionary(locale).loading);
+      expect(header().getByRole("button")).toBe(retry);
+      noAccountLinks(locale);
+      await act(async () => {
+        resolveSecond();
+        await second;
+      });
+      authenticated(locale, false);
+      expect(
+        header().queryByRole("button", { name: dictionary(locale).retry }),
+      ).not.toBeInTheDocument();
+      expect(
+        header().getByRole("link", { name: dictionary(locale).settings }),
+      ).not.toHaveFocus();
+      expect(mocks.replace).not.toHaveBeenCalled();
+      expect(mocks.refresh).not.toHaveBeenCalled();
+    });
+    it("renders neutral SSR despite cached admin and hydrates safely with authenticated client cache", () => {
+      mocks.pathname = `/${locale}/settings`;
+      setSession({ data: session("admin") });
+      const ui = page(locale);
+      const container = document.createElement("div");
+      container.innerHTML = renderToString(ui);
+      const serverHeader = within(container).getByRole("banner");
+      const serverAccount = serverHeader.querySelector(".nav-account");
+      expect(serverAccount).toHaveAttribute("data-session-state", "pending");
+      expect(serverAccount).toHaveTextContent(dictionary(locale).loading);
+      expect(
+        within(serverHeader)
+          .getAllByRole("link")
+          .map((link) => link.getAttribute("href")),
+      ).toEqual([
+        `/${locale}`,
+        `/${locale}/works`,
+        locale === "en" ? "/vi/settings" : "/en/settings",
+      ]);
+      expect(serverHeader.innerHTML).not.toMatch(/PRIVATE_|@private\.invalid/);
+      document.body.appendChild(container);
+      setSession({ data: session("user", true, "account-b") });
+      const onRecoverableError = vi.fn();
+      render(ui, { container, hydrate: true, onRecoverableError });
+      authenticated(locale, false);
+      expect(account("authenticated")).toBe(serverAccount);
+      expect(onRecoverableError).not.toHaveBeenCalled();
+    });
   });
 });
