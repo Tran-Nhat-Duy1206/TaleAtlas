@@ -1422,3 +1422,51 @@ Static tests protect semantic color pairs and specificity, unchanged palette/foc
 Existing functional/server/authentication/session/privacy logic and dictionaries are untouched. No API/schema, CI, infrastructure, hosted SMTP/V4, Vercel configuration or deployment changes. Existing branches/worktrees were preserved. The index is empty and no A7 commit, push, PR or merge was performed.
 
 Recommendation: **GO for separate authorization of one scoped A7 commit**, based on the local gates and read-only review. Independent Linux browser/required CI confirmation remains pending future publication authorization; no staging/production acceptance is inferred. Stop after this implementation and validation record.
+
+
+## V6A A8 — Evidence-first accessibility/responsive infrastructure (2026-10-26 UTC)
+
+- Maintainer-authorized V6A-10 evidence-first phase only, branch `test/v6a-accessibility-responsive-evidence`, worktree `E:\TaleAtlas-v6a-accessibility-responsive`.
+- Exact baseline/unchanged HEAD: `45986e937ae17420c434834ca3ae3ae1222227cb`. Receipts apply to the uncommitted five-file test/documentation patch, not a new commit, GitHub CI result or completed accessibility acceptance.
+- Exact inventory: new `tests/e2e/accessibility-responsive.spec.ts`; new `tests/helpers/accessibility-evidence.ts`; new `tests/unit/accessibility-evidence.test.ts`; new `docs/V6A_ACCESSIBILITY_EVIDENCE.md`; this ledger (append only).
+- Existing application/CSS, server/authentication/privacy/data behavior, dependencies, old tests, Playwright configuration, mandatory workflows, budgets, workers and retry policies are untouched. No source fix is authorized or performed.
+
+### Authored evidence, not browser results
+
+- 14 additive bounded browser cases: Home/Catalog profiles A–D (375 VI dark; 768 EN dark; 1280 EN light; 1440 VI light, all height900), narrow/desktop Discovery+Login samplers and genuine-owner Library/Requests/New Request/Settings samplers, System light→dark→light and reduced-motion checks.
+- Existing genuine synthetic-account verification and exact-owned cleanup are reused, with no fabricated sessions, protected-route bypass, valid request mutation or duplicated long authenticated lifecycle. Catalog status locators remain main-scoped.
+- Checks cover bounded document/essential-control/card geometry, label text fragments and meaningful associations, peer overlap excluding nested elements, actual Tab/skip/focus and native disclosure/error-summary interactions. Contrast uses applicable thresholds and conservative real-backdrop/group-opacity sampling; unsupported/complex samples are manual-review candidates, not fake PASS.
+- The pure helper validates finite bounded sRGB/alpha/geometry inputs, unrounded contrast arithmetic and exact allowlisted observation records. No raw/private text, identities, URLs, response bodies, DOM/HTML, cookies, tokens or unrestricted exception messages are accepted in records. NOT_RUN cannot contain measurements; NOT_VERIFIED requires a fixed explanation. No logging, network, storage or public reporting side effects.
+- New browser failures use fixed codes without arbitrary causes; no new screenshots, attachments, uploaders, reporters or diagnostic workflow. Existing confidential artifacts stay private under the unchanged native wrapper.
+
+### Actual local validation
+
+Node 24.19.0; pnpm 11.7.0. Successful full gates were not repeated.
+
+| Check | Observed outcome |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS, one prerequisite installation; manifests/lock unchanged |
+| `pnpm exec vitest run tests/unit/accessibility-evidence.test.ts` | PASS: 55 passed / 0 failed / 0 pending |
+| `pnpm exec tsc --noEmit -p tsconfig.tests.json` | PASS: focused test/helper type validation |
+| Static TypeScript/browser-source discovery and policy inspection | PASS: 14 source-defined cases; unchanged complete native config includes the new spec; no config loaded or browser started for discovery |
+| `pnpm test` | PASS: 2,416 passed / 0 failed / 0 pending, 76 files, one full run |
+| `pnpm typecheck` | PASS, one full run |
+| `pnpm lint` | PASS, one run |
+| `pnpm build` | PASS, one production-mode build using synthetic compile-only loopback settings; no app/browser/SMTP/database service started or hosted environment used |
+| Scoped formatting / `git diff --check` | PASS |
+| Independent read-only math/privacy and browser-source review | NoBlock; no actual scoped implementation defect established |
+
+The three new TypeScript file hashes were frozen before the full sequence and checked unchanged afterward. Unit/math/schema checks and successful compilation do not constitute app accessibility, physical glyph, browser geometry, AT announcement, actual contrast or backend authorization proof.
+
+### Explicit limitations and classification
+
+- A8 browser matrix: **AUTHORED — NOT RUN locally**. No configured ambient TEST_DATABASE_URL or owned local database receipt exists; no new disposable or Windows infrastructure was created.
+- **GENUINE 200% BROWSER ZOOM: NOT RUN.** The evidence document requires fixed physical window/OS scaling, browser-chrome100% baseline, displayed200% verification, repeated interactions, CSS viewport metrics and restore100%. Viewport resizing, CSS/font zoom, DPR and pinch overrides are not substitutes.
+- Human screen reader, actual VI diacritics/glyph quality, clipped focus, full visual/tab-order and manual critical-contrast review: **NOT RUN**. Full A8 acceptance remains incomplete.
+- Header forced pending/error, Library loading/server-error observation and complex/unreliable compositing: **NOT VERIFIED**; no states or passing measurements were fabricated.
+- Parser supports a restricted RGB/RGBA subset; unsupported valid aliases/exponents require manual handling. Initial reload before keyboard traversal is an unobserved portability risk; a demonstrated restoration issue must be classified as test setup, not an app defect. Measurement caps similarly do not prove a layout defect.
+- No independently confirmed P0/P1 application/browser defect was found in this non-browser implementation phase. Future failures require pinned source/profile/symptom and application-defect, test/fixture-defect, measurement-limitation or inconclusive classification before any separately approved source change.
+
+### Decision and stop boundary
+
+**GO for separate authorization of one scoped A8 commit and Draft PR for ordinary Linux native CI**, based on the actual local gates and source reviews. This does not complete A8 manual acceptance or authorize publication, merge or deployment. Existing confidentiality/CI/Vercel behavior is preserved. No commit, staging, push, PR, diagnostic, hosted SMTP/V4/database operation, merge, deployment, A9 work or previous-worktree cleanup occurred. Stop after implementation and validation.
