@@ -32,7 +32,7 @@ form.controls {
 }
 .card {
   padding: 1.25rem;
-  border: 1px solid var(--border, #888);
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
 }
 .card a {
@@ -57,7 +57,7 @@ form.controls {
 .widget {
   margin-block: 1rem;
   padding: 1rem;
-  border: 1px solid var(--border, #888);
+  border: 1px solid var(--line);
   border-radius: 0.75rem;
 }
 .cover {

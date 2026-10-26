@@ -105,7 +105,7 @@
   min-height: 44px;
   padding: 0.7rem 1.2rem;
   background: var(--green);
-  color: var(--paper);
+  color: var(--green-ink);
   border: 0;
   border-radius: 6px;
   font: inherit;
@@ -125,7 +125,11 @@
   color: var(--green);
 }
 .catalog a.button {
-  color: var(--paper);
+  color: var(--green-ink);
+}
+.catalog .button:hover:not(:disabled) {
+  background: var(--green);
+  color: var(--green-ink);
 }
 .catalog :is(a, button, input, select):focus-visible {
   outline: 3px solid var(--green);
