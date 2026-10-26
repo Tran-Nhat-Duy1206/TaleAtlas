@@ -1,10 +1,12 @@
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import { types } from "node:util";
 import { browserGeometryObserver, selfTestProbes } from "./a8-final-probes.mjs";
 
 const BASE = "061529828cf09dc00fd0e9291a256b74267bfcf1";
@@ -246,12 +248,101 @@ function authChanges(source) {
   return changes;
 }
 
-export async function instrumentTests(root, { apply = false } = {}) {
-  root = path.resolve(root);
+// Validate descriptors before reading values: options/environment accessors must
+// never execute, and no public option can replace policy, files, platform or git.
+function record(value, allowed) {
+  if (!value || typeof value !== "object" || types.isProxy(value)) refuse();
+  const prototype = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) refuse();
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (
+      typeof key !== "string" ||
+      (allowed && !allowed.includes(key)) ||
+      !Object.hasOwn(descriptors[key], "value")
+    )
+      refuse();
+  }
+  return descriptors;
+}
+function optionsFor(options, allowed) {
+  record(options, allowed);
+  return options;
+}
+function intendedEnvironment(environment) {
+  const descriptors = record(environment);
+  for (const descriptor of Object.values(descriptors)) {
+    if (typeof descriptor.value !== "string" || descriptor.value.includes("\0"))
+      refuse();
+  }
+  for (const key of ["CI", "GITHUB_WORKSPACE", "A8_DIAG_SUT"]) {
+    if (!Object.hasOwn(descriptors, key)) refuse();
+  }
+  if (environment.CI !== "true") refuse();
+  // Copy all credentials unchanged; never log or return the environment.
+  return Object.fromEntries(
+    Object.entries(descriptors).map(([key, descriptor]) => [
+      key,
+      descriptor.value,
+    ]),
+  );
+}
+async function canonicalDirectory(value) {
+  if (
+    typeof value !== "string" ||
+    !path.isAbsolute(value) ||
+    /[\x00-\x1f\x7f]/.test(value) ||
+    value !== path.resolve(value) ||
+    (await fs.realpath(value)) !== value ||
+    !(await fs.lstat(value)).isDirectory()
+  )
+    refuse();
+  return value;
+}
+async function environmentIdentity(root, environment) {
+  const env = intendedEnvironment(environment);
+  await canonicalDirectory(root);
+  await canonicalDirectory(env.GITHUB_WORKSPACE);
+  await canonicalDirectory(env.A8_DIAG_SUT);
+  if (
+    root !== env.A8_DIAG_SUT ||
+    root !== path.join(env.GITHUB_WORKSPACE, "sut") ||
+    probePath.startsWith(root + path.sep)
+  )
+    refuse();
+}
+async function applyPolicy(root, environment, platform) {
+  if (platform !== "linux") refuse();
+  await environmentIdentity(root, environment);
+}
+function assertionFingerprint(ts, source) {
+  const file = ts.createSourceFile(
+    "spec.ts",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+  if (file.parseDiagnostics.length) refuse();
+  const found = [];
+  const visit = (node) => {
+    if (ts.isExpressionStatement(node)) {
+      const text = node.expression.getText(file);
+      if (/^(?:await\s+)?expect\s*(?:\(|\.)/.test(text)) found.push(text);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+async function planInstrumentation(root, ts) {
+  await canonicalDirectory(root);
   const head = git(root, ["rev-parse", "HEAD"]).toString("utf8").trim();
-  if (head !== BASE) refuse();
-  const ts = loadTypeScript(root),
-    planned = [];
+  const top = git(root, ["rev-parse", "--show-toplevel"])
+    .toString("utf8")
+    .trim();
+  if (head !== BASE || (await fs.realpath(top)) !== root) refuse();
+  const planned = [];
   for (const [index, relative] of FILES.entries()) {
     const full = await guardedFile(root, relative);
     const bytes = await fs.readFile(full);
@@ -262,15 +353,16 @@ export async function instrumentTests(root, { apply = false } = {}) {
       source,
       index === 0 ? geometryChanges(source) : authChanges(source),
     );
-    const before = cases(ts, source),
-      after = cases(ts, result.output);
-    if (
-      before.length !== (index === 0 ? 6 : 4) ||
-      JSON.stringify(before) !== JSON.stringify(after)
-    )
-      refuse();
-    // All original action/assert/poll expression spellings are preserved literally;
-    // only the four explicitly phase-tagged geometry calls have changed arguments.
+    const before = ts ? cases(ts, source) : null;
+    if (ts) {
+      if (
+        before.length !== (index === 0 ? 6 : 4) ||
+        JSON.stringify(before) !== JSON.stringify(cases(ts, result.output)) ||
+        JSON.stringify(assertionFingerprint(ts, source)) !==
+          JSON.stringify(assertionFingerprint(ts, result.output))
+      )
+        refuse();
+    }
     for (const p of result.proof) {
       if (
         [1, 98, 99, 135, 210, 212, 643, 694, 761, 775].includes(p.number) &&
@@ -284,77 +376,464 @@ export async function instrumentTests(root, { apply = false } = {}) {
       full,
       bytes,
       output: result.output,
+      proof: result.proof,
       metadata: {
         path: relative,
         originalSHA256: sha(bytes),
         overlaySHA256: sha(result.output),
         lineCount: source.split("\n").length,
-        testDeclarationCount: before.length,
-        sourceSpans: before.map(({ line, endLine }) => ({ line, endLine })),
+        ...(before
+          ? {
+              testDeclarationCount: before.length,
+              sourceSpans: before.map(({ line, endLine }) => ({
+                line,
+                endLine,
+              })),
+              originalAssertionsPreserved: true,
+            }
+          : {}),
         changedLines: result.proof.map((p) => p.number),
         exactReversalProof: true,
       },
     });
   }
-  if (apply) {
-    if (
-      process.platform !== "linux" ||
-      process.env.CI !== "true" ||
-      !process.env.GITHUB_WORKSPACE ||
-      !process.env.A8_DIAG_SUT
-    )
-      refuse();
-    if (
-      root !== path.resolve(process.env.A8_DIAG_SUT) ||
-      root !== path.resolve(process.env.GITHUB_WORKSPACE, "sut")
-    )
-      refuse();
-    if (
-      (await fs.realpath(root)) !== root ||
-      probePath.startsWith(root + path.sep)
-    )
-      refuse();
-    // Recheck both files before the first write. Never follow an output symlink.
-    for (const item of planned) {
-      await guardedFile(root, item.relative);
-      if (sha(await fs.readFile(item.full)) !== sha(item.bytes)) refuse();
-    }
-    const opened = [];
-    try {
-      for (const item of planned)
-        opened.push(
-          await fs.open(item.full, constants.O_RDWR | constants.O_NOFOLLOW),
-        );
-      for (let i = 0; i < planned.length; i++) {
-        const current = await opened[i].readFile();
-        if (sha(current) !== sha(planned[i].bytes)) refuse();
-      }
-      for (let i = 0; i < planned.length; i++) {
-        await opened[i].write(
-          Buffer.from(planned[i].output),
-          0,
-          Buffer.byteLength(planned[i].output),
-          0,
-        );
-        await opened[i].truncate(Buffer.byteLength(planned[i].output));
-      }
-    } finally {
-      for (const handle of opened) await handle.close();
-    }
-  }
+  return planned;
+}
+function metadataFor(planned, applied) {
   return {
     base: BASE,
-    applied: apply,
+    applied,
     lineCountPreserved: true,
     originalTestDeclarationsPreserved: true,
+    originalAssertionsPreserved: true,
     files: planned.map((p) => p.metadata),
   };
 }
+async function writePlan(root, planned) {
+  if (
+    planned.length !== FILES.length ||
+    planned.some((item, index) => item.relative !== FILES[index])
+  )
+    refuse();
+  // Complete read-only planning and all-file revalidation precede any write.
+  for (const item of planned) {
+    if ((await guardedFile(root, item.relative)) !== item.full) refuse();
+    if (sha(await fs.readFile(item.full)) !== sha(item.bytes)) refuse();
+  }
+  const opened = [];
+  try {
+    for (const item of planned)
+      opened.push(
+        await fs.open(item.full, constants.O_RDWR | constants.O_NOFOLLOW),
+      );
+    for (let i = 0; i < planned.length; i++) {
+      const stat = await opened[i].stat();
+      const named = await fs.lstat(
+        await guardedFile(root, planned[i].relative),
+      );
+      if (
+        !stat.isFile() ||
+        stat.dev !== named.dev ||
+        stat.ino !== named.ino ||
+        sha(await opened[i].readFile()) !== sha(planned[i].bytes)
+      )
+        refuse();
+    }
+    for (let i = 0; i < planned.length; i++) {
+      const buffer = Buffer.from(planned[i].output);
+      let offset = 0;
+      while (offset < buffer.length) {
+        const { bytesWritten } = await opened[i].write(
+          buffer,
+          offset,
+          buffer.length - offset,
+          offset,
+        );
+        if (!bytesWritten) refuse();
+        offset += bytesWritten;
+      }
+      await opened[i].truncate(buffer.length);
+      await opened[i].sync();
+    }
+    for (const item of planned) {
+      await guardedFile(root, item.relative);
+      if (sha(await fs.readFile(item.full)) !== sha(item.output)) refuse();
+    }
+  } finally {
+    await Promise.all(opened.map((handle) => handle.close()));
+  }
+}
 
-export async function selfTestInstrumentation(root) {
-  // Intentionally dry-run only, even on a CI host. Never launches original tests.
+export async function preflightInstrumentation(root, options = {}) {
+  const { environment } = optionsFor(options, ["environment"]);
+  await applyPolicy(root, environment, process.platform);
+  const planned = await planInstrumentation(root, null);
+  // No TypeScript/module resolution occurs here. Do not claim AST validation yet.
+  return {
+    base: BASE,
+    applied: false,
+    preflightPassed: true,
+    lineCountPreserved: true,
+    files: planned.map((item) => item.metadata),
+  };
+}
+
+export async function instrumentTests(root, options = {}) {
+  const { apply = false, environment } = optionsFor(options, [
+    "apply",
+    "environment",
+  ]);
+  if (typeof apply !== "boolean") refuse();
+  if (apply) await applyPolicy(root, environment, process.platform);
+  else if (environment !== undefined)
+    await environmentIdentity(root, environment);
+  // Dry runs remain local, read-only and need no CI environment.
+  const canonical = apply ? root : path.resolve(root);
+  const planned = await planInstrumentation(
+    canonical,
+    loadTypeScript(canonical),
+  );
+  if (apply) {
+    await applyPolicy(root, environment, process.platform);
+    await writePlan(root, planned);
+  }
+  return metadataFor(planned, apply);
+}
+
+// This private capability is created only here from mkdtemp. It cannot be
+// supplied through any export/options, and every fixture mutation is confined.
+async function fixtureRegressionChecks(actualRoot, ts) {
+  const owner = await fs.realpath(
+    await fs.mkdtemp(path.join(os.tmpdir(), "a8-instrumentor-")),
+  );
+  if (owner === actualRoot || actualRoot.startsWith(owner + path.sep)) refuse();
+  const workspace = path.join(owner, "workspace");
+  const sut = path.join(workspace, "sut");
+  const results = {};
+  const owned = async (target) => {
+    const absolute = path.resolve(target);
+    if (absolute === owner || !absolute.startsWith(owner + path.sep)) refuse();
+    const parent = await fs.realpath(path.dirname(absolute));
+    if (parent !== owner && !parent.startsWith(owner + path.sep)) refuse();
+    return absolute;
+  };
+  const writeOwned = async (target, bytes) =>
+    fs.writeFile(await owned(target), bytes);
+  // Snapshot every non-git fixture entry, not just the two expected outputs.
+  const snapshot = async () => {
+    const entries = [];
+    const walk = async (directory) => {
+      for (const name of (await fs.readdir(directory)).sort()) {
+        if (name === ".git" || name === "node_modules") continue;
+        const full = path.join(directory, name);
+        const relative = path.relative(sut, full);
+        const stat = await fs.lstat(full);
+        if (stat.isSymbolicLink())
+          entries.push([relative, "link", await fs.readlink(full)]);
+        else if (stat.isDirectory()) {
+          entries.push([relative, "dir"]);
+          await walk(full);
+        } else entries.push([relative, sha(await fs.readFile(full))]);
+      }
+    };
+    await walk(sut);
+    return entries;
+  };
+  const rejectWithoutWrites = async (name, action) => {
+    const before = JSON.stringify(await snapshot());
+    let rejected = false;
+    try {
+      await action();
+    } catch {
+      rejected = true;
+    }
+    if (!rejected || before !== JSON.stringify(await snapshot())) refuse();
+    results[name] = true;
+  };
+  try {
+    await fs.mkdir(await owned(workspace));
+    await owned(sut);
+    // Local, network-free clone: real pinned commit and real git HEAD, no fake git.
+    execFileSync(
+      "git",
+      ["clone", "--shared", "--no-checkout", "--", actualRoot, sut],
+      {
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
+    git(sut, ["-c", "core.autocrlf=false", "checkout", "--detach", BASE]);
+    await canonicalDirectory(sut);
+    const environment = {
+      CI: "true",
+      GITHUB_WORKSPACE: workspace,
+      A8_DIAG_SUT: sut,
+    };
+    // Linux exercises the actual public apply API; elsewhere only this lexical
+    // closure simulates Linux, and still uses real git/files/guards/AST/writer.
+    const applyFixture = async (
+      root = sut,
+      env = environment,
+      options = {},
+    ) => {
+      await owned(root);
+      if (process.platform === "linux")
+        return instrumentTests(root, {
+          apply: true,
+          environment: env,
+          ...options,
+        });
+      optionsFor(options, []);
+      await applyPolicy(root, env, "linux");
+      const planned = await planInstrumentation(root, ts);
+      await applyPolicy(root, env, "linux");
+      await writePlan(root, planned);
+      return metadataFor(planned, true);
+    };
+    // Prove the bootstrap path works before the fixture has any dependencies.
+    let dependencyPresent = false;
+    try {
+      await fs.lstat(path.join(sut, "node_modules"));
+      dependencyPresent = true;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+    if (dependencyPresent) refuse();
+    if (process.platform === "linux") {
+      const preflight = await preflightInstrumentation(sut, { environment });
+      if (!preflight.preflightPassed || preflight.applied) refuse();
+      results.realPublicPreflightPassed = true;
+    } else {
+      await owned(sut);
+      await applyPolicy(sut, environment, "linux");
+      const earlyPlan = await planInstrumentation(sut, null);
+      if (earlyPlan.length !== 2) refuse();
+    }
+    results.preflightWithoutDependencies = true;
+    if (process.platform === "linux") {
+      // Resolve the existing parser, without installing or copying dependencies.
+      const dependency = await fs.realpath(
+        path.join(actualRoot, "node_modules"),
+      );
+      await fs.symlink(
+        dependency,
+        await owned(path.join(sut, "node_modules")),
+        "dir",
+      );
+    }
+    const originals = await Promise.all(
+      FILES.map((relative) => fs.readFile(path.join(sut, relative))),
+    );
+    const originalSnapshot = await snapshot();
+    await rejectWithoutWrites("missingSUTRejected", () =>
+      applyFixture(sut, {
+        CI: "true",
+        GITHUB_WORKSPACE: workspace,
+      }),
+    );
+    await rejectWithoutWrites("wrongSUTRejected", () =>
+      applyFixture(sut, {
+        ...environment,
+        A8_DIAG_SUT: workspace,
+      }),
+    );
+    await rejectWithoutWrites("wrongWorkspaceRejected", () =>
+      applyFixture(sut, {
+        ...environment,
+        GITHUB_WORKSPACE: owner,
+      }),
+    );
+    await rejectWithoutWrites("rootMismatchRejected", () =>
+      applyFixture(workspace),
+    );
+    await rejectWithoutWrites("noncanonicalRootRejected", () =>
+      applyFixture(sut + path.sep + "."),
+    );
+    const alias = path.join(workspace, "sut-alias");
+    await fs.symlink(
+      sut,
+      await owned(alias),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    await rejectWithoutWrites("symlinkRootRejected", () =>
+      applyFixture(alias, {
+        ...environment,
+        A8_DIAG_SUT: alias,
+      }),
+    );
+    await rejectWithoutWrites("unauthorizedFilesRejected", () =>
+      applyFixture(sut, environment, {
+        files: [FILES[0], "tests/e2e/unauthorized.spec.ts"],
+      }),
+    );
+    for (const key of ["platformOverride", "baseline", "platform", "head"]) {
+      await rejectWithoutWrites("unknownOverridesRejected", () =>
+        instrumentTests(sut, { [key]: "ignored" }),
+      );
+    }
+    // Corrupt the second file: the first must remain untouched on failed planning.
+    const second = path.join(sut, FILES[1]);
+    await writeOwned(
+      second,
+      Buffer.concat([originals[1], Buffer.from("\n// mismatch\n")]),
+    );
+    await rejectWithoutWrites("sourceHashMismatchRejected", () =>
+      applyFixture(),
+    );
+    await writeOwned(second, originals[1]);
+    let getterCalls = 0;
+    const getterEnvironment = { ...environment };
+    Object.defineProperty(getterEnvironment, "A8_DIAG_SUT", {
+      get() {
+        getterCalls++;
+        return sut;
+      },
+      enumerable: true,
+    });
+    const proxyEnvironment = new Proxy(
+      { ...environment },
+      {
+        get() {
+          getterCalls++;
+          refuse();
+        },
+        ownKeys() {
+          getterCalls++;
+          refuse();
+        },
+      },
+    );
+    const symbolEnvironment = {
+      ...environment,
+      [Symbol("invalid")]: "invalid",
+    };
+    for (const env of [
+      undefined,
+      null,
+      [],
+      Object.create(environment),
+      getterEnvironment,
+      proxyEnvironment,
+      symbolEnvironment,
+      { ...environment, CI: "false" },
+      { ...environment, CI: true },
+      { ...environment, A8_DIAG_SUT: sut + path.sep + "." },
+      { ...environment, GITHUB_WORKSPACE: workspace + path.sep + ".." },
+    ]) {
+      // Explicit undefined must not activate applyFixture's default parameter.
+      await rejectWithoutWrites("invalidEnvironmentNoWrites", async () => {
+        if (process.platform === "linux")
+          return instrumentTests(sut, { apply: true, environment: env });
+        await applyPolicy(sut, env, "linux");
+      });
+    }
+    if (getterCalls) refuse();
+    if (process.platform !== "linux") {
+      await rejectWithoutWrites("publicNonLinuxApplyRejected", () =>
+        instrumentTests(sut, { apply: true, environment }),
+      );
+      await rejectWithoutWrites("publicNonLinuxPreflightRejected", () =>
+        preflightInstrumentation(sut, { environment }),
+      );
+    }
+    // Parent directory junctions/symlinks are rejected without writing through them.
+    const parent = path.join(sut, "tests", "e2e");
+    const moved = path.join(sut, "tests", "e2e-original");
+    await fs.rename(await owned(parent), await owned(moved));
+    await fs.symlink(
+      moved,
+      await owned(parent),
+      process.platform === "win32" ? "junction" : "dir",
+    );
+    await rejectWithoutWrites("sourceParentSymlinkRejected", () =>
+      applyFixture(),
+    );
+    await fs.unlink(await owned(parent));
+    await fs.rename(await owned(moved), await owned(parent));
+    // An actual successful write, not a reported boolean or dry-run stand-in.
+    const applied = await applyFixture();
+    if (!applied.applied || applied.files.length !== 2) refuse();
+    results.validExplicitEnvironmentPropagation = true;
+    const after = await snapshot();
+    const originalMap = new Map(
+      originalSnapshot.map((entry) => [entry[0], JSON.stringify(entry)]),
+    );
+    const changed = after.filter(
+      (entry) => originalMap.get(entry[0]) !== JSON.stringify(entry),
+    );
+    if (
+      after.length !== originalSnapshot.length ||
+      changed.length !== 2 ||
+      JSON.stringify(changed.map((entry) => entry[0]).sort()) !==
+        JSON.stringify(
+          FILES.map((relative) => relative.split("/").join(path.sep)).sort(),
+        )
+    )
+      refuse();
+    results.validEnvironmentOnlyTwoOverlayWrites = true;
+    for (const [index, relative] of FILES.entries()) {
+      const output = await fs.readFile(path.join(sut, relative), "utf8");
+      const original = originals[index].toString("utf8");
+      if (
+        JSON.stringify(cases(ts, original)) !==
+          JSON.stringify(cases(ts, output)) ||
+        JSON.stringify(assertionFingerprint(ts, original)) !==
+          JSON.stringify(assertionFingerprint(ts, output))
+      )
+        refuse();
+      const proof = rewrite(
+        original,
+        index === 0 ? geometryChanges(original) : authChanges(original),
+      ).proof;
+      const restored = output.split("\n");
+      for (const change of proof) {
+        if (restored[change.number - 1] !== change.replacement) refuse();
+        restored[change.number - 1] = change.expected;
+      }
+      const recovered = Buffer.from(restored.join("\n"));
+      const pinned = git(sut, ["show", `${BASE}:${relative}`]);
+      if (!recovered.equals(pinned) || !recovered.equals(originals[index]))
+        refuse();
+      await writeOwned(path.join(sut, relative), recovered);
+    }
+    if (JSON.stringify(originalSnapshot) !== JSON.stringify(await snapshot()))
+      refuse();
+    results.originalDeclarationsAndAssertionsPreserved = true;
+    results.exactSourceRecoveryFromPinnedSHA = true;
+    return {
+      ...results,
+      platformSimulation: process.platform !== "linux",
+      realPublicLinuxApply: process.platform === "linux",
+      ownedTempFixtureWrites: true,
+    };
+  } finally {
+    // Never clean a worktree supplied by the caller. Verify the exact owned
+    // mkdtemp root and canonical parent immediately before recursive removal.
+    const realOwner = await fs.realpath(owner);
+    const tempParent = await fs.realpath(os.tmpdir());
+    if (
+      realOwner !== owner ||
+      path.dirname(owner) !== tempParent ||
+      !path.basename(owner).startsWith("a8-instrumentor-") ||
+      owner === actualRoot ||
+      actualRoot.startsWith(owner + path.sep)
+    )
+      refuse();
+    await fs.rm(owner, { recursive: true, force: true });
+  }
+}
+
+export async function selfTestInstrumentation(root, options = {}) {
+  const { environment } = optionsFor(options, ["environment"]);
+  if (environment !== undefined) await environmentIdentity(root, environment);
+  // Existing dry checks/probe checks stay browser-free. Actual apply regression
+  // writes happen exclusively in the newly owned disposable local clone.
   const metadata = await instrumentTests(root);
   if (metadata.applied || metadata.files.length !== 2) refuse();
   await selfTestProbes();
-  return { ...metadata, browserFreeSelfTests: true };
+  const actualRoot = await fs.realpath(root);
+  const regressionChecks = await fixtureRegressionChecks(
+    actualRoot,
+    loadTypeScript(actualRoot),
+  );
+  return { ...metadata, browserFreeSelfTests: true, regressionChecks };
 }

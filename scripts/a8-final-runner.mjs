@@ -26,6 +26,7 @@ import {
 
 import {
   instrumentTests,
+  preflightInstrumentation,
   selfTestInstrumentation,
 } from "./a8-final-instrumentor.mjs";
 
@@ -312,6 +313,9 @@ async function main() {
     A8_DIAG_PRIVATE: privateDirectory,
     A8_DIAG_SUT: root,
   };
+  // Validate the same explicit contract used by the in-process writer before
+  // provisioning PostgreSQL or spending an install/build/browser preparation cycle.
+  await preflightInstrumentation(root, { environment });
   const pnpmVersion = execFileSync("pnpm", ["--version"], {
     cwd: root,
     encoding: "utf8",
@@ -346,10 +350,10 @@ async function main() {
   stage = "reporter-safety";
   manifest = await buildManifest(root);
   requireGuard(await selfTest(root));
-  requireGuard(await selfTestInstrumentation(root));
+  requireGuard(await selfTestInstrumentation(root, { environment }));
   // Reporting-only overlays are confined to this disposable Linux SUT checkout.
   // Both source safety suites run against original sources after original build/types.
-  await instrumentTests(root, { apply: true });
+  await instrumentTests(root, { apply: true, environment });
   // Same-line overlays preserve original declarations/assertion line provenance.
   manifest = await buildManifest(root);
   const overlayNames = git("diff", "--name-only").split("\n").sort();
