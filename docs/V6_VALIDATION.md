@@ -1376,3 +1376,49 @@ The build used explicit production mode and synthetic compile-only loopback DB/S
 ### Decision and remaining limitations
 
 **GO for one scoped local A6 commit only after separate maintainer authorization.** Local required gates passed and the approved five-file implementation is ready for review. This is NOT publication, merge, browser/visual acceptance or deployment authorization. Native browser/layout validation remains NOT RUN, and a real-world flash has not been reproduced or claimed fixed. Independent Linux/native coverage is reserved for separately approved publication. No source outside the approved inventory, auth contract/provider/cache/role policy, SDK, endpoint, dictionary, dependency, schema, workflow, hosted/Vercel/V4 setting or prior worktree was modified. No staging, commit, push, PR, merge, deployment, cleanup or A7 work occurred. All historical ledger bytes precede this append unchanged.
+
+
+## V6A A7 — Bounded design consistency implementation (2026-10-26 UTC)
+
+- Maintainer-authorized V6A-09 only, in branch `fix/v6a-design-consistency`, worktree `E:\TaleAtlas-v6a-design-consistency`.
+- Exact baseline/unchanged HEAD: `5289b4d4f2f49e4f8f45cff608a3a1e30273e11e`. Results below apply to the uncommitted nine-file A7 patch, not a new commit or GitHub CI result.
+- Inventory: `apps/web/src/app/globals.css`; `apps/web/src/components/catalog/catalog.module.css`; `apps/web/src/components/library/library.module.css`; `apps/web/src/app/[locale]/library/page.tsx`; `apps/web/src/app/[locale]/requests/new/page.tsx`; `apps/web/src/components/catalog/Discovery.tsx`; new `tests/unit/design-consistency.test.ts`; `tests/e2e/foundation.spec.ts`; this ledger (append only).
+
+### Five corrections and preserved contracts
+
+1. Enabled global primary hover explicitly retains `--green` / `--green-ink`. Catalog native/button-link foregrounds use `--green-ink`; a scoped enabled hover rule wins over the generic button hover. Existing palette, secondary/danger/disabled/focus rules are unchanged.
+2. Opt-in `.page-title` reuses utility-heading proportions: `clamp(1.75rem, 4vw, 2.25rem)`, line height 1.25, normal flowing margins and safe wrapping. Only the three Library branch h1s, Request a Story h1 and Discovery h1 opt in. Semantic h1s, localized expressions, Vietnamese serif fallback and unrelated display headings remain unchanged.
+3. Library Apply uses the existing `button primary` classes. The native GET action, input names/defaults, serialization, reset/navigation/pagination and submit semantics remain unchanged.
+4. Exactly two Library card/widget borders use `--line` instead of undefined `--border` fallback. No new surface, shadow, radius or layout rule.
+5. Discovery imports/reuses the Catalog container. Work cards, ordering, dates/citations, navigation, pagination, localized labels and honest empty-state expressions remain unchanged.
+
+### Actual local validation
+
+Node 24.19.0; pnpm 11.7.0. No new dependencies or changes to dependency manifests/lockfile.
+
+| Check | Observed outcome |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS, one run; dependency contracts unchanged |
+| `pnpm exec vitest run tests/unit/design-consistency.test.ts` before production edits | Expected RED: 12 failed / 16 passed on untouched baseline, establishing the missing contracts |
+| Same focused command after corrections | PASS: 28 passed / 0 failed / 0 pending |
+| `pnpm test` (full unit suite, one run) | PASS: 2,361 passed / 0 failed / 0 pending, 75 files |
+| `pnpm typecheck` | PASS, one run; includes authored browser-test source |
+| `pnpm lint` | PASS, one run |
+| `pnpm build` | PASS, one production-mode run with synthetic compile-only loopback configuration; no hosted services contacted or provisioned |
+| `git diff --check` / scoped formatting | PASS |
+| Source preservation / read-only independent review | PASS / NoBlock: exact presentation-only TSX changes, two Library border substitutions, original 100 browser expect-call AST nodes retained in order |
+
+Static tests protect semantic color pairs and specificity, unchanged palette/focus/reduced-motion declarations, opt-in headings and EN/VI/state expressions, native GET controls and Discovery reuse/data render contracts. These are CSS/source contracts, not pixel geometry, physical glyph/font rendering, backend authorization proof or WCAG contrast certification.
+
+### Browser and visual evidence limitations
+
+- Native browser / authored public-page check: **NOT RUN**. No ambient `TEST_DATABASE_URL` or owned local database receipt exists in this worktree; no disposable infrastructure, SMTP, TLS or browser services were started for A7.
+- One bounded public foundation case is authored: eight public document navigations, EN/VI, light/dark via existing theme controls, primary normal/settled-hover/focus color pairs and Discovery utility headings/container alignment. It waits for actual CSS transitions rather than timed sleeps; per-document main bounds avoid cross-document scrollbar assumptions. No new authenticated lifecycle, screenshots, viewport matrix, setup/retry/worker/timeout changes or weakened existing assertions.
+- Actual primary-hover pixels, computed browser geometry/colors, EN/VI glyph readability and private-page visual rendering: **NOT RUN** locally. The new browser assertions are compiled, not executed or claimed passing.
+- Comprehensive keyboard, zoom, responsive breakpoints, system-theme/reduced-motion exercise and manual contrast evaluation remain **NOT RUN / A8 scope**. No accessibility or contrast certification claimed.
+
+### Scope and decision
+
+Existing functional/server/authentication/session/privacy logic and dictionaries are untouched. No API/schema, CI, infrastructure, hosted SMTP/V4, Vercel configuration or deployment changes. Existing branches/worktrees were preserved. The index is empty and no A7 commit, push, PR or merge was performed.
+
+Recommendation: **GO for separate authorization of one scoped A7 commit**, based on the local gates and read-only review. Independent Linux browser/required CI confirmation remains pending future publication authorization; no staging/production acceptance is inferred. Stop after this implementation and validation record.

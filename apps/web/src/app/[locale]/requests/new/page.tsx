@@ -49,7 +49,7 @@ export default async function NewRequestPage({ params, searchParams }: Props) {
     REQUEST_FORMATS.find((value) => value === query.format) ?? "UNKNOWN";
   return (
     <section className={styles.module}>
-      <h1>{requestDictionary(locale).new}</h1>
+      <h1 className="page-title">{requestDictionary(locale).new}</h1>
       <NewRequestForm
         locale={locale}
         prefillTitle={q}

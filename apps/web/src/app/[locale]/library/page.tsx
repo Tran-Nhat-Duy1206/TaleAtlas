@@ -32,7 +32,7 @@ export default async function LibraryPage({
   if (!h)
     return (
       <section className={styles.library}>
-        <h1>{t.title}</h1>
+        <h1 className="page-title">{t.title}</h1>
         <p role="alert">{t.accessUnconfirmed}</p>
         <p>{t.accessGuidance}</p>
         <div className={styles.actions}>
@@ -46,7 +46,7 @@ export default async function LibraryPage({
   if (!query)
     return (
       <section className={styles.library}>
-        <h1>{t.title}</h1>
+        <h1 className="page-title">{t.title}</h1>
         <p role="alert">{t.invalid}</p>
         <Link href={`/${locale}/library`}>{t.reset}</Link>
       </section>
@@ -65,7 +65,7 @@ export default async function LibraryPage({
     result !== null && result.total > 0 && result.items.length === 0;
   return (
     <section className={styles.library}>
-      <h1>{t.title}</h1>
+      <h1 className="page-title">{t.title}</h1>
       <p>{t.private}</p>
       <form
         // Uncontrolled selects must rebind when a reset/new server filter commits.
@@ -113,7 +113,7 @@ export default async function LibraryPage({
             <option value="RATING_DESC">{t.rating}</option>
           </select>
         </label>
-        <button>{t.apply}</button>
+        <button className="button primary">{t.apply}</button>
         {/* Native navigation also clears unsent selections when the URL is already bare. */}
         <a href={`/${locale}/library`}>{t.reset}</a>
       </form>

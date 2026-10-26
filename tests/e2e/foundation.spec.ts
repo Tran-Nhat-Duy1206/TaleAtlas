@@ -2,6 +2,8 @@ import { test, expect } from "../helpers/browser-test";
 import { randomUUID } from "node:crypto";
 import type { Page, Route } from "@playwright/test";
 import { dictionary, type Locale } from "../../apps/web/src/lib/i18n";
+import { publicCopy } from "../../apps/web/src/components/catalog/query";
+import { discoveryCopy } from "../../apps/web/src/features/catalog/discovery";
 
 function collectSafeRuntimeErrors(page: Page) {
   const names: string[] = [];
@@ -249,6 +251,197 @@ test("bilingual navigation, mobile layout and persisted accessible themes", asyn
     page.getByRole("heading", { name: "Đăng nhập", exact: true }),
   ).toBeVisible();
   expect(runtimeErrors, "No runtime or hydration error names").toEqual([]);
+});
+
+test("A7 public primary tokens, utility titles and discovery containers in EN/VI themes", async ({
+  page,
+}) => {
+  // Public GETs only, at the fixture's default viewport; no record-count premise.
+  const main = page.getByRole("main");
+  const themes = ["light", "dark"] as const;
+  const selectTheme = async (
+    locale: Locale,
+    theme: (typeof themes)[number],
+  ) => {
+    const themeSelect = page
+      .getByRole("contentinfo")
+      .getByLabel(dictionary(locale).theme);
+    await expect(themeSelect).toBeEnabled();
+    await themeSelect.selectOption(theme);
+    await expect(themeSelect).toHaveValue(theme);
+    await expect(page.locator("html")).toHaveAttribute("lang", locale);
+    if (theme === "dark")
+      await expect(page.locator("html")).toHaveClass(/dark/);
+    else await expect(page.locator("html")).not.toHaveClass(/dark/);
+  };
+  const expectPrimary = async (control: ReturnType<Page["getByRole"]>) => {
+    await expect(control).toBeVisible();
+    await expect(control).toBeEnabled();
+    // Wait out ThemeProvider's temporary transition suppression, not a timed sleep.
+    await expect(control).toHaveCSS("transition-duration", "0.15s, 0.15s");
+    const settledPair = () =>
+      control.evaluate(async (element) => {
+        // Reading computed style registers pending CSS transitions before enumeration.
+        void getComputedStyle(element).backgroundColor;
+        await Promise.all(
+          element.getAnimations().map((animation) => animation.finished),
+        );
+        const root = getComputedStyle(document.documentElement);
+        const probe = document.createElement("span");
+        probe.style.backgroundColor = root.getPropertyValue("--green");
+        probe.style.color = root.getPropertyValue("--green-ink");
+        probe.hidden = true;
+        document.body.append(probe);
+        try {
+          const expected = getComputedStyle(probe);
+          const actual = getComputedStyle(element);
+          return {
+            background: actual.backgroundColor,
+            foreground: actual.color,
+            green: expected.backgroundColor,
+            greenInk: expected.color,
+            outline: actual.outlineColor,
+          };
+        } finally {
+          probe.remove();
+        }
+      });
+    const expectPair = async () => {
+      const pair = await settledPair();
+      // Semantic computed-color pairs only, not a rendered contrast/WCAG claim.
+      expect(pair.background).toBe(pair.green);
+      expect(pair.foreground).toBe(pair.greenInk);
+      return pair;
+    };
+    await page.mouse.move(0, 0);
+    await expectPair();
+    await control.hover();
+    await expectPair(); // Must observe the completed 150ms hover, not its first frame.
+    await page.mouse.move(0, 0);
+    await control.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect(control).toBeFocused();
+    await expect(control).toHaveCSS("outline-style", "solid");
+    await expect(control).toHaveCSS("outline-width", "3px");
+    const focused = await expectPair();
+    expect(focused.outline).toBe(focused.green);
+  };
+  const containerMetrics = async () => {
+    const container = main.locator(":scope > section");
+    await expect(container).toHaveCount(1);
+    return container.evaluate((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      const mainBounds = element.closest("main")!.getBoundingClientRect();
+      return {
+        mainLeft: mainBounds.left,
+        mainRight: mainBounds.right,
+        maxWidth: style.maxWidth,
+        padding: [
+          style.paddingTop,
+          style.paddingRight,
+          style.paddingBottom,
+          style.paddingLeft,
+        ],
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+        viewportWidth: window.innerWidth,
+      };
+    });
+  };
+  const expectContainer = (
+    metrics: Awaited<ReturnType<typeof containerMetrics>>,
+  ) => {
+    expect(metrics.maxWidth).toBe("1200px");
+    expect(metrics.left).toBeGreaterThanOrEqual(0);
+    expect(metrics.right).toBeLessThanOrEqual(metrics.viewportWidth);
+    expect(parseFloat(metrics.padding[1])).toBeGreaterThan(0);
+    // Each document may have different scrollbar occupancy; validate centering
+    // against its own main bounds rather than assuming identical absolute pixels.
+    expect(metrics.width).toBeCloseTo(
+      Math.min(
+        parseFloat(metrics.maxWidth),
+        metrics.mainRight - metrics.mainLeft,
+      ),
+      0,
+    );
+    expect(metrics.left).toBeCloseTo(
+      (metrics.mainLeft + metrics.mainRight - metrics.width) / 2,
+      0,
+    );
+  };
+  for (const locale of ["en", "vi"] as const) {
+    await page.goto(`/${locale}`);
+    const homeTitle = main.getByRole("heading", { level: 1 });
+    await expect(homeTitle).toHaveCount(1);
+    await expect(homeTitle).toHaveText(dictionary(locale).headline);
+    await expect(homeTitle).not.toHaveClass(/\bpage-title\b/);
+    for (const theme of themes) {
+      await selectTheme(locale, theme);
+      await expectPrimary(
+        main.getByRole("link", { name: dictionary(locale).start, exact: true }),
+      );
+    }
+
+    await page.goto(`/${locale}/works`);
+    await expect(main.getByRole("heading", { level: 1 })).toHaveText(
+      publicCopy[locale].title,
+    );
+    const catalog = await containerMetrics();
+    expectContainer(catalog);
+    for (const theme of themes) {
+      await selectTheme(locale, theme);
+      await expectPrimary(
+        main.getByRole("button", {
+          name: publicCopy[locale].apply,
+          exact: true,
+        }),
+      );
+    }
+
+    for (const [route, title] of [
+      ["recently-added", discoveryCopy[locale].recent],
+      ["releases", discoveryCopy[locale].releases],
+    ] as const) {
+      await page.goto(`/${locale}/${route}`);
+      const heading = main.getByRole("heading", { level: 1 });
+      await expect(heading).toHaveCount(1);
+      await expect(heading).toHaveText(title);
+      await expect(heading).toHaveClass(/\bpage-title\b/);
+      for (const theme of themes) {
+        await selectTheme(locale, theme);
+        const discovery = await containerMetrics();
+        expectContainer(discovery);
+        expect({
+          maxWidth: discovery.maxWidth,
+          padding: discovery.padding,
+        }).toEqual({ maxWidth: catalog.maxWidth, padding: catalog.padding });
+        const typography = await heading.evaluate((element) => {
+          const style = getComputedStyle(element);
+          return {
+            size: parseFloat(style.fontSize),
+            lineHeight: parseFloat(style.lineHeight),
+            wrap: style.overflowWrap,
+            whiteSpace: style.whiteSpace,
+            family: style.fontFamily,
+            bodySize: getComputedStyle(document.body).fontSize,
+            expectedSize: Math.min(36, Math.max(28, window.innerWidth * 0.04)),
+          };
+        });
+        expect(typography.bodySize).toBe("15px");
+        expect(typography.size).toBeGreaterThanOrEqual(28);
+        expect(typography.size).toBeCloseTo(typography.expectedSize, 1);
+        expect(typography.lineHeight / typography.size).toBeCloseTo(1.25, 2);
+        expect(typography.wrap).toBe("anywhere");
+        expect(typography.whiteSpace).toBe("normal");
+        expect(typography.family).toContain(
+          locale === "vi" ? "Times New Roman" : "Georgia",
+        );
+      }
+    }
+  }
 });
 
 test("real registration, email verification, login, protected settings and logout", async ({

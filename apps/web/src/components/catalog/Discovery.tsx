@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WorkCard } from "./WorkCard";
+import styles from "./catalog.module.css";
 import { discoveryCopy } from "../../features/catalog/discovery";
 import type { Locale } from "../../lib/i18n";
 import type {
@@ -22,8 +23,8 @@ export function Discovery({
   const result = recent ?? releases!;
   const path = recent ? "recently-added" : "releases";
   return (
-    <section>
-      <h1>{recent ? d.recent : d.releases}</h1>
+    <section className={styles.catalog}>
+      <h1 className="page-title">{recent ? d.recent : d.releases}</h1>
       <p>{recent ? d.recentNote : d.releaseNote}</p>
       <nav aria-label={locale === "vi" ? "Khám phá" : "Discovery"}>
         <Link href={`/${locale}/recently-added`}>{d.recent}</Link>
