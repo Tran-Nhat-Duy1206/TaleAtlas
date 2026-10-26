@@ -4,6 +4,7 @@ import type { Page, Route } from "@playwright/test";
 import { dictionary, type Locale } from "../../apps/web/src/lib/i18n";
 import { publicCopy } from "../../apps/web/src/components/catalog/query";
 import { discoveryCopy } from "../../apps/web/src/features/catalog/discovery";
+import { requireTestDatabase } from "../helpers/test-database";
 
 function collectSafeRuntimeErrors(page: Page) {
   const names: string[] = [];
@@ -448,7 +449,45 @@ test("real registration, email verification, login, protected settings and logou
   page,
   request,
   baseURL,
+  extraHTTPHeaders,
 }) => {
+  // The native/local fixture owns this loopback origin and disposable database.
+  // Never send a trusted synthetic identity to a hosted application.
+  try {
+    requireTestDatabase();
+    const origin = new URL(baseURL ?? "");
+    const port = Number(origin.port);
+    if (
+      !["http:", "https:"].includes(origin.protocol) ||
+      origin.hostname !== "127.0.0.1" ||
+      !Number.isInteger(port) ||
+      port < 1024 ||
+      port > 65535 ||
+      origin.username ||
+      origin.password ||
+      origin.pathname !== "/" ||
+      origin.search ||
+      origin.hash
+    )
+      throw new Error("Guarded disposable auth actor required");
+  } catch {
+    throw new Error("Guarded disposable auth actor required");
+  }
+  // A new test invocation/retry is a new genuine actor. Keep one address for
+  // its entire lifecycle; randomize /64 network bits, not only the last hextet.
+  const actorAddress = randomUUID()
+    .replaceAll("-", "")
+    .slice(0, 20)
+    .match(/.{4}/g)!
+    .join(":");
+  await page.context().setExtraHTTPHeaders({
+    ...Object.fromEntries(
+      Object.entries(extraHTTPHeaders ?? {}).filter(
+        ([name]) => name.toLowerCase() !== "x-real-ip",
+      ),
+    ),
+    "x-real-ip": `2001:db8:${actorAddress}:1`,
+  });
   const runtimeErrors = collectSafeRuntimeErrors(page);
   const email = `${randomUUID()}@example.invalid`;
   await page.goto("/en/settings");
