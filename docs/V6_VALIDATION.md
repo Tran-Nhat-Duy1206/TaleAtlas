@@ -1470,3 +1470,139 @@ The three new TypeScript file hashes were frozen before the full sequence and ch
 ### Decision and stop boundary
 
 **GO for separate authorization of one scoped A8 commit and Draft PR for ordinary Linux native CI**, based on the actual local gates and source reviews. This does not complete A8 manual acceptance or authorize publication, merge or deployment. Existing confidentiality/CI/Vercel behavior is preserved. No commit, staging, push, PR, diagnostic, hosted SMTP/V4/database operation, merge, deployment, A9 work or previous-worktree cleanup occurred. Stop after implementation and validation.
+
+## V6A A10 — Source-pinned evidence reconciliation (2026-10-27 UTC)
+
+### A10.1 Scope, chronology and independent decisions
+
+- Audited application/main source: [`0eef3e50020f5035fc9789a499863e6aa9fe7fe3`](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/commit/0eef3e50020f5035fc9789a499863e6aa9fe7fe3), the merge of A9 PR #24; tree `0766976388f2a194401748f513140eda6818cba9`.
+- Authority remains [V6A-01 through V6A-12](<V6A_UI_STABILIZATION.md>). This is a documentation-only, append-only reconciliation, not another implementation, test execution, diagnostic, visual acceptance or hosted operation.
+- Every earlier line retains its receipt-time meaning, including historical headings containing "Current", local NOT RUN entries, failed attempts and original proposed inventories. New independent evidence below does not retrospectively change those outcomes or explain previously inconclusive causes.
+- A10 authorization covers only this ledger and [accessibility evidence](<V6A_ACCESSIBILITY_EVIDENCE.md>). This append is an uncommitted documentation candidate; the source CI cited below is not a new CI receipt for this documentation append.
+
+| Independent decision | Status at the pinned source | Boundary |
+| --- | --- | --- |
+| Code and automated CI readiness | **PASS** | All five required jobs and the required executed steps below succeeded |
+| V6A evidence completeness | **INCOMPLETE** | This reconciliation still needs review/publication; current visual, manual and hosted receipts remain incomplete |
+| Accessibility acceptance | **INCOMPLETE** | Automated coverage is not manual acceptance or WCAG certification |
+| V6A-05 hosted SMTP/account acceptance | **NOT VERIFIED** | Synthetic native SMTP does not establish hosted delivery or account acceptance |
+| Deployment/promotion | **NOT AUTHORIZED** | No deployment, promotion, variable change or infrastructure operation is authorized |
+| Overall V6A closure | **NO-GO** | No milestone completion or release acceptance is declared |
+
+### A10.2 Final merged A1–A9 inventory
+
+Changed-file counts and high-level inventories are the actual final merged PR inventories, not the earlier proposed lists. The inventory links identify the exact paths. Each final Push/PR pair below was verified successful with all five mandatory jobs; job names are not test counts. Shared manual and hosted limitations remain governed by A10.5–A10.8.
+
+| Batch / contract | PR and exact merge commit | Final changed files and high-level inventory | Final verified Push / PR CI | Current bounded outcome and limitation |
+| --- | --- | --- | --- | --- |
+| A1 / V6A-01, V6A-02 | [#16](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/16); `4791c0373588aef9a6895049d2def67fc045a1c1` | [9 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/16/files): Library loading/page/CSS and dictionary; three unit files; presentation harness; ledger | [39596536004](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39596536004) / [39596540836](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/39596540836) | Merged; code/CI PASS. Native intermediate loading observation and manual review remain incomplete |
+| A2 / V6A-03 | [#17](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/17); `e42fb9212e0a34008a6ca1a24cfd80129d4164f4` | [12 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/17/files): Catalog component/CSS; two unit files and presentation harness; ledger; six dependency/lock/workspace/glob-adapter files | [40089241378](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40089241378) / [40089244373](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40089244373) | Merged; code/CI PASS. Historical images and failures are not current-source manual approval |
+| A3 / V6A-04 | [#18](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/18); `f919c78b8c5a090dcc3dd1201079e02376e9b614` | [5 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/18/files): My Requests page/CSS; browser and unit coverage; ledger | [40115302451](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40115302451) / [40115311055](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40115311055) | Merged; code/CI PASS. Human visual acceptance remains separate |
+| A4 / V6A-06 | [#19](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/19); `96762d9d64179173f154d71adc94434ea58f68f5` | [8 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/19/files): progressive request form/CSS/i18n; three browser files; form units; ledger | [40174662703](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40174662703) / [40174664556](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40174664556) | Merged; code/CI PASS. Earlier legacy compatibility failures remain historical |
+| A5 / V6A-07 | [#20](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/20); `1f0df17743a75881146c9793a87cf364f6ebebc3` | [11 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/20/files): Library/Works pages and honest Catalog/Library state/copy logic; two browser files; three unit files; ledger | [40184425469](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40184425469) / [40184506905](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40184506905) | Merged; code/CI PASS. Earlier local unit failures were not retrospectively explained by Linux success |
+| A6 / V6A-08 | [#21](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/21); `5289b4d4f2f49e4f8f45cff608a3a1e30273e11e` | [6 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/21/files): Shell/CSS; two browser files; UI units; ledger | [40247016997](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40247016997) / [40247020606](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40247020606) | Merged; code/CI PASS. Covered presentation/error transitions do not retrospectively reproduce the original live flash |
+| A7 / V6A-09 | [#22](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/22); `45986e937ae17420c434834ca3ae3ae1222227cb` | [9 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/22/files): two pages, Discovery and scoped/shared style consistency; browser and source-contract tests; ledger | [40253547206](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40253547206) / [40253686280](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40253686280) | Merged; code/CI PASS. Static style checks are not manual rendered contrast or glyph review |
+| A8 / V6A-10 | [#23](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/23); `ed78cfe61d782cef079d2d3f3a41ce72bb9aa447` | [8 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/23/files): two browser files; two helpers; two unit files; two evidence documents | [40396805319](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40396805319) / [40396813331](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40396813331) | Merged; supported automated assertions PASS. Manual accessibility acceptance remains incomplete |
+| A9 / V6A-11 | [#24](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/24); `0eef3e50020f5035fc9789a499863e6aa9fe7fe3` | [2 files](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/24/files): existing Catalog and Library native browser scenarios only | [40440138459](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40440138459) / [40440232007](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40440232007) | Merged; same-URL reset assertions PASS under native CI. Not a newly established application defect or manual visual approval |
+
+A1 addressed hardcoded bilingual loading, inherited form direction and stale committed selections. A2 addressed Catalog alignment/help layout and uncontrolled-filter/reset behavior. A3 improved adjacent heading/actions and owner/followed grouping. A4 separated optional details with native disclosure and reveal-before-invalid-focus behavior. A5 distinguished empty, filtered-zero, out-of-range, unavailable and unresolved-access states. A6 corrected data-only header presentation of unresolved/error/cached sessions without changing authorization policy. A7 applied bounded semantic style/container consistency. A8 added evidence contracts and corrected measurement/fixture defects; A9 added the missing same-bare-URL reset regression.
+
+A2 also included reviewed security maintenance: Vitest 4.1.12, Next/eslint 16.4.1, Zod 4.6.6, undici 7.30.1, nodemailer 10.1.4 and smtp-server 3.19.24, scoped dependency overrides/lockfiles, and the narrow glob adapter retarget. The full V6A history is therefore **not exclusively UI/CSS**. These reviewed changes are not hosted infrastructure changes or evidence of hosted acceptance.
+
+### A10.3 Exact successful post-merge CI execution
+
+[Run 40441344619](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619), attempt **1**, event **push**, exact head `0eef3e50020f5035fc9789a499863e6aa9fe7fe3`, used [the mandatory workflow](<../.github/workflows/ci.yml>) and completed successfully on 2026-10-27 UTC. Actual job/step metadata and existing allowlisted aggregate receipts were checked; this is not an inference from a workflow-level green badge. The required steps below completed with success, not skipped. No test or audit was rerun for A10.
+
+| Requirement / actual command or phase | Run job and step number | Verified existing outcome |
+| --- | --- | --- |
+| Frozen install: `pnpm install --frozen-lockfile` | [Quality foundations 121982172607](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121982172607), step 6; also native/audit preparation | PASS |
+| TypeScript: `pnpm typecheck` | Foundations steps 7 and 16 | PASS before and after build |
+| Lint: `pnpm lint` | Foundations step 8 | PASS |
+| Full units: `pnpm test` | Foundations step 9 | PASS; no total transplanted from a historical local receipt |
+| Migration application and repeat: `pnpm db:migrate` twice | Foundations steps 10 and 11 | PASS; disposable PostgreSQL 17 fixture |
+| Generation: `pnpm db:generate`; tracked drift: `git diff --exit-code -- packages/database/drizzle` | Foundations steps 12 and 13 | PASS; existing generator receipt reports no schema changes |
+| Complete SQL integration selection: `pnpm test:integration` with private reporters/output | Foundations step 14, displayed as `Run set +x` | PASS; fixed receipts `INTEGRATION PASS` and `INTEGRATION_EXIT 0` |
+| Production build: `pnpm build` | Foundations step 15; native jobs also build | PASS |
+| Complete original/legacy native selection, production HTTPS | [Legacy 121984296826](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121984296826), step 14 | PASS; fixed receipt `LEGACY PASS` |
+| Enabled V4 native selection | [V4 121984296793](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121984296793), step 14 | PASS; fixed receipt `V4 PASS` |
+| Production audit: `pnpm audit --prod --audit-level high` | [Audits 121984296732](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121984296732), step 6 | PASS; existing output reports no known vulnerabilities |
+| Full dependency audit: `pnpm audit --audit-level moderate` | Audits step 7 | PASS; existing output reports no known vulnerabilities |
+| Require every mandatory dependency to succeed | [Verify 121987833176](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121987833176), step 2 | PASS; checks, legacy, enabled V4 and audits each recorded success |
+
+The historical job labels "Native original 17" and "Native enabled V4 8" are labels, not newly extracted test totals. Private native output exposes aggregate phase results, not a new public per-cell measurement report. Existing TLS/SMTP, account, database, privacy, worker, retry and timeout boundaries remain in force. Local synthetic mail and owned HTTPS do not establish hosted provider delivery or deployment readiness.
+
+The merged [Catalog additions](<../tests/e2e/advanced-discovery.spec.ts#L311-L361>) and [Library additions](<../tests/e2e/library-pagination.spec.ts#L213-L297>) remain in their existing scenarios selected by the unchanged native configuration. Each adds EN/VI dirty-controls-at-bare-URL checks followed by localized Reset focus/Enter and genuine default/result/locale postconditions, with no intervening test-driven reload/navigation. The Library checks retain actor/source-scoped ownership and hidden-metadata exclusion. They have now executed within the successful complete legacy selection; this is distinct from human visual acceptance.
+
+### A10.4 Source and migration integrity; retained failures
+
+The read-only comparison from roadmap baseline `55ec938228338960f2612206bcf8ca47f3e5d5d0` to `0eef3e50020f5035fc9789a499863e6aa9fe7fe3` found **no database package changes**. Fifteen committed migrations numbered 0000–0014 and their snapshots/journal are unchanged. Authentication and session policy and the required CI workflows are unchanged across that range. Existing generation output in foundations and both native jobs reported no schema changes, and their drift checks succeeded. No migration was generated or applied by A10; these are source comparisons and earlier CI receipts, not a new database operation.
+
+The prior A1 hydration timeout, A2 Reset/security/SQL/unit/orchestration failures, A4 legacy compatibility failures, A5 local unit failures and A6 matcher uncertainty remain recorded with their original scopes. Later successful Linux CI neither erases them nor proves an unexplained local failure harmless, preexisting or Windows-only.
+
+The [executed A8 attribution run 40293536041](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40293536041) tested application source `061529828cf09dc00fd0e9291a256b74267bfcf1` and reported **36 passed / 3 failed**. Its G05 observations were Request a Story input/button pairs with a conclusively excluded closed-details endpoint; they did not demonstrate obstruction between genuinely rendered controls. The genuine foundation flow observed signup/signin HTTP 200, at least one session-transport HTTP 429 during the initial failing attempt, and retry signup HTTP 429. This supported a fixture isolation correction; it did not identify every prior bucket contributor or prove the last session request caused every UI error.
+
+[Correction recorded on PR #23](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/23#issuecomment-6426695254): closed-details rendered eligibility preserves first summaries, open/nested behavior, visible-peer detection, one-pixel tolerance, bounds and caps; 25 geometry regressions were added. Foundation uses one fresh stable synthetic context identity per actor/attempt, not per-request rotation, limiter resets, fabricated sessions or changed application rate limits. Final corrective head `ed786afdc36221a2ea68ea113f6cb63a5e0ea56a` subsequently passed Linux CI. The final PR inventory is eight files; the earlier five-file implementation receipt above remains historically correct for that earlier phase.
+
+The earlier [40288321788 diagnostic](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40288321788) stopped at reporting/instrumentation safety before Playwright and is not a browser-execution failure count. Original A8-O04 attribution remains inconclusive; passing later assertions is not retrospective proof of its original cause. No A8 investigation was reopened, and no current source correction is supported by this documentation reconciliation.
+
+### A10.5 Screenshot existence, relevance and privacy
+
+Historical material is not globally absent. The previous read-only audit confirmed file-name availability at the exact retained A1/A2 locations referenced by their historical receipts, without opening images or raw artifacts. Those private host-specific locations are deliberately not repeated here. The historical presentation harnesses used synthetic props/adapters: their images are not proof of genuine SQL/authentication, hosted behavior or current full-shell/System acceptance. Individual historical inspection claims retain only their recorded scope.
+
+| Safe evidence category | Established historical material | Current-source content/privacy review |
+| --- | --- | --- |
+| Library | 64 A1 PNG names; historical ledger records two visually inspected examples | **NOT VERIFIED** for the full collection at the current source |
+| Catalog | 72 A2 final PNG names, 22 baseline/functional names, and a separately retained Reset image; historical inspected examples remain historical | **NOT VERIFIED** for the full collection at the current source |
+| Home | Authored/executed automated checks, but no qualifying current-source reviewed screenshot manifest identified in the audited documents/PRs | **NOT VERIFIED** |
+| My Requests and Request a Story | Automated state/layout/form checks are not a screenshot acceptance record | **NOT VERIFIED** |
+| Login and Settings | Automated checks do not supply a current privacy-approved visual signoff | **NOT VERIFIED** |
+| Loading, error, focus, System and zoom states | Some historical capture references or authored checks exist; no complete source-pinned current review mapping established | **NOT VERIFIED**, or **NOT RUN** for unperformed manual checks |
+
+The exact main run has zero uploaded artifacts. This preserves confidentiality; it does not prove that no runner-local image was generated. File-name inventory alone proves neither image content, current-source relevance, visual acceptance nor permission to publish. No image was created, opened for new acceptance, uploaded or committed by this documentation task.
+
+A missing-review checklist must tie safe case ID, source SHA, page category, width/height, locale, explicit/resolved theme, motion, genuine zoom setting, relevant state, reviewer/time, privacy decision and actual verdict to existing evidence. Account-bearing images, including synthetic authenticated accounts, private Library/Request content, verification links, cookies/tokens, raw HTML/traces/bodies and credential/environment values must remain private. Public documentation may carry allowlisted aggregate outcomes and approved references only. Anonymous public-page images require separate content/privacy review before any publication; there is no screenshot-publication authorization here.
+
+### A10.6 Accessibility reconciliation and acceptance boundary
+
+The formerly authored 14 A8 cases subsequently executed within successful native Linux CI. Supported bounded responsive viewport, representative keyboard/focus, native disclosure/invalid-form, locale/theme/System and reduced-motion assertions are **AUTOMATED PASS** within their actual authored scope. They do not establish every page/state/profile combination, manual contrast, human announcements or genuine 200% browser zoom. See the appended current-source reconciliation in [accessibility evidence](<V6A_ACCESSIBILITY_EVIDENCE.md>).
+
+**STILL NOT RUN:** genuine browser-chrome 200% zoom; human screen-reader review; Vietnamese physical glyph/wrapping inspection; manual visible-focus/clipping/tab-order assessment; manual rendered critical-control contrast.
+
+**STILL NOT VERIFIED:** applicable unsupported complex compositing; actual intermediate Library route-loading fallback during navigation and direct refresh; any other browser or visual state lacking directly reviewed evidence. Rendered SSR/hydration loading-unit coverage is not proof that a native intermediate fallback was observed. Header pending/error coverage is a different state and must not be silently conflated with Library loading.
+
+The roadmap explicitly requires genuine zoom, EN/VI usability, coherent visible focus/tab order and manually evaluated critical contrast. Human AT is an explicit A8 follow-up, not a claim that every screen reader or full WCAG certification is required or achieved. Unsupported samples remain bounded measurement limitations; only a documented applicability judgment can make a particular nonessential case NOT APPLICABLE. Lack of tooling, time or permission cannot produce PASS or NOT APPLICABLE.
+
+Future manual work requires separate approval and an existing approved disposable headed environment. Reuse the compact supported profiles without a needless all-axis Cartesian matrix, preserve required breakpoint coverage, use actual System controls/reduced-motion settings, and verify browser chrome 100% → 200% → 100% with physical window/OS scaling and actual viewport metrics recorded. CSS/font enlargement, DPR or pinch overrides are not substitutes. Missing or unreproducible states remain honest NOT RUN/NOT VERIFIED outcomes; do not manufacture a fallback or new backend outage. No manual/browser work is performed here.
+
+### A10.7 Hosted SMTP/account gate — future checklist only
+
+V6A-05 remains an unresolved **P0 acceptance requirement / NOT VERIFIED**. The historical ledger records signup HTTP 200, a sanitized `auth.mail` failure and zero observed sandbox messages at that time, followed by Preview SMTP variable updates. It contains no source/deployment-pinned successful hosted registration, delivery, verification, login and logout receipt. Ordinary Linux native E2E uses synthetic SMTP and does **not** close this hosted requirement or establish the generic failure's root cause.
+
+A separately authorized operator receipt must record:
+
+1. Exact deployed Preview source SHA, deployment identity and observation time; distinguish that deployment from the audited repository source.
+2. Confirmed Preview branch/environment variable **scope**, without publishing any values. Any variable change or redeployment needs its own authorization.
+3. One permitted genuine synthetic registration; no verification or throttling bypass.
+4. Observed sandbox verification-mail delivery associated privately with that permitted actor.
+5. Genuine link verification, with no public verification URL/token or raw message content.
+6. Genuine login and logout and the observed outcome.
+7. Safe evidence of secure-cookie, role and CSRF protections where applicable, without exposing cookies, headers or session material.
+
+This is only the missing future receipt definition. No Vercel or Mailtrap access, registration, email send, variable edit, provider troubleshooting or Preview deployment is performed or authorized by A10 documentation work. An ignored/canceled deployment record is not a successful hosted application or SMTP receipt.
+
+### A10.8 Remaining closure register and stop decision
+
+| Requirement / priority | Current evidence and status | Blocks full V6A closure? | Smallest remaining action / separate approval |
+| --- | --- | --- | --- |
+| P0: current release-evidence reconciliation | Source-pinned append prepared; broader evidence **INCOMPLETE**, documentation not yet reviewed/published | Yes | Review this two-file documentation candidate; commit/Draft PR/publication require separate approval |
+| P0: V6A-05 hosted account/SMTP acceptance | Historical failure and later variable edits; current outcome **NOT VERIFIED** | Yes | Obtain an existing valid operator receipt or separately authorize the bounded A10.7 flow; no automatic redeploy |
+| V6A-10 genuine browser 200% zoom | **NOT RUN** | Yes | Separately approve the defined real browser-chrome procedure |
+| V6A-10 VI text, clipping, critical contrast, focus/tab order | Human visual/manual assessment **NOT RUN** | Yes | Separately approve bounded current-source manual review, retaining failures and actual metrics |
+| A8 screen-reader spot checks | **NOT RUN** | Yes, for full A8 manual acceptance | Separately approve the documented bounded AT follow-up; no certification inferred from automation |
+| Current-source screenshot/privacy review | Historical collections exist; current manifest/review **NOT VERIFIED** | Yes, for claiming V6A-12 visual evidence complete | Reconcile existing material first; capture only missing evidence after separate approval; no account-bearing publication |
+| Native intermediate Library loading, refresh/navigation | **NOT VERIFIED** | Yes, before claiming V6A-01's native transition observation complete | Safely observe the real state under separate approval or retain the limitation; no fake success/outage framework |
+| Applicable unsupported compositing | **NOT VERIFIED** | Conditional: critical applicable controls require manual adjudication | Manual fallback or documented applicability decision under separate review approval |
+| Required automated gates and unchanged migration scope | **PASS** at the pinned source | No remaining automated blocker identified | Preserve receipts; do not repeat successful suites merely for this append |
+| Deployment/promotion | **NOT AUTHORIZED** | Independent operational authorization gate | Explicit future maintainer authorization; no deployment action follows from CI or documentation approval |
+
+**Final decision: Code/CI PASS; evidence and accessibility INCOMPLETE; hosted SMTP NOT VERIFIED; deployment/promotion NOT AUTHORIZED; overall full V6A closure remains NO-GO.** This is not a new application-defect finding. No application/test/configuration/dependency/schema/workflow correction is proposed. A separately authorized documentation commit and Draft PR may follow local documentation validation, but no commit, push, PR, merge, tests, screenshots, hosted verification, deployment or A1–A9 reimplementation is performed here.
