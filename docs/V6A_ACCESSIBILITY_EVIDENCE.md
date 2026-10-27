@@ -127,3 +127,74 @@ No independently confirmed P0/P1 browser defect exists from this implementation-
 ## Follow-up boundary
 
 After separate publication authorization, the additive spec is discovered by the unchanged ordinary Linux native suite; no special workflow is needed. Preserve its database/SMTP/TLS guards and all required jobs. Do not rerun historical workflows or start a diagnostic automatically. Tests/docs infrastructure readiness and eligibility for a scoped commit are distinct from full A8/manual acceptance, merge or deployment readiness.
+
+## A10 current-source accessibility reconciliation — 2026-10-27 UTC
+
+### Source pin and historical boundary
+
+This append reconciles the supplied current-source/CI receipts against the historical evidence above; it does not rewrite their time scope or claim a new local execution. Current source is exact main [`0eef3e50020f5035fc9789a499863e6aa9fe7fe3`](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/commit/0eef3e50020f5035fc9789a499863e6aa9fe7fe3), with [PR #24](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/24) (A9) merged. The original local **AUTHORED — NOT RUN** browser rows remain valid for that earlier phase; later CI execution is recorded separately below.
+
+- Current main CI: [run 40441344619](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619), attempt `1`; all five required CI results and their actual steps **PASS**.
+- Legacy [CI job 121984296826](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40441344619/job/121984296826), step `14`, actually completed the real production HTTPS / native guarded SMTP suite. Its whole source-configured base includes the 14 previously authored A8 browser cases: these were **later executed by that passing complete legacy CI suite**, not merely discovered or typechecked.
+- Current A9 source adds two body blocks with four EN/VI observations; these are **not new A8 cases** and do not increase the historical 14-case A8 count.
+- [PR #23](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/23)'s final scope was eight files at feature head [`ed786afdc36221a2ea68ea113f6cb63a5e0ea56a`](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/commit/ed786afdc36221a2ea68ea113f6cb63a5e0ea56a): corrected closed-`details` geometry, foundation-stable per-actor IP behavior, and 25 new geometry unit tests. The [corrective comment](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/23#issuecomment-6426695254) records that correction. The original five-file phase described above remains historically valid, not overwritten by the final scope.
+- The full batch/CI and migration-history reconciliation is in the [validation ledger](<V6_VALIDATION.md>), under “V6A A10 — Source-pinned evidence reconciliation (2026-10-27 UTC)”. No migration or source change is implied here.
+
+Current source references, evaluated at the pinned SHA: [browser spec](<../tests/e2e/accessibility-responsive.spec.ts>), [DOM geometry sampler](<../tests/helpers/accessibility-geometry.ts>) and [pure evidence contracts](<../tests/helpers/accessibility-evidence.ts>). This documentation-only append does not introduce tests, helper changes or fresh execution receipts.
+
+### What the current automated PASS supports
+
+| Evidence axis | Supported claim | Boundary |
+| --- | --- | --- |
+| Responsive profiles | Bounded-viewport assertions at 375/VI/dark, 768/EN/dark, 1280/EN/light and 1440/VI/light PASS within the actual assertions | Representative route/profile selection, not every Cartesian combination or per-pixel measurement |
+| Keyboard and forms | Representative keyboard focus, skip/disclosure interaction and real invalid-form checks PASS within the actual assertions | Not complete manual tab-order, visual focus/clipping or announcement review |
+| Locale and theme | Asserted EN/VI, light/dark and actual System preference-control behavior PASS | No universal locale/theme/state certification; OS preference emulation is not every native OS integration |
+| Reduced motion | Asserted runtime preference and bounded scrolling/transition checks PASS | Not every animation or visual state reviewed |
+| Geometry and conservative contrast contracts | Bounded geometry and applicable supported contrast assertions passed; unsupported/inapplicable samples retain their authored classifications | Not manual rendered contrast, physical glyph inspection or every control/state/pixel |
+| Public CI reporting | Wrapper reports aggregate native PASS/FAIL | Not an individually published numerical observation matrix |
+
+A headless width change is **not** genuine browser-chrome 200% zoom evidence. Successful assertions do not silently convert unsupported samples or unreviewed visual states into PASS. These are source-pinned automated results, not a fresh local browser review by this reconciliation author.
+
+### Remaining acceptance matrix
+
+The [roadmap authority](<V6A_UI_STABILIZATION.md#v6a-10--accessibility-and-responsive-evidence-p1>) still requires literal 200% browser zoom, EN/VI readability, visible focus/coherent tab order and manual critical-control contrast. Human AT is an explicit existing A8 follow-up above; this is not a claim to certify every WCAG or AT/browser combination.
+
+| Remaining evidence | Current status | Required distinction |
+| --- | --- | --- |
+| True browser-chrome 200% zoom | **STILL NOT RUN** | Verify actual browser UI zoom; responsive width, CSS zoom, DPR, pinch and font enlargement are not substitutes |
+| Human assistive-technology review | **STILL NOT RUN** | Real screen-reader names, reading position, announcements, disclosure and focus continuity; distinguish application locale from AT/browser locale |
+| VI physical glyphs and wrapping | **STILL NOT RUN** | Human review of actual diacritics, fallback glyphs and rendered wrapping, including true zoom |
+| Manual visible-focus clipping and tab order | **STILL NOT RUN** | Numeric bounds and computed styles alone cannot prove perceptual visibility or coherent traversal |
+| Manual critical rendered contrast | **STILL NOT RUN** | Review actual important text/control/focus states and applicability |
+| Applicable complex composites, unsupported colors, images and filters | **STILL NOT VERIFIED** | Unsupported measurement remains manual-review work, not an automatic contrast verdict |
+| Actual intermediate Library route Loading on navigation and refresh | **STILL NOT VERIFIED** | SSR/hydration unit coverage is not proof of the native rendered intermediate interval |
+| Other browser visual states without review | **STILL NOT VERIFIED** | Neither source assertions nor historical receipts imply reviewed rendering |
+| Hosted V6A-05 P0 | **NOT VERIFIED** | Native guarded SMTP evidence does not close hosted acceptance |
+| Deployment | **NOT AUTHORIZED** | Automated PASS is not permission to deploy or perform hosted operations |
+
+A nonessential item may become NOT APPLICABLE only through a documented applicability judgment. Missing tools, permissions or review time do not establish non-applicability. Applicable mandatory work remains open.
+
+### Screenshot inventory and privacy limits
+
+Historical documentation records A1 Library's 64 PNG names, A2 Catalog's 72 final / 22 baseline images, and separate Reset image metadata, with their old roots verified at that time. These are historical inventory receipts, not a current-source screenshot acceptance set.
+
+- This reconciliation has **not opened the images**, verified their privacy, or verified a collection at the current source SHA. No private roots, accounts, emails, raw HTML, tokens, queried URLs or project environment values are reproduced here.
+- For Home, My Requests, New Request, Login and Settings, no qualifying **current-source, privacy-approved review manifest was found in the scoped documents/PRs**. Status is **NOT VERIFIED**; this is not a claim of global absence.
+- The current CI run has **zero uploaded artifacts**. That does not prove nothing was captured locally on the runner, and is not a reason or authorization to upload raw images.
+- Existing local historical receipts remain historical. Inventory existence, filename counts and aggregate CI PASS do not silently certify visual review or privacy approval.
+
+### Proposed follow-up — separate approval required
+
+No manual execution or capture is authorized by this proposal. Only after separate approval, conduct a private headed review in an **existing approved disposable environment**, without new infrastructure:
+
+1. Verify browser chrome at 100% → 200% → restored 100%, fixing the physical window and OS scaling; record relevant physical-window/CSS-viewport/DPR metrics and the actual UI zoom verification. Do not fake zoom with CSS, DPR, pinch or viewport resizing.
+2. Exercise real System and reduced-motion settings; review representative EN/VI reading, focus, disclosure, invalid-form and recovery states. Record application locale separately from screen-reader/AT/browser locale.
+3. Keep all private-account images private, **including synthetic-account images**; synthetic content is not publication permission. Public anonymous images require content/privacy review before any publication.
+4. Limit any public manifest to static case ID, source SHA, page category, profile, actual review time and outcomes. Do not publish host paths, users, query strings, tokens or account-bearing captures.
+5. Record manual cases as **NOT RUN until actually executed**; record unsupported or inconclusive observations honestly and obtain separate scope approval before fixes or new tests.
+
+Only documentation validation and read-only evidence inspection are performed for this append. No application tests, installs, type/lint/build gates, SQL operations, browser sessions, screenshot captures/uploads, hosted acceptance checks, CI/workflow executions, dependency changes, commits, pushes, PRs, merges or deployments are performed. No source assets or helpers are added.
+
+### Decision
+
+**GO only for a future separately authorized documentation commit**, subject to local validation of the exact append-only prefix and two-document scope. **NO-GO for whole-V6A closure**: full V6A/evidence/accessibility acceptance remains **INCOMPLETE**, manual evidence remains open, hosted V6A-05 P0 is not verified, and deployment is not authorized.
