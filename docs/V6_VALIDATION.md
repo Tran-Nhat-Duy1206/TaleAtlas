@@ -1606,3 +1606,68 @@ This is only the missing future receipt definition. No Vercel or Mailtrap access
 | Deployment/promotion | **NOT AUTHORIZED** | Independent operational authorization gate | Explicit future maintainer authorization; no deployment action follows from CI or documentation approval |
 
 **Final decision: Code/CI PASS; evidence and accessibility INCOMPLETE; hosted SMTP NOT VERIFIED; deployment/promotion NOT AUTHORIZED; overall full V6A closure remains NO-GO.** This is not a new application-defect finding. No application/test/configuration/dependency/schema/workflow correction is proposed. A separately authorized documentation commit and Draft PR may follow local documentation validation, but no commit, push, PR, merge, tests, screenshots, hosted verification, deployment or A1–A9 reimplementation is performed here.
+
+## V6B B1 — Pure identity contracts and privacy projection (2026-10-27 UTC)
+
+### Scope and source pin
+
+- Maintainer-authorized B1 only, branch `feat/v6b-b1-profile-contracts`, unchanged HEAD `1cc6ddd9191488c4b00ef8db9d885eafba6b3e0c`. The exact merged baseline was fetched and verified before creating the isolated worktree; stale local main was not used as its starting point. Earlier branches/worktrees remain preserved.
+- [Baseline main CI 40459306889](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40459306889) is the maintainer-verified predecessor receipt, not a CI result for this uncommitted B1 candidate. No B1 commit or GitHub execution is claimed.
+- Deferred manual/external acceptance no longer automatically blocks unrelated authorized coding. It does not become PASS or public rollout permission. The twelve entries in [the centralized backlog](<DEFERRED_MANUAL_VERIFICATION.md>) are byte-identical to the baseline; no hosted-profile item was added because no hosted B1 feature exists.
+
+| Exact authorized file | Observed change |
+| --- | --- |
+| [Reader-profile contracts](<../apps/web/src/features/reader-profile/contracts.ts>) | New pure strict validators and provisional caller-supplied policy factory |
+| [Reader-profile projection](<../apps/web/src/features/reader-profile/projection.ts>) | New pure owner/public allowlists and fail-closed decision model |
+| [Contract unit tests](<../tests/unit/reader-profile-contracts.test.ts>) | New fixed synthetic validation, Unicode and strict-input cases |
+| [Projection unit tests](<../tests/unit/reader-profile-projection.test.ts>) | New fixed caller-fact, privacy-canary and output-isolation cases |
+| [B1 contract specification](<V6B_PROFILE_CONTRACT.md>) | New provisional scope, privacy, compatibility and B2 decisions |
+| This validation ledger | Append-only actual B1 evidence; every earlier byte remains an unchanged prefix |
+
+### Implemented contracts and limits
+
+- No automatic enrollment/backfill. Create defaults to PRIVATE; public intent is a separate literal PUBLISH command with affirmative acknowledgment and expected revision. Edit accepts only a nonempty presentation/interests patch; hide is a distinct command model. No command executes state transitions or reserves a handle.
+- Required policy input supplies validated exact reserved handles and literal prefixes, copied independently of caller-owned arrays. Tests do not establish a permanent production reserved-name, retention, reuse or rename policy.
+- Raw ASCII handles are validated before lowercase canonicalization, length 3–24; strict end checks reject terminal line separators. Display names are required/nonunique NFC text, 1–80 UTF-16 units/320 UTF-8 bytes; optional plain biography is bounded at 500 units/2,000 bytes. Raw and post-normalization bounds are explicit, including invalid surrogates and prohibited control/bidi rejection. Literal markup/URL-like text is not rendered or fetched.
+- At most five explicit unique genre slugs match the existing text taxonomy format; database existence is deliberately not inferred. Revisions are noncoerced positive integers through 2,147,483,647. Canonical account IDs remain opaque exact strings, never UUID-parsed or normalized; only the separately modeled future public profile identifier uses UUID syntax.
+- Strict command/snapshot inputs reject unknown fields and unsafe plain-data shapes. Pure projection descriptor-picks only known snapshot fields, leaves unrelated private accessors unread, constructs fresh output objects/arrays and never falls back to auth name/image or Library-derived interests.
+- PUBLIC DTO fields are only public identifier, handle, explicit display name, optional biography and selected interests. OWNER adds visibility/revision, not account/session/Library data. Exact ownership is case-sensitive; admin/moderator roles do not override it. Private-nonowner, absent, removed, invalid and blocked public views expose no profile; unavailable session infrastructure is represented without inspecting the profile as anonymous.
+- Caller-supplied viewer/block facts are not authenticated sessions or database-qualified authorization. Conservative block denial is not an irreversible platform blocking policy; anonymous public access still permits logout/alternate-account circumvention. B2 must implement and test real authority, uniqueness, lifecycle, visibility/races and deletion.
+
+### Actual focused attempts and scoped corrections
+
+The failures below are retained, not converted into PASS by later success. Raw test output stays private; fixed counts/categories are recorded here.
+
+| Attempt, in order | Observed result | Correction or boundary |
+| --- | --- | --- |
+| Initial two-file focused run | Exit 1; 65 tests completed, then worker heap exhaustion; not a complete passing receipt | Parameterized title data included rich Zod schema objects, including a schema occupying a string-placeholder position. Replaced schema-bearing title rows with scalar command/field labels; no heap, timeout, worker or retry setting changed. Allocation internals were not separately instrumented |
+| First completed focused run | 297 PASS / 2 FAIL | Tests exposed code-point string length checks where UTF-16 units were required, and a normalization-growth fixture expectation. Inspected installed Zod behavior; replaced text limits with explicit `value.length` checks before and after NFC |
+| Next focused run | 303 PASS / 1 FAIL | A trailing U+0344 after x partly recomposed to U+1E8D, so that fixture did not actually exceed the limit. Used leading U+0344 and asserted actual 80→81 / 500→501 NFC lengths. Also corrected parameterization to pass complete invalid interest arrays, and added five strict terminal-line-separator cases; no assertion threshold weakened |
+| Final focused run | **304 PASS / 0 FAIL / 0 pending**, two files | 239 contract cases and 65 projection cases passed on the corrected candidate |
+
+The final focused TypeScript command executed only after the final focused tests passed. Earlier unsuccessful focused runs did not reach that compilation step. All corrections remained inside the two authorized contract/test files; no infrastructure troubleshooting or deferred-verification attempt was used to force green results.
+
+### Actual final local validation
+
+Node 24.19.0; pnpm 11.7.0. Four TypeScript files and the new specification were formatted and their hashes frozen before the full sequence. Full gates ran once on that final code; the only subsequent authored change is this evidence append, and the five frozen file hashes remain unchanged.
+
+| Executed check | Actual result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS, one fresh-worktree prerequisite; dependency manifests/lock unchanged |
+| `pnpm exec vitest run tests/unit/reader-profile-contracts.test.ts tests/unit/reader-profile-projection.test.ts` with private JSON receipt | Final PASS: 304 / 0 failed / 0 pending, two files; unsuccessful attempts preserved above |
+| `pnpm exec tsc --noEmit -p tsconfig.tests.json` | PASS on the final focused candidate |
+| `pnpm test` complete unit selection with private JSON receipt | PASS: **2,745 / 0 failed / 0 pending**, 79 files; one full run, 08:01:46–08:04:25 UTC |
+| `pnpm typecheck` | PASS once, 08:04:26–08:05:30 UTC |
+| `pnpm lint` | PASS once, 08:05:30–08:05:57 UTC |
+| `pnpm build` | PASS once, 08:05:57–08:06:57 UTC; synthetic production compile-only HTTPS/loopback settings, database and SMTP deliberately nonservice ports; no service or hosted connection provisioned |
+| Scoped Prettier checks | PASS for four new TypeScript files and the new specification; historical ledger not reformatted |
+| Pure-import/source inspection and documentation link/privacy checks | PASS; no runtime environment, database, HTTP, session, logger, media or network dependency introduced; deferred backlog unchanged |
+| Independent read-only privacy/contracts review and scoped correction re-review | NoBlock; no remaining concrete source/privacy finding; reviews themselves did not execute tests |
+
+SQL integration, native browser E2E, new dependency audits and hosted/manual verification were **NOT RUN locally for B1**. No SQL table, migration, API, server mutation service, UI, follow/feed/reaction/notification, public list, runtime flag or V4 activation exists in this change. Existing mandatory workflows and prior tests are unchanged; their future ordinary CI remains required after separately authorized publication. Pure tests and a compile-only build do not constitute authenticated end-to-end, database, hosted or accessibility acceptance.
+
+### Remaining policy decisions and stop boundary
+
+The [B1 specification](<V6B_PROFILE_CONTRACT.md>) retains required maintainer decisions before B2: exact reserved/impersonation policy; handle rename and reuse; reservation retention/account erasure; profile hide versus content deletion; bidirectional blocking/anonymous limits; public abuse/takedown responsibility; feature gates and budgets; and public activation requirements. No B1 unit test approves an irreversible database or retention policy.
+
+**GO for separate authorization of one scoped B1 commit and Draft PR**, based on the actual local gates, unchanged tested source and independent review. The index remains empty and all six approved files are uncommitted. This does not authorize publication, persistence, manual/hosted testing, rollout, merge or deployment, and does not declare full V6A or V6B acceptance. Stop after implementation and reporting; no deferred check, new infrastructure, provider access, database operation or publication was performed.
