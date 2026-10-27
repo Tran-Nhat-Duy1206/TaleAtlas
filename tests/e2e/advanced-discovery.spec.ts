@@ -307,6 +307,58 @@ test("advanced discovery composes exact public filters across bilingual native n
         ).toHaveValue("");
         await expect(page.locator("article h2").first()).toBeVisible();
       }
+
+      // A9: once per locale, outside the existing width/theme matrix. The URL
+      // is already bare: an unchanged committed query must not retain unsent edits.
+      const copy = publicCopy[locale];
+      const main = page.getByRole("main");
+      const bareURL = new URL(`/${locale}/works`, page.url()).href;
+      const defaults = [
+        [main.locator('input[name="q"]'), ""],
+        [main.locator('select[name="format"]'), ""],
+        [main.locator('select[name="genre"]'), ""],
+        [main.locator('input[name="originalLanguage"]'), ""],
+        [main.locator('select[name="releaseStatus"]'), ""],
+        [main.locator('input[name="pageSize"]'), "20"],
+      ] as const;
+      const publishedFixtures = main.locator(
+        slugs
+          .slice(0, 5)
+          .map((slug) => `article a[href="/${locale}/works/${slug}"]`)
+          .join(","),
+      );
+      await expect(page).toHaveURL(bareURL);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      for (const [control, value] of defaults)
+        await expect(control).toHaveValue(value);
+      await expect(publishedFixtures.first()).toBeVisible();
+      await expect(
+        main.locator(`article a[href="/${locale}/works/${slugs[5]!}"]`),
+      ).toHaveCount(0);
+
+      await main.locator('input[name="q"]').fill(run);
+      await main.locator('select[name="format"]').selectOption("NOVEL");
+      await main.locator('select[name="genre"]').selectOption(genre);
+      await expect(main.locator('input[name="q"]')).toHaveValue(run);
+      await expect(main.locator('select[name="format"]')).toHaveValue("NOVEL");
+      await expect(main.locator('select[name="genre"]')).toHaveValue(genre);
+      await expect(page).toHaveURL(bareURL);
+
+      const reset = main.getByRole("link", { name: copy.reset, exact: true });
+      await expect(reset).toHaveAttribute("href", `/${locale}/works`);
+      await reset.focus();
+      await expect(reset).toBeFocused();
+      await reset.press("Enter");
+      // Only the user's native link activation may discard the unsent values.
+      // No goto/reload/form reset may be inserted before these postconditions.
+      await expect(page).toHaveURL(bareURL);
+      for (const [control, value] of defaults)
+        await expect(control).toHaveValue(value);
+      await expect(publishedFixtures.first()).toBeVisible();
+      await expect(
+        main.locator(`article a[href="/${locale}/works/${slugs[5]!}"]`),
+      ).toHaveCount(0);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
     }
     expect(errors).toEqual([]);
   } finally {
