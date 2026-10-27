@@ -210,6 +210,92 @@ test("owner library native pagination and filters preserve unavailable facts wit
         page.getByRole("link", { name: copy.detail, exact: true }),
       ).toHaveCount(50);
 
+      // A9: the same real actor and 52 existing entries; no new lifecycle or seed.
+      // Validate displayed entry IDs against this actor's UUID-owned fixture only.
+      requireTestDatabase();
+      const ownedEntries = await sql`select id from library_entries
+        where user_id=${actor.id!} and work_id in(select id from works where source_id=${sourceId})`;
+      expect(ownedEntries.length === 52, "A9-L01").toBe(true);
+      const ownedHrefs = new Set(
+        ownedEntries.map((entry) => `/${locale}/library/${String(entry.id)}`),
+      );
+      const main = page.getByRole("main");
+      const bareURL = new URL(`/${locale}/library`, page.url()).href;
+      const defaults = [
+        [main.getByRole("combobox", { name: copy.status, exact: true }), ""],
+        [main.getByRole("combobox", { name: copy.favorite, exact: true }), ""],
+        [
+          main.getByRole("combobox", { name: copy.sort, exact: true }),
+          "UPDATED_DESC",
+        ],
+      ] as const;
+      const entries = main.getByRole("link", {
+        name: copy.detail,
+        exact: true,
+      });
+      await expect(page).toHaveURL(bareURL);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+      for (const [control, value] of defaults)
+        await expect(control).toHaveValue(value);
+      await expect(entries).toHaveCount(50);
+      expect(
+        (
+          await entries.evaluateAll((nodes) =>
+            nodes.map((node) => node.getAttribute("href")),
+          )
+        ).every((href) => ownedHrefs.has(href ?? "")),
+        "A9-L02",
+      ).toBe(true);
+      await expect(main).not.toContainText(hidden);
+
+      await main
+        .getByRole("combobox", { name: copy.status, exact: true })
+        .selectOption("READING");
+      await main
+        .getByRole("combobox", { name: copy.favorite, exact: true })
+        .selectOption("false");
+      await main
+        .getByRole("combobox", { name: copy.sort, exact: true })
+        .selectOption("TITLE_ASC");
+      await expect(
+        main.getByRole("combobox", { name: copy.status, exact: true }),
+      ).toHaveValue("READING");
+      await expect(
+        main.getByRole("combobox", { name: copy.favorite, exact: true }),
+      ).toHaveValue("false");
+      await expect(
+        main.getByRole("combobox", { name: copy.sort, exact: true }),
+      ).toHaveValue("TITLE_ASC");
+      await expect(page).toHaveURL(bareURL);
+
+      const reset = main.getByRole("link", { name: copy.reset, exact: true });
+      await expect(reset).toHaveAttribute("href", `/${locale}/library`);
+      await reset.focus();
+      await expect(reset).toBeFocused();
+      await reset.press("Enter");
+      // Do not navigate/reload from the test: the real Reset must clear edits.
+      await expect(page).toHaveURL(bareURL);
+      for (const [control, value] of defaults)
+        await expect(control).toHaveValue(value);
+      await expect(entries).toHaveCount(50);
+      expect(
+        (
+          await entries.evaluateAll((nodes) =>
+            nodes.map((node) => node.getAttribute("href")),
+          )
+        ).every((href) => ownedHrefs.has(href ?? "")),
+        "A9-L03",
+      ).toBe(true);
+      await expect(
+        main.getByRole("link", { name: copy.unavailable, exact: true }),
+      ).toHaveCount(50);
+      await expect(
+        main.getByRole("link", { name: copy.catalog, exact: true }),
+      ).toHaveCount(0);
+      await expect(main.getByRole("alert")).toHaveCount(0);
+      await expect(main).not.toContainText(hidden);
+      await expect(page.locator("html")).toHaveAttribute("lang", locale);
+
       // Valid page 3 is beyond both the known 52-row library and this real
       // 26-row subset. Keep status, false and sort in first-page recovery.
       await page.goto(
