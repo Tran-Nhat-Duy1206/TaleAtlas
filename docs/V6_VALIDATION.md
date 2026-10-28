@@ -1757,3 +1757,82 @@ Migrations/snapshots 0000–0014 are byte-identical to the baseline. All 40 old 
 B2b still needs exact reserved/impersonation policy, abuse/takedown responsibility, signed verified-session and owner-only commands, Origin/body fences, affirmative publication, coherent bidirectional-block/public qualification, restoration semantics if offered, safe OCC/overflow/races, rate/mutation budgets and budget-key erasure, feature gates and activation decisions. Root SQL cascades are distinct from the surrounding non-globally-atomic existing authentication workflow.
 
 The index is empty and all 15 source changes are uncommitted. No API/server profile HTTP service/UI, follow/feed, Library sharing, new runtime activation, hosted/manual check, V4 enablement, provider/deployment operation, commit, push, PR or merge was performed. Earlier worktrees remain preserved. This candidate is not full V6B acceptance or public profile functionality.
+
+## V6B B2a — Automated SQL/CI acceptance and provider reconciliation (2026-10-28 UTC)
+
+### Receipt scope and historical preservation
+
+This append reconciles observed GitHub CI with the maintainer's independently authenticated final review. It does not execute another test, query a provider, publish documentation or authorize a merge. The entire preceding **287,953 bytes / 1,759 lines** remain an identical prefix, SHA-256 `4ee6245d8e262a73352e7f3c04bbdd1059cf75feddccb16ed45f44f9b0ec919a`. Earlier FAIL, NOT RUN, NO-GO and uncommitted-state statements retain their receipt-time meaning. In particular, SQL was not run in the original Windows worktree; later actual PostgreSQL evidence below comes from isolated GitHub runners, not retroactive local execution.
+
+Source base remains merged B1 `52ab0bea8420bee571e5571068e43612cb8542ef`. [PR #28](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/28) remains open, Draft and unmerged on `feat/v6b-b2a-profile-persistence`. Its published source head is **`fdd1e0f31f9ef7a1d4cb0034c69cffabbf597cdb`**, and its 15-file source scope is unchanged. This locally prepared append is the only new documentation change; it has not been committed or pushed at this receipt.
+
+### Original CI-first publication and retained failure
+
+The maintainer separately authorized CI-first publication despite the unavailable approved local SQL lifecycle. The original B2a source commit was `565c6d36a9f4ce081b5c3c2293fed4b3419aad8f`, parent `52ab0bea8420bee571e5571068e43612cb8542ef`. This exception authorized a normal commit/push and Draft PR, not SQL acceptance, deployment or merge.
+
+- [Original Push CI 40606270793](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40606270793), attempt 1: **FAIL**.
+- [Original PR CI 40606373458](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40606373458), attempt 1: **FAIL**.
+- Both failed Quality foundations step 14 (full SQL integration): **345 total, 344 passed, 1 failed, 0 skipped/pending/todo**. V5D-C01 through V5D-C06 passed; scope was `OUTSIDE_SIX`, category `ASSERTION_FAILURE`. Fresh/repeated migrations and generation/no-drift had passed; build, native E2E and audits were subsequently skipped. Final verify failed.
+
+These were executed automated failures, not missing manual verification. Neither original attempt was rerun or reclassified as PASS.
+
+### One-shot localization and focused correction
+
+The separate diagnostic branch `diag/v6b-b2a-sql-fingerprint` received commit `7d2b36802a67ffd8337185f66006f87f23d38569`, parent `565c6d36a9f4ce081b5c3c2293fed4b3419aad8f`. Its three-file bootstrap contained branch-specific Vercel configuration and independent privacy-safe reporting; those diagnostic changes were not imported into PR #28.
+
+[Diagnostic Push CI 40627692400](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40627692400), attempt 1, retained the **344/345 FAIL** and emitted fixed fingerprint `F37 CASE 1 KIND ASSERTION CATEGORY ASSERTION_FAILURE LOCATION UNKNOWN`. F37 is [reader-profile persistence](<../tests/integration/reader-profile.test.ts>); CASE 1 is the first test case, not an inner `expect()` ordinal. The exact throwing assertion/stack location was not runtime-verified and is not retrospectively claimed here.
+
+The diagnostic's actual per-file report showed [erasure](<../tests/integration/reader-profile-erasure.test.ts>) F35 **2/2 PASS**, [migration](<../tests/integration/reader-profile-migration.test.ts>) F36 **3/3 PASS**, persistence F37 **7/8 PASS**, [authentication](<../tests/integration/authentication.test.ts>) F02 **3/3 PASS**, and [community migration](<../tests/integration/community-migration.test.ts>) F09 **1/1 PASS**. All 13 authored B2a cases were discovered and produced execution results: **12 PASS / 1 FAIL**, with no skips or suite/hook failures.
+
+Source review found a high-confidence timestamp-representation expectation defect: Drizzle 0.45.3 installs transparent postgres.js timestamp parsers on the client, so raw SQL rows contain strings rather than JavaScript Date instances. The maintainer approved only the two timestamp expectations in [the first persistence case](<../tests/integration/reader-profile.test.ts#L88-L91>). Correction commit **`fdd1e0f31f9ef7a1d4cb0034c69cffabbf597cdb`**, parent `565c6d36a9f4ce081b5c3c2293fed4b3419aad8f`, replaced them with raw-string type checks and finite `Date.parse` checks: four additions, two deletions in that one file.
+
+Every other assertion, test registration, SQL statement, fixture, schema, migration, client behavior, dependency, reporter, workflow and budget remained unchanged by the correction. Independent review confirmed the exact replacement. Local preparation passed test-project TypeScript, focused ESLint (exit 0 with the Next.js pages-directory advisory), formatting/diff checks, **304 focused pure unit tests** and **11 synthetic timestamp-predicate checks**. Actual local SQL remained **NOT RUN**; those checks were not presented as PostgreSQL proof.
+
+### Actual corrected-source automated acceptance
+
+One normal correction commit and one push triggered the existing Push and PR workflows. No extra PR, workflow dispatch, historical rerun, skip, timeout/retry/worker increase, SQL change or additional diagnostic iteration was used.
+
+- [Correction Push CI 40632625332](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40632625332): **SUCCESS**, attempt 1, source `fdd1e0f31f9ef7a1d4cb0034c69cffabbf597cdb`.
+- [Correction PR CI 40632629201](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40632629201): **SUCCESS**, attempt 1, same source. The synthetic PR merge tree was verified identical to the corrected feature-head tree; PR #28 was not merged.
+
+| Mandatory actual result | Push 40632625332 | PR 40632629201 |
+| --- | --- | --- |
+| Frozen dependency install, typecheck and lint | PASS | PASS |
+| Full unit selection; 2,745/2,745 (count independently verified by maintainer) | PASS | PASS |
+| Fresh isolated PostgreSQL 17 migration through 0015 | PASS | PASS |
+| Repeated migration without unwanted changes | PASS | PASS |
+| Drizzle generation and zero schema drift | PASS | PASS |
+| Full original SQL integration; 345/345 | PASS | PASS |
+| SQL failed/skipped/pending/todo counts | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+| V5D-C01 through V5D-C06 | PASS | PASS |
+| Production build and post-build typecheck | PASS | PASS |
+| Native original suite (historical job label "17", V4 disabled) | PASS | PASS |
+| Native enabled V4 eight-case suite, existing zero retries | PASS | PASS |
+| Production/high and whole-workspace/moderate security audits | PASS; no known vulnerabilities in either audit | PASS; no known vulnerabilities in either audit |
+| Final verify; all five mandatory jobs successful and unskipped | PASS | PASS |
+
+The agent observed completed job/step outcomes and fixed safe receipts `INTEGRATION PASS`, `INTEGRATION_EXIT 0`, aggregate **345 passed / 0 failed / 0 skipped / 0 pending / 0 todo**, `LEGACY PASS` and `V4 PASS`. The maintainer independently verified the final CI evidence, including **2,745/2,745 unit tests**. No fresh CI was run to prepare this reconciliation.
+
+### Thirteen-case SQL evidence reconciliation and limits
+
+The corrected source retains the same **2 erasure + 3 migration + 8 persistence** registrations, unchanged full integration glob/command, fixtures and SQL as the diagnostic source; only the two timestamp expectations differ. The earlier actual per-file discovery/execution evidence plus both fresh complete **345/345, zero-skip** runs therefore supports **13/13 B2a cases PASS by reconciliation**, together with the unchanged real email-confirmed Better Auth account-deletion and community-migration regressions. This is not a claim that the corrected runs emitted new per-file F35/F36/F37 diagnostic receipts: they retained the original reporter, and emitted aggregate results only.
+
+This automated evidence covers the authored uniqueness/claim/immutability and canonical text/bounds checks; interest slots, FKs and ACTIVE-parent locking; concurrent claims and both removal orderings; directed blocks; root cascade, erasure, rollback and handle release; bounded cached-plan handling; fresh/repeated migration/catalog checks; and the existing V3/V4 regressions. It is actual PostgreSQL execution, not inference from compilation, mocks or generated DDL alone. Migrations/snapshots 0000–0014 and the 0015 implementation were not changed by the correction. It is still scoped test evidence, not exhaustive concurrency/performance, hosted operation or security certification.
+
+### Maintainer-verified provider outcome for the corrected SHA
+
+Earlier agent deployment-list requests timed out and correctly reported **NOT VERIFIED**, not zero records or cancellation. The maintainer subsequently supplied independently authenticated final evidence for project `taleatlas-staging`, repository `Tran-Nhat-Duy1206/TaleAtlas`:
+
+- Deployment **`dpl_7YNM269K37vTypEDLukpijmPhY97`**; exact source **`fdd1e0f31f9ef7a1d4cb0034c69cffabbf597cdb`**; branch `feat/v6b-b2a-profile-persistence`.
+- Final state **CANCELED**; target **null**. Authenticated build logs confirmed that the existing Custom Ignored Build Step returned **exit code 0** and canceled the deployment.
+- No successful deployment of this correction SHA was observed. **A deployment record was created; this was not zero deployment creation, proof of branch exclusion, or successful hosted acceptance.**
+
+This resolves the prior corrected-SHA provider-verification blocker. It does not authorize or establish a successful deployment, promotion, hosted migration, environment change, SMTP operation or provider mutation. No provider investigation was repeated to prepare this entry.
+
+### Decision and remaining independent acceptance boundaries
+
+**The scoped B2a persistence/SQL automated acceptance evidence is complete at `fdd1e0f31f9ef7a1d4cb0034c69cffabbf597cdb`; no remaining known B2a-specific technical blocker is identified by these results. GO for separately authorized documentation publication and maintainer merge review.** This is not merge permission: PR #28 remains Draft and unmerged, this evidence append is local preparation only, and any documentation commit/push and its resulting CI/provider handling require separate authorization. Current CI receipts belong to the corrected source above, not to a future documentation commit.
+
+Hosted/manual acceptance remains separate under the unchanged twelve-item [central verification backlog](<DEFERRED_MANUAL_VERIFICATION.md>): intended staging readiness/configuration, hosted Sandbox mail and genuine account lifecycle/security checks, production release/smoke, human zoom/screen-reader/VI/focus/contrast/visual/loading checks. The canceled correction deployment does not satisfy those checks or turn their NOT RUN / NOT VERIFIED statuses into PASS. No new deferred item was added, and the earlier observed automated failure was not deferred into that backlog.
+
+The B2a storage contract remains intact: opaque TEXT account identity, separate generated public UUID, explicit PRIVATE enrollment, immutable account-lifetime handle claim, at most five explicit taxonomy interests, directed account-bound blocks, claim-preserving hiding/removal, root cascade/handle release and no inferred Library publication. No public profile HTTP/API/UI capability, V4 hosted activation, production acceptance, full V6A/V6B acceptance or release is declared. **B2b has not begun**; its reserved-handle/impersonation, abuse/moderation, verified-session/Origin/body, affirmative publication, visibility/block qualification, OCC/race/error, budget/erasure, restoration and feature-gate decisions remain separately authorized work. No commit, push, CI rerun, SQL/provider change, deployment or merge was performed as part of this documentation preparation.
