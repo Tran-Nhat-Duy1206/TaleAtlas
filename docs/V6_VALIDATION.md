@@ -1671,3 +1671,89 @@ SQL integration, native browser E2E, new dependency audits and hosted/manual ver
 The [B1 specification](<V6B_PROFILE_CONTRACT.md>) retains required maintainer decisions before B2: exact reserved/impersonation policy; handle rename and reuse; reservation retention/account erasure; profile hide versus content deletion; bidirectional blocking/anonymous limits; public abuse/takedown responsibility; feature gates and budgets; and public activation requirements. No B1 unit test approves an irreversible database or retention policy.
 
 **GO for separate authorization of one scoped B1 commit and Draft PR**, based on the actual local gates, unchanged tested source and independent review. The index remains empty and all six approved files are uncommitted. This does not authorize publication, persistence, manual/hosted testing, rollout, merge or deployment, and does not declare full V6A or V6B acceptance. Stop after implementation and reporting; no deferred check, new infrastructure, provider access, database operation or publication was performed.
+
+## V6B B2a — Profile persistence candidate (2026-10-27 UTC)
+
+### Authority, isolation and exact scope
+
+Maintainer-authorized persistence and SQL-test authoring only, from exact merged B1 main `52ab0bea8420bee571e5571068e43612cb8542ef`, tree `551253af857bde2a6c5ab14e2e3b00901bba7335`, isolated branch `feat/v6b-b2a-profile-persistence`. Required remote main and a clean initial worktree/index were verified before creation; stale local main and previous worktrees were preserved. The maintainer-verified [post-merge predecessor CI 40479224205](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40479224205) is not a CI receipt for this uncommitted candidate.
+
+The approved lifecycle in [contract section 8](<V6B_PROFILE_CONTRACT.md#8-explicitly-approved-b2a-persistence-policy-2026-10-27>) was checked against B1 and existing erasure safeguards before forward generation: no policy conflict requiring a stop was found. This is static compatibility review, not SQL certification. Historical B1 text remains an unchanged prefix; approval now resolves initial account-lifetime handle retention, not all B2b policy.
+
+| Authorized changed file | Actual change |
+| --- | --- |
+| [Profile constants/types](<../packages/database/src/reader-profile-types.ts>) | New stored-state and B1-compatible bounds |
+| [Profile schema](<../packages/database/src/reader-profile-schema.ts>) | New minimal three-table cohort |
+| [Database exports](<../packages/database/src/index.ts>) | Export new schema/types |
+| [Database client](<../packages/database/src/client.ts>) | Register cohort only; existing connection/TLS/deadline options unchanged |
+| [Drizzle configuration](<../packages/database/drizzle.config.ts>) | Add the reviewed schema path |
+| [Forward 0015](<../packages/database/drizzle/0015_reader_profiles.sql>) | Generated additive DDL plus reviewed lifecycle/erasure triggers |
+| [0015 snapshot](<../packages/database/drizzle/meta/0015_snapshot.json>) | Generated next snapshot; 40 existing table definitions preserved, three added |
+| [Migration journal](<../packages/database/drizzle/meta/_journal.json>) | One 0015 entry; first 15 historical entries unchanged |
+| [Migration tests](<../tests/integration/reader-profile-migration.test.ts>) | New owned-child-database fresh/repeat migration and exact inventory/legacy preservation cases |
+| [Persistence tests](<../tests/integration/reader-profile.test.ts>) | New SQL integrity, canonical input, uniqueness, slot, block and removal-race cases |
+| [Erasure tests](<../tests/integration/reader-profile-erasure.test.ts>) | New bounded cached-plan/rollback/cascade/removal/reclaim designs |
+| [Existing V4 migration regression](<../tests/integration/community-migration.test.ts>) | Necessary additive inventory updates only; V4 teardown and original legacy assertions retained |
+| [Existing authentication regression](<../tests/integration/authentication.test.ts>) | Add cohort witnesses to the existing real email-confirmed deletion flow, no new registration lifecycle |
+| [Profile contract](<V6B_PROFILE_CONTRACT.md>) | Append approved B2a policy without rewriting B1 history |
+| This validation ledger | Append actual results, failures and missing SQL gates |
+
+Exactly 15 changed paths. Optional package-manifest scoped exports were omitted because no new scoped consumer requires them; dependency manifests/lock/workspace files remain baseline-identical. No extra helper, infrastructure runner, route, service, UI, environment variable or workflow was added.
+
+### Defined schema and erasure design — not PostgreSQL-verified
+
+- `reader_profiles`: canonical TEXT account owner primary key/FK with account CASCADE; generated separate UUID public ID and globally unique canonical lowercase ASCII handle; PRIVATE/ACTIVE/revision-1 defaults; explicit visibility/state/positive integer checks; nullable, bounded NFC/trim canonical presentation fields. ACTIVE requires a nonempty display name; REMOVED requires PRIVATE and NULL display name/biography. Display names are nonunique. No account name/email/image copy or automatic enrollment/backfill.
+- `reader_profile_interests`: owner/slot primary key, slots 1–5, unique owner/genre pair, profile CASCADE and canonical text taxonomy FK with RESTRICT. Owner/genre indexes support scoped erasure and taxonomy references. No Library-derived interest or cached Work metadata.
+- `reader_blocks`: directed account pair primary key, no self-edge, account CASCADE in both directions, reverse index. No profile enrollment prerequisite, follow/feed data or inferred relationship.
+- Forward DDL defines 20 named PK/unique/check/FK constraints, eight indexes and four new fixed-search-path SECURITY INVOKER functions/triggers. Identity immutability and direct live-account profile-delete rejection retain claims; root-account deletion is designed to permit the native cascade. Removal deletes only that owner's interests; interest writes lock an ACTIVE parent. No historical redirects, claim table or post-account tombstone exists.
+- The additive root replan follows the existing RI/SPI cached-plan safeguard without changing frozen functions, settings, statistics, privileges or rows. DISCARD PLANS has backend-wide nontransactional plan-cache effects even on rollback; it is not itself data erasure, a concurrency guarantee or performance proof.
+- B1 contracts/projections, existing authentication policy, V3 Library and V4 behavior remain unchanged. B2b must supply verified authority, explicit publication execution, coherent public/block predicates, budgets and actual OCC. PUBLIC updates are legal storage states, not an authenticated command or public activation.
+
+### Missing mandatory SQL evidence — NOT RUN, not PASS
+
+The current Windows worktree has no fresh owned database receipt or native PostgreSQL CLI on PATH. The existing installed helper's Windows stop path forcibly kills the process tree and removes its data directory; [repository testing guidance](<TESTING.md#current-v5-status-and-phase-1-verification-boundary>) forbids using the incompatible Windows helper, reusing historical clusters or inventing a new lifecycle. No replacement runner, WSL/Docker/service installation, historical database, hosted credentials or persistent user database was used. This is a missing approved local execution environment, not an observed SQL application failure or a waived gate.
+
+| Required actual database evidence | Current result |
+| --- | --- |
+| Fresh migrations through 0015 and repeat migration execution | **NOT RUN** — no approved owned SQL lifecycle |
+| Focused three-suite persistence/migration/erasure execution, 13 new authored SQL cases | **NOT RUN** — test compilation is not SQL execution |
+| Exact live table/index/FK/check/trigger catalog and constraint rejection results | **NOT RUN** — generated definitions/metadata inspected only |
+| Native uniqueness/claim races, both interest-removal orderings and invalid-transaction rollback | **NOT RUN** |
+| Root cascades, bounded cached-plan deletion, handle release, unrelated V3 preservation and real Better Auth deletion augmentation | **NOT RUN** — no actual account-erasure proof for this candidate |
+| Existing full SQL integration regressions including V3/V4 and legacy migration assertions | **NOT RUN** |
+
+The migration suite is designed to use the official existing Drizzle migrator on a UUID-owned child UTF8 `_test` database within the approved loopback cluster. It requires permission to create/drop that owned child database; target and owner checks precede cleanup, without FORCE or other-session termination. Its forward-DDL rollback test does not tear down shared legacy tables. This source design has not run locally and does not replace the missing cluster workflow or prove compatibility by itself.
+
+### Observed corrections and actual non-SQL gates
+
+Initial focused test/schema TypeScript compilation **FAILED** with TS2307 because the root test workspace did not directly own the Drizzle migrator dependency. Corrected only the new migration test to resolve the official migrator from its existing database workspace dependency, with a narrow typed signature. No dependency, application migration API or custom migration engine was introduced. Export-resolution metadata check and final focused compilation then passed. The failed receipt is retained, not retrospectively marked PASS.
+
+Static review also corrected a credential-bearing URL equality assertion to boolean-only comparison before any SQL execution; no credential value was exposed. Test-source review moved permitted internal LF/CRLF/tab biographies into valid cases while retaining prohibited-control cases, corrected the raw/post-NFC explanation, and added revision boundaries and controlled real-lock race designs. These are pre-execution source corrections, not invented SQL failure/pass receipts. No timeout, retry, assertion threshold or test-isolation safeguard was relaxed.
+
+Node 24.19.0; pnpm 11.7.0. Fourteen authored/generated files were hash-frozen before the full sequence; all stayed unchanged. Only this evidence append followed the successful gates.
+
+| Executed local check | Actual observed result |
+| --- | --- |
+| `pnpm install --frozen-lockfile` | PASS once as fresh-worktree prerequisite, dependencies unchanged |
+| Official migrator resolution from its owning workspace | PASS, module/export metadata only; no migration call or SQL |
+| `pnpm exec tsc --noEmit -p tsconfig.tests.json` | Final PASS after the retained TS2307 failure; covers new test/schema typing only |
+| `pnpm test` complete unit selection with private JSON receipt | PASS: **2,745 / 0 failed / 0 pending**, 79 files; once, 10:46:11–10:49:15 UTC. Integration specs were not executed by this command |
+| `pnpm typecheck` | PASS once, 10:49:15–10:50:16 UTC |
+| `pnpm lint` | PASS once, 10:50:16–10:50:45 UTC |
+| `pnpm build` | PASS once, 10:50:45–10:51:49 UTC; production-shaped compile-only synthetic HTTPS/loopback database and SMTP port-1 settings, no service provisioned or hosted connection |
+| Reviewed Drizzle generation with `--name reader_profiles` | PASS offline; created only 0015 SQL/snapshot and the journal entry |
+| `pnpm --filter @taleatlas/database generate` no-drift check | PASS once, 10:51:49–10:51:52 UTC: no schema changes; frozen hashes unchanged. This does not validate SQL syntax/functions or fresh/repeat execution |
+| `pnpm audit --prod --audit-level high` | PASS once, 10:51:52–10:51:54 UTC; zero info/low/moderate/high/critical vulnerabilities |
+| `pnpm audit --audit-level moderate` | PASS once, 10:51:54–10:51:56 UTC; zero info/low/moderate/high/critical vulnerabilities |
+| Scoped Prettier, diff check, appended-policy Markdown/link/privacy checks | PASS; historical documents not reformatted |
+| Independent policy/schema/privacy review and correction re-review | NoBlock **STATIC ONLY**; no PostgreSQL syntax/cascade/concurrency/performance certification |
+
+Migrations/snapshots 0000–0014 are byte-identical to the baseline. All 40 old snapshot table definitions and old enum/schema/sequence/role/policy/view metadata remain unchanged; 0015 links to the old snapshot and adds three tables. The historical ledger's **275,130 bytes / 1,673 lines** remain an identical prefix, SHA-256 `b7effe1c88dcf78d34e8402d2c624175cb4098f92f4dc6653e252bc970566888`. The B1 contract prefix and the twelve centralized [deferred checks](<DEFERRED_MANUAL_VERIFICATION.md>) remain unchanged; no speculative hosted-profile entry was added.
+
+### Decision and remaining B2b fence
+
+**NO-GO for a separately authorized B2a commit and Draft PR at this point: mandatory real PostgreSQL migration/integrity/erasure/regression gates are missing.** Other observed automation is green, but cannot substitute for SQL proof. Stop for maintainer direction on an approved disposable SQL execution environment; do not defer this automated validation gap into the hosted/manual backlog or publish automatically.
+
+B2b still needs exact reserved/impersonation policy, abuse/takedown responsibility, signed verified-session and owner-only commands, Origin/body fences, affirmative publication, coherent bidirectional-block/public qualification, restoration semantics if offered, safe OCC/overflow/races, rate/mutation budgets and budget-key erasure, feature gates and activation decisions. Root SQL cascades are distinct from the surrounding non-globally-atomic existing authentication workflow.
+
+The index is empty and all 15 source changes are uncommitted. No API/server profile HTTP service/UI, follow/feed, Library sharing, new runtime activation, hosted/manual check, V4 enablement, provider/deployment operation, commit, push, PR or merge was performed. Earlier worktrees remain preserved. This candidate is not full V6B acceptance or public profile functionality.

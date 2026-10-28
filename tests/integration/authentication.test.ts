@@ -12,6 +12,9 @@ const messages: string[] = [];
 const origin = "http://localhost:3000";
 const password = "Synthetic-only-password-17!";
 const email = `${randomUUID()}@example.invalid`;
+// Direct-SQL sentinel only; no additional registration/verification lifecycle.
+const profileSurvivor = `auth-profile-sentinel|${randomUUID()}`;
+const profileGenre = `rp-${randomUUID()}`;
 const ip = `127.0.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 const throttleIP = `127.1.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
 const mail = new SMTPServer({
@@ -80,7 +83,10 @@ beforeAll(async () => {
   });
 });
 afterAll(async () => {
+  requireTestDatabase();
+  await client`delete from users where id = ${profileSurvivor}`;
   await client`delete from users where email = ${email}`;
+  await client`delete from genres where slug = ${profileGenre}`;
   await client`delete from verifications where identifier like ${`%${email}%`}`;
   await client.end();
   await new Promise<void>((resolve) => mail.close(resolve));
@@ -195,6 +201,25 @@ describe("real persisted authentication", () => {
     });
     expect(finalLogin.status).toBe(200);
     const finalCookie = cookieOf(finalLogin);
+    // Augment this existing verified/password-reset deletion, not a new auth flow.
+    requireTestDatabase();
+    const actorId = String(stored[0]!.id);
+    const profileHandle = `r${randomUUID().replaceAll("-", "").slice(0, 23)}`;
+    await client`insert into users(id,name,email) values(${profileSurvivor},'Synthetic profile survivor',${`${randomUUID()}@invalid`})`;
+    await client`insert into genres(slug,name_en,name_vi) values(${profileGenre},'Synthetic genre','Synthetic genre')`;
+    const [profile] =
+      await client`insert into reader_profiles(user_id,handle,display_name,biography) values(${actorId},${profileHandle},'Synthetic Reader','Synthetic private preference') returning public_id`;
+    await client`insert into reader_profile_interests(user_id,slot,genre_slug) values(${actorId},1,${profileGenre})`;
+    await client`insert into reader_blocks(blocker_id,blocked_id) values(${actorId},${profileSurvivor}),(${profileSurvivor},${actorId})`;
+    expect(
+      await client`select slot from reader_profile_interests where user_id=${actorId}`,
+    ).toHaveLength(1);
+    expect(
+      await client`select blocker_id from reader_blocks where blocker_id=${actorId} or blocked_id=${actorId}`,
+    ).toHaveLength(2);
+    const survivorBefore = [
+      ...(await client`select * from users where id=${profileSurvivor}`),
+    ];
     expect(
       (
         await request(
@@ -217,6 +242,18 @@ describe("real persisted authentication", () => {
     expect(
       await client`select id from sessions where user_id = ${stored[0]!.id}`,
     ).toHaveLength(0);
+    expect(
+      await client`select user_id from reader_profiles where user_id=${actorId} or handle=${profileHandle} or public_id=${profile!.public_id}::uuid`,
+    ).toHaveLength(0);
+    expect(
+      await client`select slot from reader_profile_interests where user_id=${actorId}`,
+    ).toHaveLength(0);
+    expect(
+      await client`select blocker_id from reader_blocks where blocker_id=${actorId} or blocked_id=${actorId}`,
+    ).toHaveLength(0);
+    expect(
+      await client`select * from users where id=${profileSurvivor}`,
+    ).toEqual(survivorBefore);
   });
   it("atomically limits concurrent authentication attempts", async () => {
     const concurrentIP = `127.2.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;

@@ -12,3 +12,5 @@ export * from "./library-schema";
 export * from "./library-types";
 export * from "./community-schema";
 export * from "./community-types";
+export * from "./reader-profile-schema";
+export * from "./reader-profile-types";

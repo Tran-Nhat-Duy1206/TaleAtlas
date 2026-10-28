@@ -74,6 +74,13 @@ const v5bTables = [
   "metadata_edit_events",
   "catalog_metadata_evidence",
 ] as const;
+// Additive 0015 tables remain outside the reviewed V4-only teardown. Their
+// constraints/guards are separately inventoried by reader-profile-migration.
+const v6bTables = [
+  "reader_profiles",
+  "reader_profile_interests",
+  "reader_blocks",
+] as const;
 const v4Functions = [
   "community_user_erasure_budgets",
   "community_content_scope_and_erasure",
@@ -400,17 +407,21 @@ describe("V4A populated legacy forward-DDL preservation", () => {
       expect(originalPrototype.objects).toHaveLength(5);
       expect(originalPrototype.enums).toHaveLength(8);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
+        [...legacyTables, ...v4Tables, ...v5bTables, ...v6bTables].sort(),
       );
-      expect((await tableNames(backend)).length).toBe(40);
+      expect((await tableNames(backend)).length).toBe(43);
       expect(
         (await tableNames(backend)).filter(
-          (name) => !v5bTables.some((v5b) => v5b === name),
+          (name) =>
+            !v5bTables.some((v5b) => v5b === name) &&
+            !v6bTables.some((v6b) => v6b === name),
         ),
       ).toEqual([...legacyTables, ...v4Tables].sort());
       expect(
         (await tableNames(backend)).filter(
-          (name) => !v5bTables.some((v5b) => v5b === name),
+          (name) =>
+            !v5bTables.some((v5b) => v5b === name) &&
+            !v6bTables.some((v6b) => v6b === name),
         ).length,
       ).toBe(37);
       const metadata = await v5bFacts(backend);
@@ -439,9 +450,9 @@ describe("V4A populated legacy forward-DDL preservation", () => {
       for (const name of v4Enums)
         await backend.unsafe(`DROP TYPE public.${name}`);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v5bTables].sort(),
+        [...legacyTables, ...v5bTables, ...v6bTables].sort(),
       );
-      expect((await tableNames(backend)).length).toBe(35);
+      expect((await tableNames(backend)).length).toBe(38);
       expect(await v5bFacts(backend)).toEqual(metadata);
       expect(legacyTables).toHaveLength(32);
       expect(await legacyFacts(backend, work.id)).toEqual(facts);
@@ -453,12 +464,14 @@ describe("V4A populated legacy forward-DDL preservation", () => {
           .filter(Boolean))
           await backend.unsafe(statement);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
+        [...legacyTables, ...v4Tables, ...v5bTables, ...v6bTables].sort(),
       );
-      expect((await tableNames(backend)).length).toBe(40);
+      expect((await tableNames(backend)).length).toBe(43);
       expect(
         (await tableNames(backend)).filter(
-          (name) => !v5bTables.some((v5b) => v5b === name),
+          (name) =>
+            !v5bTables.some((v5b) => v5b === name) &&
+            !v6bTables.some((v6b) => v6b === name),
         ).length,
       ).toBe(37);
       expect(await v5bFacts(backend)).toEqual(metadata);
@@ -491,9 +504,9 @@ describe("V4A populated legacy forward-DDL preservation", () => {
       expect(await prototypeFacts(backend)).toEqual(originalPrototype);
       expect(await v5bFacts(backend)).toEqual(metadata);
       expect(await tableNames(backend)).toEqual(
-        [...legacyTables, ...v4Tables, ...v5bTables].sort(),
+        [...legacyTables, ...v4Tables, ...v5bTables, ...v6bTables].sort(),
       );
-      expect((await tableNames(backend)).length).toBe(40);
+      expect((await tableNames(backend)).length).toBe(43);
       expect(
         await backend.unsafe(
           "select body from community_contents where id=$1",
