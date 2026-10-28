@@ -78,6 +78,10 @@ jobs:
           if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" 2>>"$private/output.log"; } 2>/dev/null; then
             unknown_receipt
           fi
+          # Independent fixed-ID SQL fingerprint; never print raw private output.
+          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" --sql-fingerprint 2>>"$private/output.log"; } 2>/dev/null; then
+            printf '%s\n' 'SQL_DIAG_REPORT UNKNOWN' || :
+          fi
           exit "$status"
       - run: pnpm build
       - run: pnpm typecheck

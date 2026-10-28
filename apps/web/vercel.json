@@ -2,5 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @taleatlas/web build"
+  "buildCommand": "pnpm --filter @taleatlas/web build",
+  "git": {
+    "deploymentEnabled": {
+      "diag/v6b-b2a-sql-fingerprint": false
+    }
+  }
 }
