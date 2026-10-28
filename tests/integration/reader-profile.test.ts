@@ -85,8 +85,10 @@ describe("reader profile persistence (guarded real SQL)", () => {
       expect(p.public_id).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
       );
-      expect(p.created_at).toBeInstanceOf(Date);
-      expect(p.updated_at).toBeInstanceOf(Date);
+      expect(p.created_at).toBeTypeOf("string");
+      expect(Number.isFinite(Date.parse(p.created_at))).toBe(true);
+      expect(p.updated_at).toBeTypeOf("string");
+      expect(Number.isFinite(Date.parse(p.updated_at))).toBe(true);
       await rejected(
         tx,
         "insert into reader_profiles(user_id,handle,display_name) values($1,$2,'Synthetic')",
