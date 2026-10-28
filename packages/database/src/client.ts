@@ -9,6 +9,7 @@ import * as editSuggestionSchema from "./edit-suggestion-schema";
 import * as releaseSchema from "./release-schema";
 import * as librarySchema from "./library-schema";
 import * as communitySchema from "./community-schema";
+import * as readerProfileSchema from "./reader-profile-schema";
 
 const schema = {
   ...authSchema,
@@ -18,6 +19,7 @@ const schema = {
   ...releaseSchema,
   ...librarySchema,
   ...communitySchema,
+  ...readerProfileSchema,
 };
 
 export function createDatabase(url: string) {
