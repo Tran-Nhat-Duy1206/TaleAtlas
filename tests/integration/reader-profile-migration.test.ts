@@ -205,13 +205,13 @@ async function legacyFacts(backend: Reader) {
 }
 
 describe("reader-profile forward migration and exact integrity inventory", () => {
-  it("migrates a fresh owned database through 0015 and repeats without journal/data changes", async () => {
+  it("migrates a fresh owned database through 0016 and repeats without journal/data changes", async () => {
     guardedTarget();
     expect(await tableNames(sql)).toEqual([...legacyTables, ...tables].sort());
     expect(await tableNames(sql)).toHaveLength(43);
     const before =
       await sql`select hash,created_at from drizzle.__drizzle_migrations order by id`;
-    expect(before).toHaveLength(16);
+    expect(before).toHaveLength(17);
     const journal = JSON.parse(
       await readFile(
         new URL(
@@ -221,7 +221,12 @@ describe("reader-profile forward migration and exact integrity inventory", () =>
         "utf8",
       ),
     );
-    expect(journal.entries).toHaveLength(16);
+    expect(journal.entries).toHaveLength(17);
+    expect(journal.entries[16]).toMatchObject({
+      idx: 16,
+      tag: "0016_reader_profile_rate_limit_erasure",
+      breakpoints: true,
+    });
     expect(journal.entries[15]).toMatchObject({
       idx: 15,
       tag: "0015_reader_profiles",

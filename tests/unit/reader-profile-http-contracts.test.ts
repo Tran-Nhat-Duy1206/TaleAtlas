@@ -19,7 +19,15 @@ import "../../apps/web/src/server/http";
 import { HttpError } from "../../apps/web/src/server/http";
 import { CatalogError } from "../../apps/web/src/server/catalog/errors";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), log: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  session: vi.fn(),
+  log: vi.fn(),
+  admission: vi.fn(),
+}));
+// Transport units isolate storage only; actual quota/clock/erasure needs real SQL.
+vi.mock("../../apps/web/src/server/reader-profile/rate-limits", () => ({
+  chargeReaderProfileAttempt: mocks.admission,
+}));
 // UNIT transport fixtures only: not actual signed-session, SQL or auth acceptance.
 // Keep the actual HTTP helpers and session error classes; mock only auth inputs.
 vi.mock("../../apps/web/src/server/env", async (importOriginal) => ({
@@ -45,6 +53,7 @@ const statuses = [
   ["VALIDATION_ERROR", 400],
   ["AUTHENTICATION_UNAVAILABLE", 503],
   ["SERVICE_UNAVAILABLE", 503],
+  ["RATE_LIMITED", 429],
 ] as const;
 const privateMarker = "private-session-biography-token";
 
@@ -87,6 +96,7 @@ async function expectEnvelope(
 
 beforeEach(async () => {
   vi.resetAllMocks();
+  mocks.admission.mockResolvedValue(undefined);
   const { logger } = await import("../../apps/web/src/server/logger");
   vi.spyOn(logger, "error").mockImplementation(mocks.log);
   vi.stubEnv("V6B_PROFILE_OWNER_ENABLED", "true");
@@ -151,7 +161,10 @@ describe("reader profile foundation pure closed contracts", () => {
     },
   );
   it.each(statuses)("maps %s to only its fixed status %i", (code, status) => {
-    const error = new ReaderProfileFoundationError(code);
+    const error = new ReaderProfileFoundationError(
+      code,
+      code === "RATE_LIMITED" ? 1 : undefined,
+    );
     expect(error.code).toBe(code);
     expect(error.status).toBe(status);
     expect(error.message).toBe(code);
@@ -229,6 +242,7 @@ describe("reader profile foundation actual HTTP helpers (unit auth fixture)", ()
     expect(req.bodyUsed).toBe(false);
     expect(run).not.toHaveBeenCalled();
     expect(mocks.session).not.toHaveBeenCalled();
+    expect(mocks.admission).not.toHaveBeenCalled();
     expect(mocks.log).not.toHaveBeenCalled();
   });
   it.each([
@@ -351,7 +365,10 @@ describe("reader profile foundation actual HTTP helpers (unit auth fixture)", ()
     async (code, status) => {
       await expectEnvelope(
         await readerProfileFoundationJson(() => {
-          throw new ReaderProfileFoundationError(code);
+          throw new ReaderProfileFoundationError(
+            code,
+            code === "RATE_LIMITED" ? 1 : undefined,
+          );
         }),
         status,
         { error: code },
@@ -408,5 +425,144 @@ describe("reader profile foundation actual HTTP helpers (unit auth fixture)", ()
     await expectEnvelope(await transport(request()), 503, {
       error: "AUTHENTICATION_UNAVAILABLE",
     });
+    expect(mocks.admission).not.toHaveBeenCalled();
+  });
+});
+
+describe("profile admission transport ordering and closed retry headers", () => {
+  it("keeps early query rejection before authentication or admission", async () => {
+    const req = new Request(`${origin}/foundation?unknown=1`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: "not JSON",
+    });
+    await expectEnvelope(await transport(req), 400, {
+      error: "VALIDATION_ERROR",
+    });
+    expect(mocks.session).not.toHaveBeenCalled();
+    expect(mocks.admission).not.toHaveBeenCalled();
+    expect(req.bodyUsed).toBe(false);
+  });
+  it.each(["ordinary", "content", "withdrawal"] as const)(
+    "awaits committed admission before body parsing for internal %s dispatch",
+    async (kind) => {
+      const req = request();
+      mocks.admission.mockImplementationOnce(async () => {
+        expect(req.bodyUsed).toBe(false);
+        expect(mocks.session).toHaveBeenCalledOnce();
+        await Promise.resolve();
+        expect(req.bodyUsed).toBe(false);
+      });
+      const result = await readReaderProfileFoundationJson(req, kind);
+      expect(mocks.admission).toHaveBeenCalledExactlyOnceWith(
+        result.principal,
+        kind,
+      );
+      expect(result.body).toEqual({});
+      expect(req.bodyUsed).toBe(true);
+    },
+  );
+  it("does not let client inputs choose the protected class", async () => {
+    await expectEnvelope(
+      await transport(
+        request('{"attemptClass":"withdrawal"}', {
+          "x-reader-profile-class": "withdrawal",
+        }),
+      ),
+      400,
+      { error: "VALIDATION_ERROR" },
+    );
+    expect(mocks.admission).toHaveBeenCalledOnce();
+    expect(mocks.admission.mock.calls[0]?.[1]).toBe("ordinary");
+  });
+  it.each([
+    ["{", "application/json", 400, "INVALID_JSON"],
+    ['{"unknown":true}', "application/json", 400, "VALIDATION_ERROR"],
+    ["{}", "text/plain", 415, "JSON_REQUIRED"],
+    ["{}" + " ".repeat(8191), "application/json", 413, "BODY_TOO_LARGE"],
+  ] as const)(
+    "retains admission before a later invalid body/media result (%i)",
+    async (body, media, status, code) => {
+      await expectEnvelope(
+        await transport(request(body, { "content-type": media })),
+        status,
+        { error: code },
+      );
+      expect(mocks.admission).toHaveBeenCalledOnce();
+    },
+  );
+  it("retains admission on malformed UTF-8 after the committed boundary", async () => {
+    await expectEnvelope(
+      await transport(
+        request(
+          stream(Uint8Array.from([123, 34, 0xc3, 0x28, 34, 58, 49, 125])),
+        ),
+      ),
+      400,
+      { error: "INVALID_JSON" },
+    );
+    expect(mocks.admission).toHaveBeenCalledOnce();
+  });
+  it.each([1, 17, 60])(
+    "emits only a bounded Retry-After=%i on quota denial",
+    async (seconds) => {
+      const req = request("not JSON");
+      mocks.admission.mockRejectedValueOnce(
+        new ReaderProfileFoundationError("RATE_LIMITED", seconds),
+      );
+      const response = await transport(req);
+      expect(response.headers.get("retry-after")).toBe(String(seconds));
+      await expectEnvelope(response, 429, { error: "RATE_LIMITED" });
+      expect(req.bodyUsed).toBe(false);
+      expect(mocks.log).not.toHaveBeenCalled();
+    },
+  );
+  it.each([undefined, 0, -1, 1.5, 61, NaN, Infinity, "3", privateMarker])(
+    "fails closed for an invalid quota retry value %j",
+    async (value) => {
+      const error = new ReaderProfileFoundationError(
+        "RATE_LIMITED",
+        value as number,
+      );
+      expect(error.code).toBe("SERVICE_UNAVAILABLE");
+      expect(error.retryAfterSeconds).toBeUndefined();
+      const response = await readerProfileFoundationJson(() => {
+        throw error;
+      });
+      expect(response.headers.get("retry-after")).toBeNull();
+      await expectEnvelope(response, 503, { error: "SERVICE_UNAVAILABLE" });
+      expect(mocks.log).not.toHaveBeenCalled();
+    },
+  );
+  it("revalidates runtime-mutated retry metadata before setting headers", async () => {
+    const error = new ReaderProfileFoundationError("RATE_LIMITED", 10);
+    Object.defineProperty(error, "retryAfterSeconds", { value: privateMarker });
+    const response = await readerProfileFoundationJson(() => {
+      throw error;
+    });
+    expect(response.headers.get("retry-after")).toBeNull();
+    await expectEnvelope(response, 503, { error: "SERVICE_UNAVAILABLE" });
+  });
+  it("does not accept a foreign HTTP 429 as DB-derived quota metadata", async () => {
+    const response = await readerProfileFoundationJson(() => {
+      throw new HttpError(429, "RATE_LIMITED");
+    });
+    expect(response.headers.get("retry-after")).toBeNull();
+    await expectEnvelope(response, 503, { error: "SERVICE_UNAVAILABLE" });
+  });
+  it("fails closed before parsing when admission storage is unavailable", async () => {
+    const req = request("not JSON");
+    mocks.admission.mockRejectedValueOnce(
+      new ReaderProfileFoundationError("SERVICE_UNAVAILABLE"),
+    );
+    const response = await transport(req);
+    expect(response.headers.get("retry-after")).toBeNull();
+    await expectEnvelope(response, 503, { error: "SERVICE_UNAVAILABLE" });
+    expect(req.bodyUsed).toBe(false);
+  });
+  it("never attaches retry metadata to a different approved error", async () => {
+    const error = new ReaderProfileFoundationError("ACCESS_DENIED", 10);
+    expect(error.code).toBe("SERVICE_UNAVAILABLE");
+    expect(error.retryAfterSeconds).toBeUndefined();
   });
 });

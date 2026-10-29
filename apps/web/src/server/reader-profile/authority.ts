@@ -12,6 +12,7 @@ import {
   requireEmptyReaderProfileQuery,
 } from "../../features/reader-profile/http-contracts";
 import { isReaderProfileOwnerEnabled } from "./availability";
+import type { ReaderProfileAttemptClass } from "./rate-limits";
 
 export type ReaderProfileAuthorityTransaction = Parameters<
   Parameters<Database["transaction"]>[0]
@@ -142,12 +143,19 @@ export async function assertReaderProfilePrincipalCurrent(
 }
 
 /** Empty foundation transport only; no profile command or live route is added. */
-export async function readReaderProfileFoundationJson(request: Request) {
+export async function readReaderProfileFoundationJson(
+  request: Request,
+  // Trusted internal dispatch only; this is never read from HTTP inputs.
+  attemptClass: ReaderProfileAttemptClass = "ordinary",
+) {
   enabled();
   requireEmptyReaderProfileQuery(new URL(request.url));
   const { requireTrustedOrigin, readJson } = await import("../http");
   requireTrustedOrigin(request);
   const principal = await requireReaderProfilePrincipal(request.headers);
+  const { chargeReaderProfileAttempt } = await import("./rate-limits");
+  // Admission commits independently before reading any body or business work.
+  await chargeReaderProfileAttempt(principal, attemptClass);
   const body = await readJson(
     request,
     readerProfileFoundationBodySchema,
@@ -168,7 +176,8 @@ export async function readerProfileFoundationJson(
   const { safeJson, HttpError } = await import("../http");
   const { AuthorizationError, AuthenticationUnavailableError } =
     await import("../session");
-  return safeJson("reader-profile.foundation", async () => {
+  let retryAfterSeconds: number | undefined;
+  const response = await safeJson("reader-profile.foundation", async () => {
     try {
       const parsed = readerProfileFoundationResponseSchema.safeParse(
         await run(),
@@ -185,8 +194,18 @@ export async function readerProfileFoundationJson(
         if (
           code.success &&
           readerProfileErrorStatus[code.data] === error.status
-        )
+        ) {
+          if (code.data === "RATE_LIMITED") {
+            const retry =
+              error instanceof ReaderProfileFoundationError
+                ? error.retryAfterSeconds
+                : undefined;
+            if (!Number.isInteger(retry) || retry! < 1 || retry! > 60)
+              throw new HttpError(503, "SERVICE_UNAVAILABLE");
+            retryAfterSeconds = retry;
+          }
           throw new HttpError(error.status, code.data);
+        }
       }
       if (error instanceof AuthorizationError) {
         if (error.status === 401)
@@ -202,4 +221,7 @@ export async function readerProfileFoundationJson(
       throw new Error("Reader profile operation failed");
     }
   });
+  if (response.status === 429 && retryAfterSeconds !== undefined)
+    response.headers.set("Retry-After", String(retryAfterSeconds));
+  return response;
 }

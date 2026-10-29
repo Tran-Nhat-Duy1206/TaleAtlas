@@ -1939,3 +1939,85 @@ Future consumers must derive ownership from signed authority, use the persisted 
 **Batch 1 source/automated acceptance at `c13d22ab7407605ba5d6f667277d6d6220aa87a4`: complete, with no remaining known Batch-1-specific automated blocker identified. GO for separate maintainer merge approval, not merge permission.** PR #29 is still Draft/unmerged at this receipt. This evidence-only append is prepared under a distinct, conditional authorization for one documentation commit/push; its eventual seven-file PR scope is the six original additions plus this ledger, not another implementation batch. The source run IDs above do not attest a future documentation SHA: that head's automatic CI/provider observations must be verified and reported separately without an extra source change or publication.
 
 No profile API activation, provider environment change, hosted migration, successful deployment, V4 hosted enablement, full V6A/V6B acceptance or production release is established. The unchanged twelve-item [central manual/external backlog](<DEFERRED_MANUAL_VERIFICATION.md>) retains its NOT RUN / NOT VERIFIED statuses; canceled deployment records and isolated native HTTPS/SMTP tests do not satisfy it. No new backlog item was invented for local SQL unavailability or an automated failure. Historical FAIL / NOT RUN / NO-GO evidence is preserved, and current documentation preparation executes no new tests, SQL or hosted acceptance flow.
+
+## V6B B2b Batch 2 — Local budget/erasure foundation receipt (2026-10-29 UTC)
+
+### Authorization, accepted baseline and immutable history
+
+The maintainer approved **local implementation only** of P1–P7, scoped to six new/eight modified files. Remote main was verified at **`a2bf3bfecc1a8f834e39cd18d6cdb8c221a9eb04`** before creating the isolated `feat/v6b-b2b-budget-erasure` branch. Local main and all earlier worktrees were preserved. HEAD remains that base: these receipts describe an **uncommitted local candidate**, not a published SHA, PR or GitHub CI result.
+
+Batch 1 is already closed: PR #29 merged at 2026-10-29T00:31:09Z, and the maintainer independently verified [post-merge main CI 40794584591](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40794584591), attempt 1, including 2,862 units and 357 SQL cases. The supplied merge-deployment receipt is CANCELED, target null, authenticated Ignored Build Step exit 0. Its record creation is not a successful deployment or branch-exclusion proof. No completed CI/provider investigation was repeated. The merge execution actor was observed, but approval identity is not inferred. Older Draft/unmerged, not-yet-started, FAIL, NOT RUN and NO-GO text above retains its receipt-time meaning.
+
+The full preceding **316,131 bytes / 1,941 lines** remain an unchanged prefix, SHA-256 `b523ca18775d078437b3ef7108e2d05f86abbc1923a0a9d45b942aade089a905`. The prior [profile contract](<V6B_PROFILE_CONTRACT.md>) prefix is also unchanged (SHA-256 `cfb7a8bd837417383f904e1629c9ddb24bdfb613c6d696489941502ec842b5d7`); its appended section records the newly adopted Batch 2 scope. This does not retroactively adopt the remaining business-policy recommendations.
+
+### Exact fourteen-file candidate
+
+| Status | Authorized file | Purpose |
+| --- | --- | --- |
+| NEW | [Profile meter](<../apps/web/src/server/reader-profile/rate-limits.ts>) | Private once-charged admission, storage guards, independent counter transaction |
+| NEW | [Forward 0016](<../packages/database/drizzle/0016_reader_profile_rate_limit_erasure.sql>) | Exact three-key root-account erasure trigger/function |
+| NEW | [0016 snapshot](<../packages/database/drizzle/meta/0016_snapshot.json>) | Fresh lineage, unchanged 43-table schema payload |
+| NEW | [Budget units](<../tests/unit/reader-profile-rate-limits.test.ts>) | Synthetic transaction/policy/error/memoization tests, not actual SQL |
+| NEW | [Budget SQL cases](<../tests/integration/reader-profile-rate-limits.test.ts>) | 24 unconditional genuine-authority/SQL cases, execution NOT RUN |
+| NEW | [Migration SQL cases](<../tests/integration/reader-profile-rate-limit-migration.test.ts>) | Five unconditional owned-database cases, execution NOT RUN |
+| MODIFY | [Authority adapter](<../apps/web/src/server/reader-profile/authority.ts>) | Internal dispatch and admission before body parsing; validated retry header |
+| MODIFY | [HTTP contracts](<../apps/web/src/features/reader-profile/http-contracts.ts>) | Only RATE_LIMITED/429 and bounded retry metadata added |
+| MODIFY | [HTTP units](<../tests/unit/reader-profile-http-contracts.test.ts>) | Existing assertions retained, admission ordering/privacy/header tests added |
+| MODIFY | [Migration journal](<../packages/database/drizzle/meta/_journal.json>) | Append index 16 only, original entries unchanged |
+| MODIFY | [Existing migration regression](<../tests/integration/reader-profile-migration.test.ts>) | 17-entry/latest-migration expectations; retain 43 tables and historical 0015 replay/assertions |
+| MODIFY | [Real-auth deletion regression](<../tests/integration/authentication.test.ts>) | Existing email-confirmed deletion removes all profile keys; unrelated digests unchanged |
+| MODIFY | [Profile contract](<V6B_PROFILE_CONTRACT.md>) | Append adopted local-only P1–P7 policy |
+| MODIFY | [This validation ledger](<V6_VALIDATION.md>) | Append actual outcomes and limitations only |
+
+No shared V3/V4/catalog limiter, general database health check, source schema/client registry, dependency manifest/lockfile, old migration/snapshot, workflow, provider configuration or manual backlog is changed. No profile route, domain command, public query or UI is added.
+
+### Implemented P1–P7 behavior and deliberate limits
+
+- Per-root-account, row-anchored **60,000 ms database-clock windows**: ordinary **20**, content **5 plus ordinary**, withdrawal **10 independently**. Internal class is not read from HTTP fields or roles. Existing early gate/query/Origin rejections and invalid authority write no quota; body/media/UTF-8/size/schema and later business failures occur after committed admission. No shared catalog/V4 limiter prerequisite or block/unblock classification is introduced.
+- Counter anchors do not move on increments/denial; elapsed **at least 60,000 ms** resets to 1. Saturation is **21/6/11**, without overflow or unbounded denied-count growth. Content updates both selected buckets atomically, including denial. A DB-derived longest exhausted-window Retry-After is a validated integer **1–60 seconds**. Fixed-window boundary bursts are accepted; this is neither a rolling limit nor unlimited withdrawal capacity.
+- A private genuine-principal WeakMap publishes a class-bound Promise before asynchronous work. Concurrent same-class calls share one terminal success/rejection; wrong-class reuse fails without another charge. Fresh HTTP requests are fresh attempts. No persistent cross-request dedupe, transparent SQL retry, crash-proof or network exactly-once guarantee is asserted.
+- The short top-level counter transaction locks the root user `NO KEY UPDATE`, exact session `SHARE`, validates current persisted authority and cleanup/storage, acquires selected quota rows in fixed order including missing-key unique waits, then repeats readiness/current-authority checks and samples `clock_timestamp()` after waits. All row state is validated before updates. Denials are thrown **after transaction commit**. Failed/uncertain commits and storage errors fail closed without retry; later business rollback cannot refund an already committed admission. Future business work must fence authority independently; no authority-until-commit/delivery or multi-account block protocol is promised.
+- Existing `rate_limits` holds only stable private `reader-profile.attempt:`, `reader-profile.write:` and `reader-profile.withdraw:` keys plus unchanged opaque TEXT root identity. Random row IDs are not replacement account IDs. At most three aggregate last-window rows/account are retained; no payload/IP/email/request history or per-window keys. Idle rows have approved account-lifetime retention until reuse/deletion, **not automatic TTL**, and hashes are not claimed anonymous.
+- Forward 0016 adds one independent invoker function and unconditional root-user BEFORE DELETE trigger with fixed search path and qualified exact equality only. Cleanup is independent of feature flags/profile enrollment, does not touch other namespaces, and introduces no new table/FK/RI path. Root deletion rollback restores prior counters; stale authority cannot recreate them after committed deletion through this writer. Existing Better Auth deletion is not profile-rate-limited and its whole email/deletion workflow is not newly globally atomic. Privileged SQL/DDL remains outside the approved no-FK application protocol.
+- Admission performs uncached storage/index/trigger/function/body checks before charging and again after key waits. The exact canonical cleanup body, including formatting, is required; missing/disabled/mismatched protection yields closed 503 before body/business work. Valid quota denial adds only closed RATE_LIMITED/429 and no-store Retry-After; invalid/foreign retry metadata cannot populate headers or leak private details. Both profile gates remain default OFF and no new provider setting is introduced.
+
+### Actual local development failures and corrections retained
+
+1. **Initial new budget-unit collection: FAIL, zero cases collected.** Root tests could not resolve the web-owned Drizzle dialect import. The new test now resolves the existing dependency through its owning workspace with `createRequire`; no root dependency or manifest/lockfile change was added.
+2. **Next focused budget run: FAIL, 42/43 PASS.** A synthetic readiness fixture array was mutated by mock consumption, changing the expected before/after-wait branch. Copying fixture input fixed the test-state bug without weakening assertions. A later 50/50 intermediate run passed; the final source adds strict guard and commit/deadlock regressions and passes 52/52. Failed receipts remain private and are not relabeled PASS.
+3. Parent source review identified an unsafe draft readiness comparison: removing all SQL-body whitespace could also remove whitespace inside a key literal and accept different cleanup semantics. The candidate now compares the exact approved function body; a unit SQL-shape assertion and an authored actual-PG whitespace-in-key negative cover the correction. The latter is **NOT RUN**, not a demonstrated PostgreSQL PASS.
+4. Independent review found a **P2 test-schedule issue**, not demonstrated limiter failure: a 100 ms session lead could expire before admission reached its intended quota barrier, and a fast fixed-count clock loop could finish before expiry. The new tests warm the real fixture, use a one-second DB lead, physically observe the quota/unique-key wait, assert more than 250 ms headroom at that point, then await actual DB expiry within the unchanged 2.9-second observation deadline. The separate physical-barrier observer remains bounded at 256 observations/2.9 seconds. No sleep, admission retry, auth/clock hook, statement/test timeout increase or weakened assertion was introduced. Extreme scheduler pauses can still fail an explicit precondition; these schedules remain runtime-unverified until real PostgreSQL execution.
+5. **First audit wrapper invocation: FAIL before scanning.** PowerShell serialized a dynamic argument array as one unknown option; stdout contained no audit report, so a follow-up JSON projection also had no input. Literal audit commands corrected the invocation. This was not a dependency vulnerability result; the subsequent actual scanners below returned zero known vulnerabilities. Original diagnostics were retained, not overwritten.
+6. **Initial combined formatter check: FAIL on generated JSON style**, not TypeScript or semantic metadata. The same Prettier check also rejects the frozen baseline journal/snapshot style: the journal differs only by its absent final LF, while both snapshots use the inherited Drizzle layout. No frozen metadata was reformatted and the new snapshot keeps its exact byte-clone guarantee apart from identity/lineage fields. Scoped TypeScript formatting, JSON parsing/lineage, offline generator consistency and Markdown append validation are evaluated separately. Generated-metadata Prettier warnings remain disclosed rather than claimed PASS or suppressed by changing a workflow.
+
+### Actual local checks on this uncommitted candidate
+
+Node **24.19.0**, pnpm **11.7.0**. Dependencies were restored from the existing cache with offline/frozen mode and install scripts disabled; no manifest/lockfile update, database installation or lifecycle was performed.
+
+| Check actually executed | Outcome |
+| --- | --- |
+| New meter focused units | **52/52 PASS** |
+| Transport/gate focused units | **145/145 PASS**: 116 HTTP + 29 availability |
+| Full unit regression | **2,942/2,942 PASS**, 82 files; zero failed/skipped/pending/todo |
+| Existing B1 validation/projection subset | **304 cases included** in the full run, unchanged |
+| Test-project TypeScript | **PASS**, including authored SQL files; not SQL execution |
+| Full repository typecheck | **PASS** |
+| Lint | **PASS** |
+| Production build with local process credentials absent/gates off | **PASS**; not runtime/hosted acceptance |
+| Post-build full typecheck | **PASS** |
+| `pnpm audit --prod --audit-level high --json` | **PASS**, zero known vulnerabilities |
+| `pnpm audit --audit-level moderate --json` | **PASS**, zero known vulnerabilities |
+| Offline `pnpm db:generate` | **PASS**, no schema changes/nothing to migrate; no DB connection |
+| Snapshot/journal static consistency | **PASS**, 43 tables, fresh 0016 lineage, 17 entries, original 16 unchanged |
+
+The full count is **2,862 existing + 80 additional = 2,942**. Focused units are subsets, not additions to that total. Raw unit reports, failure objects, SQL/identity-bearing data and operational logs stay private; no artifact upload, public per-case bridge or workflow change is introduced. Formatting, links, exact allowlist and whole historical-prefix byte comparisons are checked as local static scope gates, not as substitutes for SQL/runtime evidence.
+
+### SQL inventory, independent review and acceptance boundary
+
+**Actual local PostgreSQL migrations, integration, erasure/concurrency and native E2E execution: NOT RUN.** No approved owned disposable PostgreSQL 17 lifecycle/receipt, `TEST_DATABASE_URL`, `pg_ctl` or `psql` was available. No alternate/embedded PostgreSQL 18 helper, new infrastructure, hosted database or application credentials were substituted. Static migration generation is offline and does not establish executed DDL, triggers, physical locks, catalog guards or root erasure.
+
+There are **29 new unconditional authored SQL cases: 24 quota + 5 migration**, plus the narrow existing real-auth deletion augmentation. Under the unchanged full selection, expected future SQL inventory is **357 existing + 29 new = 386**, not an observed runtime count. Signed admission cases use genuine signup/SMTP verification/login; synthetic SQL fixtures are limited to controlled migration/identifier/erasure edges. The generic SQL business-rollback harness proves a compositional counter property only when executed; it is not coverage of unimplemented profile stale/conflict/no-op/idempotency services. No SQL case is skipped to manufacture green acceptance. Fresh/repeated 0016, negative readiness DDL variants, exact canonical function/trigger catalog, existing/missing-key waits, authority changes, caps/rollover, profile-removal and genuine sign-out/re-login quota continuity, both deletion orders, rollback, unrelated-key survival and actual Better Auth root deletion still require real PostgreSQL 17 execution.
+
+Independent read-only security/privacy/concurrency review inspected all runtime/test/migration changes, exact canonical body, snapshot lineage, immutable old hashes and diff hygiene. Its P2 schedule finding was corrected and re-read; no additional actionable runtime security/privacy/concurrency defect was identified statically. This is **local source/preparation review**, not PostgreSQL or hosted certification. Current dependency-layout coupling in the earlier Batch 1 authority integration remains untouched; no broad root-dependency refactor was made.
+
+**Local implementation/preparation is ready for maintainer review; Batch 2 automated acceptance remains incomplete until actual PostgreSQL 17 and mandatory native/CI gates run.** No commit, push, PR, CI dispatch/CI-first exception, provider investigation/mutation, deployment, activation or Batch 3 work was authorized or performed. Any next publication needs a distinct bounded authorization and actual new-SHA Push/PR receipts; Batch 1 CI/Vercel acceptance is not reused for this candidate. Remaining D1–D14 business policies and hosted/manual/production/full-V6B acceptance remain separate under the unchanged [manual/external backlog](<DEFERRED_MANUAL_VERIFICATION.md>).
