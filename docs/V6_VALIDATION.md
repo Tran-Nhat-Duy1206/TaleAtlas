@@ -1836,3 +1836,106 @@ This resolves the prior corrected-SHA provider-verification blocker. It does not
 Hosted/manual acceptance remains separate under the unchanged twelve-item [central verification backlog](<DEFERRED_MANUAL_VERIFICATION.md>): intended staging readiness/configuration, hosted Sandbox mail and genuine account lifecycle/security checks, production release/smoke, human zoom/screen-reader/VI/focus/contrast/visual/loading checks. The canceled correction deployment does not satisfy those checks or turn their NOT RUN / NOT VERIFIED statuses into PASS. No new deferred item was added, and the earlier observed automated failure was not deferred into that backlog.
 
 The B2a storage contract remains intact: opaque TEXT account identity, separate generated public UUID, explicit PRIVATE enrollment, immutable account-lifetime handle claim, at most five explicit taxonomy interests, directed account-bound blocks, claim-preserving hiding/removal, root cascade/handle release and no inferred Library publication. No public profile HTTP/API/UI capability, V4 hosted activation, production acceptance, full V6A/V6B acceptance or release is declared. **B2b has not begun**; its reserved-handle/impersonation, abuse/moderation, verified-session/Origin/body, affirmative publication, visibility/block qualification, OCC/race/error, budget/erasure, restoration and feature-gate decisions remain separately authorized work. No commit, push, CI rerun, SQL/provider change, deployment or merge was performed as part of this documentation preparation.
+
+## V6B B2b Batch 1 — Authority/transport acceptance reconciliation (2026-10-29 UTC)
+
+### Receipt scope, baseline and preserved history
+
+This entry reconciles the separately authorized **B2b Batch 1: Authority and Transport Foundation** at feature commit **`c13d22ab7407605ba5d6f667277d6d6220aa87a4`**. It does not turn earlier failures, missing local SQL or prospective statements into retroactive passes. The entire preceding **299,812 bytes / 1,838 lines** remain an identical historical prefix, SHA-256 `d4e684571d625a7e65c4e3449a7f23a1119948b62a0117296bc03a775f4e89d3`. Earlier FAIL, NOT RUN, NO-GO, Draft, unmerged and not-yet-started statements retain their receipt-time meaning.
+
+The authorized starting main SHA and feature parent were **`aaf5e434d2b66dcd2d170a693f652adcf09ee288`**, the already merged B2a PR #28. The maintainer's post-merge B2a closure included successful [main CI 40680662049](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40680662049), attempt 1. That merge was observed outside the agent's authorized execution scope; an execution account is not evidence of who approved it. B2a source/automated acceptance is complete, not hosted or production acceptance. No previous worktree or historical record was replaced to start Batch 1.
+
+At preparation of this entry, [PR #29](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/pull/29) is **Draft, open and unmerged**, branch `feat/v6b-b2b-authority-foundation`, head `c13d22ab7407605ba5d6f667277d6d6220aa87a4`, base `aaf5e434d2b66dcd2d170a693f652adcf09ee288`. Its one feature commit adds exactly the following six files, **1,321 additions / zero deletions**, with no modified baseline file:
+
+| New file | Added lines |
+| --- | ---: |
+| [Server availability](<../apps/web/src/server/reader-profile/availability.ts>) | 28 |
+| [Server authority](<../apps/web/src/server/reader-profile/authority.ts>) | 205 |
+| [Pure HTTP contracts](<../apps/web/src/features/reader-profile/http-contracts.ts>) | 61 |
+| [Availability units](<../tests/unit/reader-profile-availability.test.ts>) | 142 |
+| [Transport units](<../tests/unit/reader-profile-http-contracts.test.ts>) | 412 |
+| [Real-auth authority integration](<../tests/integration/reader-profile-authority.test.ts>) | 473 |
+
+### Approved foundation, not an activated profile feature
+
+`V6B_PROFILE_OWNER_ENABLED` and `V6B_PROFILE_PUBLIC_ENABLED` default **OFF**. Only literal `true` enables a capability; public requires owner, and invalid/contradictory configuration fails both closed. Disabled foundation entrypoints do not initiate auth, request parsing or database access; runtime auth/HTTP imports are deferred, and the database dependency is type-only. The pure gate contracts and disabled-entrypoint import/IO tripwires are not deployed-route enforcement evidence: **no live profile HTTP route, middleware, UI or navigation is introduced**. No provider environment setting was changed.
+
+Authority delegates initial authentication to existing Better Auth signed sessions, then issues a frozen empty in-process capability backed by private WeakMap facts. It accepts no caller-provided account/role/session authority and has no role-based ownership override. Opaque TEXT account IDs are preserved exactly. A caller-owned transaction locks the persisted verified user `FOR NO KEY UPDATE` and the exact same-user session `FOR SHARE`, then performs a separate `clock_timestamp()` expiry/identity check **after** lock waits. The transaction-bound current-authority assertion repeats that check after later waits. Initial session retrieval alone is not continuing authority; callers must recheck at the future operation's authorization/SQL linearization point. Locks do not stop wall-clock expiry or promise validity until commit/response delivery. This single-actor helper is not the still-unapproved multi-account block-lock protocol.
+
+Transport preparation uses the existing safe HTTP helpers with an explicit **8 KiB** streamed JSON bound and fatal UTF-8 decoding; their shared default/behavior is unchanged. Mutation Origin must exactly match configured Origin, before authentication/body parsing. No query inputs or unknown body/authority fields are accepted. The closed foundation payload is only `{}` and its success envelope only `{ok:true}`: these are not enrollment, edit or publication commands. Responses are no-store; runtime-validated error codes/statuses and sanitized unexpected errors prevent private messages/rows from entering response or logging envelopes. Existing B1 validation/projection and B2a persistence semantics remain unchanged.
+
+### Actual local development receipts, including retained failures
+
+The isolated local implementation used Node **24.19.0** and pnpm **11.7.0**. Cached frozen dependency restoration used offline mode and ignored install scripts; manifests/lockfile were unchanged and no database infrastructure was installed or started. The local-development authorization covered only the six files above, not publication or later batches.
+
+- **Initial focused units: FAIL, 108/109 PASS and one failure**, on the first enabled transport case. The retained JSON diagnostic was `STACK_TRACE_ERROR`, with about 11.85 seconds elapsed. Unit module-graph loading was made explicit at collection/setup rather than inside the timed case. The diagnostic does not establish a deeper runtime root cause or production cold-start performance. The failed receipt remains a failure; no deadline, retry or assertion was weakened.
+- **Initial test-project TypeScript: FAIL**, with two new-test diagnostics: the root test could not resolve bare Drizzle (an existing web-workspace dependency), and a conditional header record inferred optional undefined values incompatible with `HeadersInit`. Both were corrected within the new tests: the existing web-workspace module path and an explicit string-record type. No dependency/configuration file was expanded.
+- Final new focused units: **117/117 PASS**, comprising **29 availability + 88 transport**, zero failed/skipped/pending/todo. Full local units: **2,862/2,862 PASS**, including **304 existing B1 profile cases**; the focused count is a subset, not an additional full-suite total.
+- Test-project TypeScript, full repository typecheck, lint, formatting/scope checks, production build and post-build full typecheck: **PASS**. The local build ran with service credentials absent and gates off; it is compilation/build evidence, not authenticated runtime or hosted acceptance. Both production/high and whole-workspace/moderate audits passed with zero known vulnerabilities.
+- Independent final code/security/privacy review: **NoBlock for local/static preparation**. Optional closed-error hardening was implemented, covered by eight added unit cases and re-reviewed. Unit transport fixtures mock auth inputs only; they do not establish actual signed-session/SQL acceptance.
+- **Actual local PostgreSQL integration: NOT RUN**. No approved owned PostgreSQL 17 lifecycle/test URL/receipt or available `pg_ctl`/`psql` was established. No application credentials, alternate infrastructure or embedded helper were substituted. Twelve real-auth SQL cases were authored, typechecked and statically reviewed locally; their executed acceptance comes from the subsequent GitHub PostgreSQL 17 runs below.
+
+### Authorized CI-first feature publication and actual gates
+
+The maintainer explicitly approved a new, bounded CI-first exception for Batch 1: one normal six-file commit, one push and one new Draft PR, with the existing automatic Push and Pull Request workflows. This was not a carried-forward B2a exception or permission to merge, deploy or activate a profile feature. The published feature commit is `c13d22ab7407605ba5d6f667277d6d6220aa87a4`, parent `aaf5e434d2b66dcd2d170a693f652adcf09ee288`.
+
+- [Feature Push CI 40724386366](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40724386366): **SUCCESS, attempt 1**, exact feature SHA above.
+- [Feature PR CI 40724399504](https://github.com/Tran-Nhat-Duy1206/TaleAtlas/actions/runs/40724399504): **SUCCESS, attempt 1**, same feature SHA. Its synthetic checkout tree was verified identical to the feature tree; this is not an actual PR merge.
+
+| Mandatory actual result | Push 40724386366 | PR 40724399504 |
+| --- | --- | --- |
+| Frozen install, typecheck and lint | PASS | PASS |
+| Full units: 2,862/2,862 across 81 passed files | PASS | PASS |
+| New unit suites: 29/29 availability and 88/88 transport | PASS | PASS |
+| Fresh and repeated PostgreSQL 17 migrations through 0015 | PASS | PASS |
+| Drizzle generation and zero drift | PASS | PASS |
+| Full SQL integration: 357/357; exit 0 | PASS | PASS |
+| SQL failed/skipped/pending/todo | 0 / 0 / 0 / 0 | 0 / 0 / 0 / 0 |
+| V5D-C01 through V5D-C06; validated complete report | PASS | PASS |
+| Production build and post-build typecheck | PASS | PASS |
+| Both native suites: legacy and enabled V4, existing retry policies | PASS | PASS |
+| Production/high and whole-workspace/moderate audits | PASS; both no known vulnerabilities | PASS; both no known vulnerabilities |
+| All five mandatory jobs and final verify | SUCCESS, unskipped | SUCCESS, unskipped |
+
+These are fresh feature-head CI outcomes, not substituted B2a counts. Unit summaries and all 81 passed-file inventories were reconciled, including the new 29/88 cases. Fixed safe receipts included `INTEGRATION PASS`, `INTEGRATION_EXIT 0`, `357 PASSED / 0 FAILED / 0 SKIPPED / 0 PENDING / 0 TODO`, `LEGACY PASS` and `V4 PASS`. No manual workflow dispatch, rerun, cancellation, assertion weakening, test-selection/reporter change, timeout/retry increase or diagnostic bootstrap was used. Raw runner reports, tokens, fixture identities and SQL parameter values remain private.
+
+### Twelve-case signed-session/SQL execution reconciliation
+
+The following are **ledger aliases for source-case ordinals**, not new CI-emitted diagnostic IDs. Both feature runs support **12/12 PASS by reconciliation**:
+
+| Alias | Source case and covered authority boundary |
+| --- | --- |
+| B2B1-C01 | [Case 1:162](<../tests/integration/reader-profile-authority.test.ts#L162>): exact owner across user/moderator/admin roles |
+| B2B1-C02 | [Case 2:178](<../tests/integration/reader-profile-authority.test.ts#L178>): forged/copied capabilities and unsigned headers |
+| B2B1-C03 | [Case 3:220](<../tests/integration/reader-profile-authority.test.ts#L220>): persisted session-owner mismatch |
+| B2B1-C04 | [Case 4:234](<../tests/integration/reader-profile-authority.test.ts#L234>): verification revoked before/after resolution |
+| B2B1-C05 | [Case 5:243](<../tests/integration/reader-profile-authority.test.ts#L243>): actual Better Auth sign-out/session revocation |
+| B2B1-C06 | [Case 6:267](<../tests/integration/reader-profile-authority.test.ts#L267>): legitimate session expiry |
+| B2B1-C07 | [Case 7:283](<../tests/integration/reader-profile-authority.test.ts#L283>): root-account deletion |
+| B2B1-C08 | [Case 8:330](<../tests/integration/reader-profile-authority.test.ts#L330>): user-lock wait followed by unverification |
+| B2B1-C09 | [Case 9:333](<../tests/integration/reader-profile-authority.test.ts#L333>): user-lock wait followed by deletion |
+| B2B1-C10 | [Case 10:337](<../tests/integration/reader-profile-authority.test.ts#L337>): session SHARE wait and fresh database clock |
+| B2B1-C11 | [Case 11:392](<../tests/integration/reader-profile-authority.test.ts#L392>): later wait and current-authority expiry recheck |
+| B2B1-C12 | [Case 12:445](<../tests/integration/reader-profile-authority.test.ts#L445>): exact transaction binding |
+
+The sole added SQL test file has twelve unconditional direct cases; no conditional registration, skip, only or todo. It uses the existing guarded synthetic fixture's real signup, SMTP verification and signed login, actual persisted account/session state and physical PostgreSQL lock barriers, not fabricated sessions or mocked SQL. All **37 prior SQL test files are byte-identical**; there are now 38. The original full `tests/integration/**/*.test.ts` selection, CI workflow and reporter are unchanged. Matching feature/PR trees and validated actual assertion counts **357 = 345 existing + 12 new**, with every row passed and no skipped/pending/todo, establish execution of the twelve new members. The unchanged summary checks assertion-row totals and each status count before emitting its safe counts. A green job alone is not this evidence chain. **No new per-file runtime diagnostic receipt is claimed**, and private raw reports were not uploaded or printed.
+
+### Independently resolved feature-SHA Vercel receipt
+
+The earlier agent deployment-list read returned HTTP 403 and correctly left the feature-SHA state **NOT VERIFIED**; that failure was not proof of cancellation or no record. The maintainer subsequently independently authenticated deployment **`dpl_JBPv42VYkZXF4C836zVCySNtMGbj`**, exact source **`c13d22ab7407605ba5d6f667277d6d6220aa87a4`**, branch `feat/v6b-b2b-authority-foundation`, project `taleatlas-staging`:
+
+- Final state **CANCELED**, target **null**.
+- Authenticated logs confirmed the existing Ignored Build Step returned **exit code 0**.
+- **A deployment record WAS created. No successful deployment for this commit was observed.** This is not zero deployment creation, branch-exclusion proof, hosted migration or production acceptance.
+
+This resolves the prior feature-SHA provider-observation gap only. The earlier 403 receipt keeps its historical meaning. No previous provider investigation was repeated for this entry, and no provider mutation was authorized or performed.
+
+### Technical debt, consumer obligations and approval boundary
+
+The integration test explicitly imports Drizzle from the existing web-workspace installation rather than adding an unapproved root dependency. Its relative `node_modules` path is **installation-layout coupling**, a reviewed nonblocking maintenance debt under the exact-six-file scope. Successful Linux CI demonstrates the current supported installation, not portability to arbitrary package layouts; any cleanup needs a separately approved scope.
+
+Future consumers must derive ownership from signed authority, use the persisted transaction fences and recheck after subsequent waits at their defined SQL authorization point. They must not treat a serialized capability, initial session result, role or stale profile snapshot as authority; no commit-time/delivery-time guarantee or coherent cross-account block/public protocol is implied. Existing [B1/B2a contracts](<V6B_PROFILE_CONTRACT.md>) are unchanged. Remaining D1–D14 recommendations not expressly adopted for this foundation remain **unapproved**: reserved namespaces/impersonation and moderation ownership, actual enrollment/edit/publication/withdrawal/removal/restoration behavior, public qualification and blocking, OCC/overflow, quota storage/capacities/key erasure, cross-account race semantics, UI and rollout. **Batch 2 has not begun.**
+
+**Batch 1 source/automated acceptance at `c13d22ab7407605ba5d6f667277d6d6220aa87a4`: complete, with no remaining known Batch-1-specific automated blocker identified. GO for separate maintainer merge approval, not merge permission.** PR #29 is still Draft/unmerged at this receipt. This evidence-only append is prepared under a distinct, conditional authorization for one documentation commit/push; its eventual seven-file PR scope is the six original additions plus this ledger, not another implementation batch. The source run IDs above do not attest a future documentation SHA: that head's automatic CI/provider observations must be verified and reported separately without an extra source change or publication.
+
+No profile API activation, provider environment change, hosted migration, successful deployment, V4 hosted enablement, full V6A/V6B acceptance or production release is established. The unchanged twelve-item [central manual/external backlog](<DEFERRED_MANUAL_VERIFICATION.md>) retains its NOT RUN / NOT VERIFIED statuses; canceled deployment records and isolated native HTTPS/SMTP tests do not satisfy it. No new backlog item was invented for local SQL unavailability or an automated failure. Historical FAIL / NOT RUN / NO-GO evidence is preserved, and current documentation preparation executes no new tests, SQL or hosted acceptance flow.
