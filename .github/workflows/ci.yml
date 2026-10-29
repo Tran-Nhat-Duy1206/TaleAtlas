@@ -52,11 +52,18 @@ jobs:
         run: |
           set +x
           umask 077
+          diagnostic_args=()
+          if [[ "${GITHUB_EVENT_NAME:-}" == push && "${GITHUB_REF:-}" == refs/heads/diag/v6b-b2b-budget-sql-fingerprint ]]; then
+            diagnostic_args=(--sql-fingerprints)
+          fi
           unknown_receipt() {
             for id in V5D-C01 V5D-C02 V5D-C03 V5D-C04 V5D-C05 V5D-C06; do
               printf '%s UNKNOWN\n' "$id" || :
             done
             printf '%s\n' 'V5D_REPORT UNKNOWN' 'V5D_COUNTS UNKNOWN' 'V5D_FAILURE_SCOPE UNKNOWN' 'V5D_CATEGORY UNKNOWN' || :
+            if (( ${#diagnostic_args[@]} )); then
+              printf '%s\n' 'SQL_DIAG_REPORT UNKNOWN' 'SQL_DIAG_COUNTS UNKNOWN' || :
+            fi
           }
           if [[ -z "${RUNNER_TEMP:-}" ]] || ! private="$(mktemp -d "$RUNNER_TEMP/taleatlas-integration.XXXXXX" 2>/dev/null)"; then
             printf '%s\n' 'INTEGRATION FAIL' 'INTEGRATION_EXIT UNKNOWN' || :
@@ -75,7 +82,7 @@ jobs:
           printf 'INTEGRATION %s\n' "$result" || :
           printf 'INTEGRATION_EXIT %s\n' "$status" || :
           # Trusted projection emits no report strings; all Node stderr is private.
-          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" 2>>"$private/output.log"; } 2>/dev/null; then
+          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" "${diagnostic_args[@]}" 2>>"$private/output.log"; } 2>/dev/null; then
             unknown_receipt
           fi
           exit "$status"

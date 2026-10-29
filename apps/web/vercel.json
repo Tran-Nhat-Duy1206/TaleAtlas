@@ -2,5 +2,6 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @taleatlas/web build"
+  "buildCommand": "pnpm --filter @taleatlas/web build",
+  "ignoreCommand": "if [ \"$VERCEL_GIT_COMMIT_REF\" = \"diag/v6b-b2b-budget-sql-fingerprint\" ]; then exit 0; else exit 1; fi"
 }
