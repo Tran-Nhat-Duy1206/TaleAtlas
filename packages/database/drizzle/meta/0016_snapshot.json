@@ -1,5 +1,5 @@
 {
-  "id": "cd9a89ca-86d1-4514-98b5-ea58cd957589",
+  "id": "c5570e87-9ebc-440e-9933-3de6dcffc99c",
   "prevId": "f2a6990d-55a6-45fc-bc33-71280e2b3e8a",
   "version": "7",
   "dialect": "postgresql",
@@ -7261,6 +7261,78 @@
         "reader_profile_interests_slot_check": {
           "name": "reader_profile_interests_slot_check",
           "value": "\"reader_profile_interests\".\"slot\" BETWEEN 1 AND 5"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.reader_profile_rate_limits": {
+      "name": "reader_profile_rate_limits",
+      "schema": "",
+      "columns": {
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_request": {
+          "name": "last_request",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reader_profile_rate_limits_user_fk": {
+          "name": "reader_profile_rate_limits_user_fk",
+          "tableFrom": "reader_profile_rate_limits",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "reader_profile_rate_limits_pkey": {
+          "name": "reader_profile_rate_limits_pkey",
+          "columns": [
+            "user_id",
+            "kind"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "reader_profile_rate_limits_kind_check": {
+          "name": "reader_profile_rate_limits_kind_check",
+          "value": "\"reader_profile_rate_limits\".\"kind\" IN ('ordinary', 'content', 'withdrawal')"
+        },
+        "reader_profile_rate_limits_count_check": {
+          "name": "reader_profile_rate_limits_count_check",
+          "value": "\"reader_profile_rate_limits\".\"count\" >= 0 AND \"reader_profile_rate_limits\".\"count\" <= 21 AND (\"reader_profile_rate_limits\".\"kind\" <> 'content' OR \"reader_profile_rate_limits\".\"count\" <= 6) AND (\"reader_profile_rate_limits\".\"kind\" <> 'withdrawal' OR \"reader_profile_rate_limits\".\"count\" <= 11)"
+        },
+        "reader_profile_rate_limits_last_request_check": {
+          "name": "reader_profile_rate_limits_last_request_check",
+          "value": "\"reader_profile_rate_limits\".\"last_request\" >= 0 AND \"reader_profile_rate_limits\".\"last_request\" <= 9007199254740991"
         }
       },
       "isRLSEnabled": false

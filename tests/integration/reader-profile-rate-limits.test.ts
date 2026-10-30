@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { createRequire } from "node:module";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getAuth } from "../../apps/web/src/server/auth";
 import { ReaderProfileFoundationError } from "../../apps/web/src/features/reader-profile/http-contracts";
@@ -44,12 +45,22 @@ function owned(actor: Actor) {
     f.users.some((user) => user.id === actor.id && user.email === actor.email),
   ).toBe(true);
 }
-function keys(actor: Actor) {
+const kinds = ["ordinary", "content", "withdrawal"] as const;
+function legacyKeys(actor: Actor) {
   owned(actor);
   return ["attempt", "write", "withdraw"].map(
     (bucket) => `reader-profile.${bucket}:${actor.id}`,
   );
 }
+// Resolve the pinned key constructor from the existing owning dependency, never
+// guess its separator or reset a shared/global authentication bucket.
+const webRequire = createRequire(
+  new URL("../../apps/web/package.json", import.meta.url),
+);
+const authRequire = createRequire(webRequire.resolve("better-auth"));
+const { createRateLimitKey } = authRequire("@better-auth/core/utils/ip") as {
+  createRateLimitKey: (ip: string, path: string) => string;
+};
 const principal = (actor: Actor) =>
   requireReaderProfilePrincipal(headers(actor));
 async function charge(
@@ -60,16 +71,25 @@ async function charge(
 }
 async function counts(actor: Actor) {
   const result: number[] = [];
-  for (const key of keys(actor)) {
-    const rows = await sql`select count from rate_limits where key=${key}`;
+  owned(actor);
+  for (const kind of kinds) {
+    const rows =
+      await sql`select count from reader_profile_rate_limits where user_id=${actor.id} and kind=${kind}`;
     expect(rows.length <= 1).toBe(true);
     result.push(rows.length ? Number(rows[0]!.count) : 0);
   }
   return result;
 }
 async function digest(actor: Actor) {
+  owned(actor);
   return (
-    await sql`select count(*)::int as count,md5(coalesce(string_agg(row_to_json(r)::text,'|' order by r.key),'')) as digest from rate_limits r where key=any(${keys(actor)}::text[])`
+    await sql`select count(*)::int as count,md5(coalesce(string_agg(row_to_json(r)::text,'|' order by r.kind),'')) as digest from reader_profile_rate_limits r where r.user_id=${actor.id}`
+  )[0];
+}
+async function sharedDigest(selected: string[]) {
+  requireTestDatabase();
+  return (
+    await sql`select count(*)::int as count,md5(coalesce(string_agg(row_to_json(r)::text,'|' order by r.key),'')) as digest from rate_limits r where r.key=any(${selected}::text[])`
   )[0];
 }
 function denied(result: Outcome, status: number) {
@@ -149,9 +169,116 @@ afterAll(async () => {
 });
 
 describe("reader-profile committed fixed-window admission with real signed actors", () => {
+  it("ignores locked legacy shared prefixes during admission and root erasure without importing, deleting or resurrecting them", async () => {
+    const actor = await f.account("user");
+    const other = await f.account("user");
+    await charge(other, "content");
+    await charge(other, "withdrawal");
+    const otherBefore = await digest(other);
+    // Mint genuine capabilities before seeding: no auth housekeeping is invoked
+    // between the controlled legacy snapshot, admission and direct SQL deletion.
+    const content = await principal(actor);
+    const withdrawal = await principal(actor);
+    const stale = await principal(actor);
+    const shared = [
+      ...legacyKeys(actor),
+      `catalog.write:${actor.id}`,
+      `auth-isolation:${randomUUID()}`,
+    ];
+    const backend = await sql.reserve();
+    let open = false;
+    try {
+      for (const key of shared)
+        await sql`insert into rate_limits(id,key,count,last_request) values(${randomUUID()},${key},21,12345)`;
+      const before = await sharedDigest(shared);
+      expect(before?.count).toBe(shared.length);
+      expect(await counts(actor)).toEqual([0, 0, 0]);
+      await backend`BEGIN`;
+      open = true;
+      await backend`select id from rate_limits where key=any(${shared}::text[]) for update`;
+      await chargeReaderProfileAttempt(content, "content");
+      await chargeReaderProfileAttempt(withdrawal, "withdrawal");
+      expect(await counts(actor)).toEqual([1, 1, 1]);
+      expect((await digest(actor))?.count).toBe(3);
+      expect(await sharedDigest(shared)).toEqual(before);
+      await sql`delete from users where id=${actor.id}`;
+      expect(await counts(actor)).toEqual([0, 0, 0]);
+      denied(await observe(chargeReaderProfileAttempt(stale)), 403);
+      expect(await sharedDigest(shared)).toEqual(before);
+      expect(await digest(other)).toEqual(otherBefore);
+      await backend`COMMIT`;
+      open = false;
+    } finally {
+      if (open) await backend`ROLLBACK`;
+      backend.release();
+      await sql`delete from rate_limits where key=any(${shared}::text[])`;
+    }
+  });
+
+  it("actually exercises expired Better Auth shared-store pruning without changing any active isolated quota row", async () => {
+    const actor = await f.account("user");
+    await charge(actor, "content");
+    await charge(actor, "withdrawal");
+    const before = await digest(actor);
+    expect(before?.count).toBe(3);
+    const h = headers(actor);
+    const client = randomUUID().replaceAll("-", "");
+    const ip = `127.${2 + (parseInt(client.slice(0, 2), 16) % 250)}.${parseInt(client.slice(2, 4), 16)}.${parseInt(client.slice(4, 6), 16)}`;
+    h.set("x-real-ip", ip);
+    const authKey = createRateLimitKey(ip, "/get-session");
+    const shared = [
+      ...legacyKeys(actor),
+      `auth-expired-isolation:${randomUUID()}`,
+    ];
+    const readSession = () =>
+      getAuth().handler(
+        new Request(`${f.origin}/api/auth/get-session`, { headers: h }),
+      );
+    let authBucketOwned = false;
+    try {
+      // Do not expire a pre-existing bucket belonging to another test/client.
+      // A collision fails this precondition rather than causing reset or retry.
+      expect(
+        (
+          await sql`select count(*)::int as n from rate_limits where key=${authKey}`
+        )[0]?.n,
+      ).toBe(0);
+      const firstSession = await readSession();
+      authBucketOwned = true;
+      expect(firstSession.status).toBe(200);
+      const bucket =
+        await sql`select count from rate_limits where key=${authKey}`;
+      expect(bucket.length).toBe(1);
+      expect(
+        Number(bucket[0]?.count) >= 1 && Number(bucket[0]?.count) < 100,
+      ).toBe(true);
+      // Controlled expiry of this exact owned below-cap auth bucket is not a
+      // limiter bypass/reset: the next real handler must take its normal expired
+      // existing-row reset path. No session, rule, clock or auth implementation changes.
+      await sql`update rate_limits set last_request=0 where key=${authKey}`;
+      for (const key of shared)
+        await sql`insert into rate_limits(id,key,count,last_request) values(${randomUUID()},${key},1,0)`;
+      expect((await sharedDigest(shared))?.count).toBe(shared.length);
+      expect((await readSession()).status).toBe(200);
+      const [reset] =
+        await sql`select count=1 and last_request>0 as reset from rate_limits where key=${authKey}`;
+      expect(reset?.reset).toBe(true);
+      // This proves pruning actually ran; a merely successful auth response is
+      // insufficient evidence of the foreign writer's cleanup branch.
+      expect((await sharedDigest(shared))?.count).toBe(0);
+      expect(await digest(actor)).toEqual(before);
+      const [active] =
+        await sql`select count(*)::int as count,bool_and(last_request<=floor(extract(epoch from clock_timestamp())*1000)::bigint and floor(extract(epoch from clock_timestamp())*1000)::bigint-last_request<60000) as active from reader_profile_rate_limits where user_id=${actor.id}`;
+      expect(active?.count).toBe(3);
+      expect(active?.active).toBe(true);
+      expect(await counts(actor)).toEqual([1, 1, 1]);
+    } finally {
+      await sql`delete from rate_limits where key=any(${[...(authBucketOwned ? [authKey] : []), ...shared]}::text[])`;
+    }
+  });
   for (const [kind, cap, saturated] of [
     ["ordinary", 20, [21, 0, 0]],
-    ["content", 5, [6, 6, 0]],
+    ["content", 5, [8, 6, 0]],
     ["withdrawal", 10, [0, 0, 11]],
   ] as const) {
     it(`admits exactly ${cap} ${kind} attempts and commits saturated denials`, async () => {
@@ -202,7 +329,7 @@ describe("reader-profile committed fixed-window admission with real signed actor
     await charge(actor, "content");
     const anchor = async () =>
       (
-        await sql`select md5(string_agg(last_request::text,'|' order by key)) as digest from rate_limits where key=any(${keys(actor)}::text[])`
+        await sql`select md5(string_agg(last_request::text,'|' order by kind)) as digest from reader_profile_rate_limits where user_id=${actor.id}`
       )[0]?.digest;
     const before = await anchor();
     for (let i = 1; i < 5; i++) await charge(actor, "content");
@@ -215,14 +342,14 @@ describe("reader-profile committed fixed-window admission with real signed actor
     const actor = await f.account("user");
     await charge(actor, "content");
     await charge(actor, "withdrawal");
-    await sql`update rate_limits set count=case when key=${keys(actor)[0]!} then 21 when key=${keys(actor)[1]!} then 6 else 11 end,last_request=floor(extract(epoch from clock_timestamp())*1000)::bigint-60001 where key=any(${keys(actor)}::text[])`;
+    await sql`update reader_profile_rate_limits set count=case when kind='ordinary' then 21 when kind='content' then 6 else 11 end,last_request=floor(extract(epoch from clock_timestamp())*1000)::bigint-60001 where user_id=${actor.id}`;
     const [before] =
       await sql`select floor(extract(epoch from clock_timestamp())*1000)::bigint as at`;
     await charge(actor, "content");
     await charge(actor, "withdrawal");
     expect(await counts(actor)).toEqual([1, 1, 1]);
     const [fresh] =
-      await sql`select bool_and(last_request>=${before!.at}::bigint and last_request<=floor(extract(epoch from clock_timestamp())*1000)::bigint) as fresh from rate_limits where key=any(${keys(actor)}::text[])`;
+      await sql`select bool_and(last_request>=${before!.at}::bigint and last_request<=floor(extract(epoch from clock_timestamp())*1000)::bigint) as fresh from reader_profile_rate_limits where user_id=${actor.id}`;
     expect(fresh?.fresh).toBe(true);
   });
 
@@ -430,7 +557,7 @@ describe("reader-profile committed fixed-window admission with real signed actor
       if (!missing) await charge(actor);
       const p = await principal(actor);
       const sid = await sessionId(actor);
-      const key = keys(actor)[0]!;
+      const kind = "ordinary";
       const backend = await sql.reserve();
       let open = false;
       let pending: Promise<Outcome> | undefined;
@@ -443,13 +570,16 @@ describe("reader-profile committed fixed-window admission with real signed actor
         open = true;
         if (missing) {
           // A real uncommitted competing key, not mocked limiter authority.
-          await backend`insert into rate_limits(id,key,count,last_request) values(${randomUUID()},${key},21,floor(extract(epoch from clock_timestamp())*1000)::bigint-60001)`;
+          await backend`insert into reader_profile_rate_limits(user_id,kind,count,last_request) values(${actor.id},${kind},21,floor(extract(epoch from clock_timestamp())*1000)::bigint-60001)`;
         } else {
-          await backend`select id from rate_limits where key=${key} for update`;
-          await backend`update rate_limits set count=21,last_request=floor(extract(epoch from clock_timestamp())*1000)::bigint-60001 where key=${key}`;
+          await backend`select user_id from reader_profile_rate_limits where user_id=${actor.id} and kind=${kind} for update`;
+          await backend`update reader_profile_rate_limits set count=21,last_request=floor(extract(epoch from clock_timestamp())*1000)::bigint-60001 where user_id=${actor.id} and kind=${kind}`;
         }
         pending = observe(chargeReaderProfileAttempt(p));
-        const waiter = await blockedBy(Number(settings!.pid), "rate_limits");
+        const waiter = await blockedBy(
+          Number(settings!.pid),
+          "reader_profile_rate_limits",
+        );
         const rootProbe = await observe(
           sql.begin(async (tx) => {
             await tx`select id from users where id=${actor.id} for no key update nowait`;
@@ -485,7 +615,7 @@ describe("reader-profile committed fixed-window admission with real signed actor
         open = false;
         expect((await pending).ok).toBe(true);
         const [fresh] =
-          await sql`select count,last_request>=${releasedAt!.at}::bigint as fresh from rate_limits where key=${key}`;
+          await sql`select count,last_request>=${releasedAt!.at}::bigint as fresh from reader_profile_rate_limits where user_id=${actor.id} and kind=${kind}`;
         expect(fresh).toEqual({ count: 1, fresh: true });
         // Admission wins first: deletion erases it and an already-issued stale
         // capability cannot resurrect it after the root disappears.
@@ -525,16 +655,16 @@ describe("reader-profile committed fixed-window admission with real signed actor
         expect(settings?.timeout).toBe("5s");
         await backend`BEGIN`;
         open = true;
-        const key = keys(actor)[0]!;
+        const kind = "ordinary";
         if (missing)
-          await backend`insert into rate_limits(id,key,count,last_request) values(${randomUUID()},${key},0,0)`;
+          await backend`insert into reader_profile_rate_limits(user_id,kind,count,last_request) values(${actor.id},${kind},0,0)`;
         else
-          await backend`select id from rate_limits where key=${key} for update`;
+          await backend`select user_id from reader_profile_rate_limits where user_id=${actor.id} and kind=${kind} for update`;
         // Mint first, then commit a DB-clock expiry before admission takes its
         // SHARE fence. No attempt to UPDATE a session already SHARE-locked.
         await sql`update sessions set expires_at=clock_timestamp()+interval '1 second' where id=${sid} and user_id=${actor.id}`;
         pending = observe(chargeReaderProfileAttempt(p, "content"));
-        await blockedBy(Number(settings!.pid), "rate_limits");
+        await blockedBy(Number(settings!.pid), "reader_profile_rate_limits");
         const [headroom] =
           await sql`select expires_at>clock_timestamp()+interval '250 milliseconds' as sufficient from sessions where id=${sid} and user_id=${actor.id}`;
         expect(headroom?.sufficient).toBe(true);
@@ -544,7 +674,7 @@ describe("reader-profile committed fixed-window admission with real signed actor
         // a fast database must not exhaust an arbitrary count before time passes.
         while (performance.now() < deadline) {
           const [row] =
-            await sql`select s.expires_at<=clock_timestamp() as expired,exists(select 1 from pg_stat_activity a where a.datname=current_database() and a.wait_event_type='Lock' and ${Number(settings!.pid)}=any(pg_blocking_pids(a.pid)) and position('rate_limits' in lower(a.query))>0) as held from sessions s where s.id=${sid} and s.user_id=${actor.id}`;
+            await sql`select s.expires_at<=clock_timestamp() as expired,exists(select 1 from pg_stat_activity a where a.datname=current_database() and a.wait_event_type='Lock' and ${Number(settings!.pid)}=any(pg_blocking_pids(a.pid)) and position('reader_profile_rate_limits' in lower(a.query))>0) as held from sessions s where s.id=${sid} and s.user_id=${actor.id}`;
           expect(row?.held).toBe(true);
           if (row?.expired) {
             expired = true;
@@ -582,9 +712,12 @@ describe("reader-profile committed fixed-window admission with real signed actor
       expect(settings?.timeout).toBe("5s");
       await backend`BEGIN`;
       open = true;
-      await backend`select id from rate_limits where key=${keys(actor)[0]!} for update`;
+      await backend`select user_id from reader_profile_rate_limits where user_id=${actor.id} and kind='ordinary' for update`;
       pending = observe(chargeReaderProfileAttempt(p, "content"));
-      const waiter = await blockedBy(Number(settings!.pid), "rate_limits");
+      const waiter = await blockedBy(
+        Number(settings!.pid),
+        "reader_profile_rate_limits",
+      );
       deletion = observe(
         sql`delete from users where id=${actor.id} and email=${actor.email}`,
       );

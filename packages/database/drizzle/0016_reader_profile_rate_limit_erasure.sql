@@ -1,14 +1,12 @@
-CREATE FUNCTION public.reader_profile_user_erasure_budgets() RETURNS trigger
-LANGUAGE plpgsql
-SECURITY INVOKER
-SET search_path = pg_catalog, public
-AS $$
-BEGIN
-  DELETE FROM public.rate_limits WHERE key IN ('reader-profile.attempt:' || OLD.id, 'reader-profile.write:' || OLD.id, 'reader-profile.withdraw:' || OLD.id);
-  RETURN OLD;
-END;
-$$;
+CREATE TABLE "reader_profile_rate_limits" (
+	"user_id" text NOT NULL,
+	"kind" text NOT NULL,
+	"count" integer NOT NULL,
+	"last_request" bigint NOT NULL,
+	CONSTRAINT "reader_profile_rate_limits_pkey" PRIMARY KEY("user_id","kind"),
+	CONSTRAINT "reader_profile_rate_limits_kind_check" CHECK ("reader_profile_rate_limits"."kind" IN ('ordinary', 'content', 'withdrawal')),
+	CONSTRAINT "reader_profile_rate_limits_count_check" CHECK ("reader_profile_rate_limits"."count" >= 0 AND "reader_profile_rate_limits"."count" <= 21 AND ("reader_profile_rate_limits"."kind" <> 'content' OR "reader_profile_rate_limits"."count" <= 6) AND ("reader_profile_rate_limits"."kind" <> 'withdrawal' OR "reader_profile_rate_limits"."count" <= 11)),
+	CONSTRAINT "reader_profile_rate_limits_last_request_check" CHECK ("reader_profile_rate_limits"."last_request" >= 0 AND "reader_profile_rate_limits"."last_request" <= 9007199254740991)
+);
 --> statement-breakpoint
-CREATE TRIGGER reader_profile_user_erasure_budgets
-BEFORE DELETE ON public.users
-FOR EACH ROW EXECUTE FUNCTION public.reader_profile_user_erasure_budgets();
+ALTER TABLE "reader_profile_rate_limits" ADD CONSTRAINT "reader_profile_rate_limits_user_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;

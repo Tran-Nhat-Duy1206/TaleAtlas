@@ -26,10 +26,10 @@ vi.mock("../../apps/web/src/server/session", () => ({
 const dialect = new PgDialect();
 const account = " Case:Opaque-UNIT-account ";
 const session = "UNIT-session";
-const key = (kind = "attempt") => `reader-profile.${kind}:${account}`;
+const key = (kind = "ordinary") => `${account}\u0000${kind}`;
 type Row = {
-  id: string;
-  key: string;
+  user_id: string;
+  kind: string;
   count: number;
   last_request: string | number;
 };
@@ -47,14 +47,31 @@ let onQuery:
   | ((tag: string, params: unknown[]) => unknown[] | undefined)
   | undefined;
 let transaction: ReturnType<typeof vi.fn>;
+const canonicalChecks = () => [
+  {
+    name: "reader_profile_rate_limits_kind_check",
+    expression:
+      "(kind = ANY (ARRAY['ordinary'::text, 'content'::text, 'withdrawal'::text]))",
+  },
+  {
+    name: "reader_profile_rate_limits_count_check",
+    expression:
+      "((count >= 0) AND (count <= 21) AND ((kind <> 'content'::text) OR (count <= 6)) AND ((kind <> 'withdrawal'::text) OR (count <= 11)))",
+  },
+  {
+    name: "reader_profile_rate_limits_last_request_check",
+    expression:
+      "((last_request >= 0) AND (last_request <= '9007199254740991'::bigint))",
+  },
+];
 
 async function principal() {
   return requireReaderProfilePrincipal(new Headers());
 }
 function seed(kind: string, count: number, anchor: string | number = "100000") {
   store.set(key(kind), {
-    id: `existing-${kind}`,
-    key: key(kind),
+    user_id: account,
+    kind,
     count,
     last_request: anchor,
   });
@@ -76,27 +93,29 @@ async function execute(query: unknown) {
     return ++currentCalls === expireOnCurrent ? [] : [{ id: session }];
   if (tag === "reader_profile_budget_readiness") {
     const ready = readiness.length > 1 ? readiness.shift() : readiness[0];
-    return [{ storage_ready: ready, erasure_ready: ready }];
+    return [
+      { storage_ready: ready, erasure_ready: ready, checks: canonicalChecks() },
+    ];
   }
   const params = compiled.params;
   if (tag === "reader_profile_budget_insert") {
-    const id = params[0] as string;
-    const budgetKey = params[1] as string;
-    if (store.has(budgetKey)) return [];
-    store.set(budgetKey, { id, key: budgetKey, count: 0, last_request: "0" });
-    return [{ id }];
+    const user_id = params[0] as string;
+    const kind = params[1] as string;
+    if (store.has(key(kind))) return [];
+    store.set(key(kind), { user_id, kind, count: 0, last_request: "0" });
+    return [{ user_id, kind }];
   }
   if (tag === "reader_profile_budget_lock") {
-    const row = store.get(params[0] as string);
+    const row = store.get(key(params[1] as string));
     return row ? [{ ...row }] : [];
   }
   if (tag === "reader_profile_budget_clock") return [{ at }];
   if (tag === "reader_profile_budget_update") {
-    const row = store.get(params[2] as string);
-    if (!row || row.id !== params[3]) return [];
+    const row = store.get(key(params[3] as string));
+    if (!row || row.user_id !== params[2]) return [];
     row.count = params[0] as number;
     row.last_request = params[1] as number;
-    return [{ id: row.id }];
+    return [{ user_id: row.user_id, kind: row.kind }];
   }
   throw new Error("Unhandled synthetic UNIT SQL");
 }
@@ -138,9 +157,9 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("reader profile budgets (synthetic UNIT only)", () => {
   it.each([
-    ["ordinary", "attempt", 20],
-    ["content", "write", 5],
-    ["withdrawal", "withdraw", 10],
+    ["ordinary", "ordinary", 20],
+    ["content", "content", 5],
+    ["withdrawal", "withdrawal", 10],
   ] as const)(
     "enforces %s cap and commits saturated denials",
     async (attemptClass, kind, cap) => {
@@ -158,27 +177,27 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
       expect(store.get(key(kind))?.count).toBe(cap + 1);
       expect(committed).toBe(cap + 3);
       expect([...store.keys()]).toEqual(
-        attemptClass === "content" ? [key(), key("write")] : [key(kind)],
+        attemptClass === "content" ? [key(), key("content")] : [key(kind)],
       );
     },
   );
   it("shares the attempt budget across ordinary/content; denied content still updates both", async () => {
-    seed("attempt", 20);
-    seed("write", 1);
+    seed("ordinary", 20);
+    seed("content", 1);
     await expect(
       chargeReaderProfileAttempt(await principal(), "content"),
     ).rejects.toMatchObject({ code: "RATE_LIMITED" });
     expect(store.get(key())?.count).toBe(21);
-    expect(store.get(key("write"))?.count).toBe(2);
+    expect(store.get(key("content"))?.count).toBe(2);
     expect(committed).toBe(1);
   });
   it("withdrawal remains independent of exhausted ordinary/content budgets", async () => {
-    seed("attempt", 21);
-    seed("write", 6);
+    seed("ordinary", 21);
+    seed("content", 6);
     await chargeReaderProfileAttempt(await principal(), "withdrawal");
-    expect(store.get(key("withdraw"))?.count).toBe(1);
+    expect(store.get(key("withdrawal"))?.count).toBe(1);
     expect(store.get(key())?.count).toBe(21);
-    expect(store.get(key("write"))?.count).toBe(6);
+    expect(store.get(key("content"))?.count).toBe(6);
   });
   it.each([
     ["159999", 429, 1],
@@ -187,7 +206,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
   ] as const)(
     "resets at exact window equality: %s",
     async (clock, status, retry) => {
-      seed("attempt", 20);
+      seed("ordinary", 20);
       at = clock;
       const result = chargeReaderProfileAttempt(await principal());
       if (status === 429)
@@ -203,8 +222,8 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     },
   );
   it("uses the largest rounded remaining window for multiple denied budgets", async () => {
-    seed("attempt", 20, "100000");
-    seed("write", 5, "110001");
+    seed("ordinary", 20, "100000");
+    seed("content", 5, "110001");
     at = "120002";
     await expect(
       chargeReaderProfileAttempt(await principal(), "content"),
@@ -242,7 +261,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     },
   );
   it("memoizes a committed denial and does not count it twice", async () => {
-    seed("attempt", 20);
+    seed("ordinary", 20);
     const p = await principal();
     const first = chargeReaderProfileAttempt(p);
     await expect(first).rejects.toMatchObject({ status: 429 });
@@ -263,7 +282,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     expect(transaction).toHaveBeenCalledTimes(1);
   });
   it("uncertain denial commit produces 503, never a premature 429", async () => {
-    seed("attempt", 20);
+    seed("ordinary", 20);
     commitFailure = true;
     await expect(
       chargeReaderProfileAttempt(await principal()),
@@ -327,7 +346,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
   ])(
     "rejects corrupt stored count/anchor (%s/%s) without fallback",
     async (count, anchor) => {
-      seed("attempt", count as number, anchor);
+      seed("ordinary", count as number, anchor);
       await expect(
         chargeReaderProfileAttempt(await principal()),
       ).rejects.toMatchObject({ status: 503 });
@@ -346,8 +365,8 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     },
   );
   it("validates all selected rows before any update", async () => {
-    seed("attempt", 2);
-    seed("write", -1);
+    seed("ordinary", 2);
+    seed("content", -1);
     await expect(
       chargeReaderProfileAttempt(await principal(), "content"),
     ).rejects.toMatchObject({ status: 503 });
@@ -380,7 +399,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
   );
   it("an insert conflict cannot legitimize somebody else's persisted zero shell", async () => {
     onQuery = (tag) => {
-      if (tag === "reader_profile_budget_insert") seed("attempt", 0, "0");
+      if (tag === "reader_profile_budget_insert") seed("ordinary", 0, "0");
       return undefined;
     };
     await expect(
@@ -389,7 +408,7 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     expect(tags).not.toContain("reader_profile_budget_update");
   });
   it("takes a fresh DB clock after a simulated external counter acquisition delay", async () => {
-    seed("attempt", 20);
+    seed("ordinary", 20);
     onQuery = (tag) => {
       if (tag === "reader_profile_budget_lock") at = "160000";
       return undefined;
@@ -398,19 +417,41 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     expect(store.get(key())?.count).toBe(1);
     expect(store.get(key())?.last_request).toBe(160000);
   });
-  it("retains existing arbitrary row IDs and uses unrelated UUIDs for new shells", async () => {
-    seed("attempt", 1);
+  it("preserves the unchanged opaque owner and composite bucket identity without keys or replacement UUIDs", async () => {
+    seed("ordinary", 1);
     await chargeReaderProfileAttempt(await principal(), "content");
-    expect(store.get(key())?.id).toBe("existing-attempt");
-    expect(store.get(key("write"))?.id).toMatch(/^[0-9a-f-]{36}$/);
-    expect(store.get(key("write"))?.id).not.toContain(account);
+    expect(store.get(key())?.user_id).toBe(account);
+    expect(store.get(key("content"))?.user_id).toBe(account);
+    expect(store.get(key("content"))?.kind).toBe("content");
+    expect(Object.keys(store.get(key("content"))!).sort()).toEqual([
+      "count",
+      "kind",
+      "last_request",
+      "user_id",
+    ]);
+    for (const q of queries) {
+      expect(q.sql).not.toMatch(/\b(?:public\.)?rate_limits\b/);
+      expect(q.params).not.toContain(`reader-profile.attempt:${account}`);
+    }
+    const insert = queries.find((q) =>
+      q.sql.includes("reader_profile_budget_insert"),
+    )!;
+    expect(insert.params).toEqual([account, "ordinary"]);
+    expect(insert.sql).toContain("on conflict (user_id, kind) do nothing");
   });
   it.each(["storage_ready", "erasure_ready"])(
     "rejects individually invalid readiness %s",
     async (field) => {
       onQuery = (tag) =>
         tag === "reader_profile_budget_readiness"
-          ? [{ storage_ready: true, erasure_ready: true, [field]: false }]
+          ? [
+              {
+                storage_ready: true,
+                erasure_ready: true,
+                checks: canonicalChecks(),
+                [field]: false,
+              },
+            ]
           : undefined;
       await expect(
         chargeReaderProfileAttempt(await principal()),
@@ -431,7 +472,10 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
     const locks = queries.filter((q) =>
       q.sql.includes("reader_profile_budget_lock"),
     );
-    expect(locks.map((q) => q.params[0])).toEqual([key(), key("write")]);
+    expect(locks.map((q) => q.params)).toEqual([
+      [account, "ordinary"],
+      [account, "content"],
+    ]);
     const lastLock = tags.lastIndexOf("reader_profile_budget_lock");
     expect(
       tags.lastIndexOf("reader_profile_authority_current"),
@@ -443,35 +487,195 @@ describe("reader profile budgets (synthetic UNIT only)", () => {
       tags.indexOf("reader_profile_budget_clock"),
     );
   });
-  it("checks exact erasure function and strict trigger/index/storage metadata, with values parameterized", async () => {
+  it.each([
+    "missing",
+    "duplicate",
+    "wrong-kind",
+    "literal-space",
+    "wide-content",
+    "wide-withdrawal",
+    "negative-count",
+    "unsafe-anchor",
+    "extra-condition",
+    "not-array",
+  ])(
+    "fails closed on missing or tampered CHECK metadata: %s",
+    async (variant) => {
+      const checks = canonicalChecks();
+      if (variant === "missing") checks.pop();
+      if (variant === "duplicate") checks[2] = { ...checks[0]! };
+      if (variant === "wrong-kind")
+        checks[0]!.expression = checks[0]!.expression.replace(
+          "'content'",
+          "'write'",
+        );
+      if (variant === "literal-space")
+        checks[0]!.expression = checks[0]!.expression.replace(
+          "'content'",
+          "'con tent'",
+        );
+      if (variant === "wide-content")
+        checks[1]!.expression = checks[1]!.expression.replace(
+          "count <= 6",
+          "count <= 21",
+        );
+      if (variant === "wide-withdrawal")
+        checks[1]!.expression = checks[1]!.expression.replace(
+          "count <= 11",
+          "count <= 21",
+        );
+      if (variant === "negative-count")
+        checks[1]!.expression = checks[1]!.expression.replace(
+          "count >= 0",
+          "count >= -1",
+        );
+      if (variant === "unsafe-anchor")
+        checks[2]!.expression = checks[2]!.expression.replace(
+          "9007199254740991",
+          "9007199254740992",
+        );
+      if (variant === "extra-condition") checks[0]!.expression += " OR true";
+      onQuery = (tag) =>
+        tag === "reader_profile_budget_readiness"
+          ? [
+              {
+                storage_ready: true,
+                erasure_ready: true,
+                checks: variant === "not-array" ? {} : checks,
+              },
+            ]
+          : undefined;
+      await expect(
+        chargeReaderProfileAttempt(await principal()),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(tags).not.toContain("reader_profile_budget_insert");
+      expect(committed).toBe(0);
+    },
+  );
+  it("accepts harmless CHECK formatting only outside quoted literals", async () => {
+    const checks = canonicalChecks().map((c) => ({
+      ...c,
+      expression: c.expression.replace(/ AND /g, "\n  AND\t"),
+    }));
+    onQuery = (tag) =>
+      tag === "reader_profile_budget_readiness"
+        ? [{ storage_ready: true, erasure_ready: true, checks }]
+        : undefined;
+    await chargeReaderProfileAttempt(await principal(), "content");
+    expect(store.get(key())?.count).toBe(1);
+    expect(store.get(key("content"))?.count).toBe(1);
+  });
+  it("rechecks exact CHECK definitions after quota waits rather than caching readiness", async () => {
+    let calls = 0;
+    onQuery = (tag) => {
+      if (tag !== "reader_profile_budget_readiness") return undefined;
+      const checks = canonicalChecks();
+      if (++calls === 2)
+        checks[0]!.expression = checks[0]!.expression.replace(
+          "'content'",
+          "'con tent'",
+        );
+      return [{ storage_ready: true, erasure_ready: true, checks }];
+    };
+    await expect(
+      chargeReaderProfileAttempt(await principal(), "content"),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(tags).toContain("reader_profile_budget_lock");
+    expect(tags).not.toContain("reader_profile_budget_update");
+    expect(store.size).toBe(0);
+  });
+  it.each([
+    ["content", 7],
+    ["withdrawal", 12],
+  ] as const)(
+    "rejects an over-saturated persisted %s counter",
+    async (kind, count) => {
+      seed(kind, count);
+      await expect(
+        chargeReaderProfileAttempt(await principal(), kind),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(tags).not.toContain("reader_profile_budget_update");
+    },
+  );
+  it.each(["user_id", "kind"])(
+    "rejects mismatched selected composite identity %s",
+    async (field) => {
+      onQuery = (tag) =>
+        tag === "reader_profile_budget_lock"
+          ? [
+              {
+                user_id: account,
+                kind: "ordinary",
+                count: 1,
+                last_request: "100000",
+                [field]: "foreign",
+              },
+            ]
+          : undefined;
+      await expect(
+        chargeReaderProfileAttempt(await principal()),
+      ).rejects.toMatchObject({ status: 503 });
+      expect(tags).not.toContain("reader_profile_budget_update");
+      expect(committed).toBe(0);
+    },
+  );
+  it("does not use application clock or shared authentication row pruning to reset its active counter", async () => {
+    seed("ordinary", 20);
+    at = "159999";
+    const sharedAuthenticationRows = new Map([["synthetic-auth-key", 100000]]);
+    const clock = vi.spyOn(Date, "now").mockReturnValue(9007199254740991);
+    try {
+      sharedAuthenticationRows.clear();
+      await expect(
+        chargeReaderProfileAttempt(await principal()),
+      ).rejects.toMatchObject({ status: 429, retryAfterSeconds: 1 });
+      expect(store.get(key())?.count).toBe(21);
+      expect(store.get(key())?.last_request).toBe(100000);
+      expect(clock).not.toHaveBeenCalled();
+      expect(
+        queries.every((q) => !/\b(?:public\.)?rate_limits\b/.test(q.sql)),
+      ).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
+  });
+  it("checks exact composite storage, validated cascade FK, active internal triggers and CHECK metadata", async () => {
     await chargeReaderProfileAttempt(await principal());
     const query = queries.find((q) =>
       q.sql.includes("reader_profile_budget_readiness"),
     )!;
     for (const clause of [
-      "t.tgtype = 11",
-      "not t.tgisinternal",
-      "t.tgqual is null",
-      "t.tgnargs = 0",
-      "t.tgconstraint = 0",
-      "not t.tgdeferrable",
-      "not p.prosecdef",
-      "p.prosrc",
-      "p.proconfig",
+      "public.reader_profile_rate_limits",
+      "reader_profile_rate_limits_pkey",
+      "reader_profile_rate_limits_user_fk",
+      "p.conkey=ARRAY[x.owner_column,x.kind_column]",
       "i.indisvalid",
       "i.indisready",
+      "i.indimmediate",
+      "i.indnkeyatts=2",
+      "i.indkey[0]=x.owner_column",
+      "i.indkey[1]=x.kind_column",
       "i.indpred is null",
       "i.indexprs is null",
       "a.attnotnull",
+      "f.convalidated",
+      "not f.condeferrable",
+      "f.confdeltype='c'",
+      "f.confrelid=x.owner_relation",
+      "f.confkey=ARRAY[x.referenced_column]",
+      "t.tgenabled in ('O','A')",
+      "session_replication_role",
+      "t.tgconstraint=f.oid",
+      "RI_FKey_cascade_del",
+      "RI_FKey_noaction_upd",
+      "RI_FKey_check_ins",
+      "RI_FKey_check_upd",
+      "c.convalidated",
+      "pg_catalog.pg_get_expr(c.conbin,c.conrelid,false)",
     ])
       expect(query.sql).toContain(clause);
-    expect(query.params).toContain("reader_profile_user_erasure_budgets");
-    expect(query.params).toContain("search_path=pg_catalog,public");
-    expect(query.sql).toContain("p.prosrc = $");
-    expect(query.sql).not.toContain("regexp_replace(p.prosrc");
-    expect(query.params).toContain(
-      "\nBEGIN\n  DELETE FROM public.rate_limits WHERE key IN ('reader-profile.attempt:' || OLD.id, 'reader-profile.write:' || OLD.id, 'reader-profile.withdraw:' || OLD.id);\n  RETURN OLD;\nEND;\n",
-    );
+    expect(query.sql).not.toContain("reader_profile_user_erasure_budgets");
+    expect(query.sql).not.toContain("p.prosrc");
     expect(query.sql).not.toContain(account);
     expect(
       queries.find((q) => q.sql.includes("reader_profile_budget_clock"))?.sql,
