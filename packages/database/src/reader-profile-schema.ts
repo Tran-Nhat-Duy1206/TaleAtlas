@@ -1,5 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 import {
+  bigint,
   check,
   foreignKey,
   index,
@@ -128,6 +129,43 @@ export const readerProfileInterests = pgTable(
     check(
       "reader_profile_interests_slot_check",
       sql`${t.slot} BETWEEN 1 AND ${sql.raw(String(C.READER_PROFILE_MAX_INTERESTS))}`,
+    ),
+  ],
+);
+
+// Private root-account aggregates, isolated from Better Auth's shared-store pruning.
+// No profile enrollment prerequisite, per-window history, or automatic TTL.
+export const readerProfileRateLimits = pgTable(
+  "reader_profile_rate_limits",
+  {
+    userId: text("user_id").notNull(),
+    kind: text("kind", {
+      enum: ["ordinary", "content", "withdrawal"],
+    }).notNull(),
+    count: integer("count").notNull(),
+    lastRequest: bigint("last_request", { mode: "number" }).notNull(),
+  },
+  (t) => [
+    primaryKey({
+      name: "reader_profile_rate_limits_pkey",
+      columns: [t.userId, t.kind],
+    }),
+    foreignKey({
+      name: "reader_profile_rate_limits_user_fk",
+      columns: [t.userId],
+      foreignColumns: [user.id],
+    }).onDelete("cascade"),
+    check(
+      "reader_profile_rate_limits_kind_check",
+      sql`${t.kind} IN ('ordinary', 'content', 'withdrawal')`,
+    ),
+    check(
+      "reader_profile_rate_limits_count_check",
+      sql`${t.count} >= 0 AND ${t.count} <= 21 AND (${t.kind} <> 'content' OR ${t.count} <= 6) AND (${t.kind} <> 'withdrawal' OR ${t.count} <= 11)`,
+    ),
+    check(
+      "reader_profile_rate_limits_last_request_check",
+      sql`${t.lastRequest} >= 0 AND ${t.lastRequest} <= ${sql.raw("9007199254740991")}`,
     ),
   ],
 );

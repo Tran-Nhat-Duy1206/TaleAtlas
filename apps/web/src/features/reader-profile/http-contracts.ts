@@ -21,6 +21,7 @@ export const readerProfileErrorCodeSchema = z.enum([
   "VALIDATION_ERROR",
   "AUTHENTICATION_UNAVAILABLE",
   "SERVICE_UNAVAILABLE",
+  "RATE_LIMITED",
 ]);
 export type ReaderProfileErrorCode = z.infer<
   typeof readerProfileErrorCodeSchema
@@ -36,6 +37,7 @@ export const readerProfileErrorStatus = Object.freeze({
   VALIDATION_ERROR: 400,
   AUTHENTICATION_UNAVAILABLE: 503,
   SERVICE_UNAVAILABLE: 503,
+  RATE_LIMITED: 429,
 } as const satisfies Readonly<Record<ReaderProfileErrorCode, number>>);
 export const readerProfileErrorResponseSchema = z
   .object({ error: readerProfileErrorCodeSchema })
@@ -44,13 +46,25 @@ export const readerProfileErrorResponseSchema = z
 export class ReaderProfileFoundationError extends Error {
   readonly code: ReaderProfileErrorCode;
   readonly status: number;
+  readonly retryAfterSeconds?: number;
 
-  constructor(code: ReaderProfileErrorCode) {
+  constructor(code: ReaderProfileErrorCode, retryAfterSeconds?: number) {
     const parsed = readerProfileErrorCodeSchema.safeParse(code);
-    const safeCode = parsed.success ? parsed.data : "SERVICE_UNAVAILABLE";
+    const boundedRetry =
+      Number.isInteger(retryAfterSeconds) &&
+      retryAfterSeconds! >= 1 &&
+      retryAfterSeconds! <= 60;
+    const safeCode =
+      parsed.success &&
+      (parsed.data !== "RATE_LIMITED" || boundedRetry) &&
+      (retryAfterSeconds === undefined ||
+        (parsed.data === "RATE_LIMITED" && boundedRetry))
+        ? parsed.data
+        : "SERVICE_UNAVAILABLE";
     super(safeCode);
     this.code = safeCode;
     this.status = readerProfileErrorStatus[safeCode];
+    if (safeCode === "RATE_LIMITED") this.retryAfterSeconds = retryAfterSeconds;
   }
 }
 

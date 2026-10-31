@@ -206,6 +206,15 @@ describe("real persisted authentication", () => {
     const actorId = String(stored[0]!.id);
     const profileHandle = `r${randomUUID().replaceAll("-", "").slice(0, 23)}`;
     await client`insert into users(id,name,email) values(${profileSurvivor},'Synthetic profile survivor',${`${randomUUID()}@invalid`})`;
+    // Controlled unrelated erasure sentinel only: never used as auth authority,
+    // never a credential account and no token/password is fabricated.
+    await client`insert into accounts(id,account_id,provider_id,user_id) values(${randomUUID()},${randomUUID()},'synthetic-erasure-only',${profileSurvivor})`;
+    const survivorAccountDigest = async () =>
+      (
+        await client`select count(*)::int as count,md5(coalesce(string_agg(row_to_json(r)::text,'|' order by r.id),'')) as digest from accounts r where user_id=${profileSurvivor}`
+      )[0];
+    const survivorAccountBefore = await survivorAccountDigest();
+    expect(survivorAccountBefore?.count).toBe(1);
     await client`insert into genres(slug,name_en,name_vi) values(${profileGenre},'Synthetic genre','Synthetic genre')`;
     const [profile] =
       await client`insert into reader_profiles(user_id,handle,display_name,biography) values(${actorId},${profileHandle},'Synthetic Reader','Synthetic private preference') returning public_id`;
@@ -217,6 +226,26 @@ describe("real persisted authentication", () => {
     expect(
       await client`select blocker_id from reader_blocks where blocker_id=${actorId} or blocked_id=${actorId}`,
     ).toHaveLength(2);
+    // Controlled erasure fixtures in the isolated account-FK table, not shared
+    // expired auth rows. Better Auth housekeeping is free to prune its own store;
+    // it cannot address these rows regardless of application/DB clock skew.
+    // Keep ancient anchors deliberately: this is physical isolation, not a
+    // timestamp-refresh workaround for the original shared-store digest failure.
+    for (const userId of [actorId, profileSurvivor])
+      for (const kind of ["ordinary", "content", "withdrawal"])
+        await client`insert into reader_profile_rate_limits(user_id,kind,count,last_request) values(${userId},${kind},1,12345)`;
+    const budgetDigest = async () => {
+      const [row] =
+        await client`select count(*)::int as count,md5(coalesce(string_agg(row_to_json(r)::text,'|' order by r.kind),'')) as digest from reader_profile_rate_limits r where user_id=${profileSurvivor}`;
+      return row;
+    };
+    const budgetsBefore = await budgetDigest();
+    expect(budgetsBefore?.count).toBe(3);
+    expect(
+      (
+        await client`select count(*)::int as count from reader_profile_rate_limits where user_id=${actorId}`
+      )[0]?.count,
+    ).toBe(3);
     const survivorBefore = [
       ...(await client`select * from users where id=${profileSurvivor}`),
     ];
@@ -254,6 +283,13 @@ describe("real persisted authentication", () => {
     expect(
       await client`select * from users where id=${profileSurvivor}`,
     ).toEqual(survivorBefore);
+    expect(await survivorAccountDigest()).toEqual(survivorAccountBefore);
+    expect(
+      (
+        await client`select count(*)::int as count from reader_profile_rate_limits where user_id=${actorId}`
+      )[0]?.count,
+    ).toBe(0);
+    expect(await budgetDigest()).toEqual(budgetsBefore);
   });
   it("atomically limits concurrent authentication attempts", async () => {
     const concurrentIP = `127.2.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}`;
