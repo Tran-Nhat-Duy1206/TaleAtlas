@@ -57,6 +57,7 @@ jobs:
               printf '%s UNKNOWN\n' "$id" || :
             done
             printf '%s\n' 'V5D_REPORT UNKNOWN' 'V5D_COUNTS UNKNOWN' 'V5D_FAILURE_SCOPE UNKNOWN' 'V5D_CATEGORY UNKNOWN' || :
+            printf '%s\n' 'SQL_DIAG_REPORT UNKNOWN' || :
           }
           if [[ -z "${RUNNER_TEMP:-}" ]] || ! private="$(mktemp -d "$RUNNER_TEMP/taleatlas-integration.XXXXXX" 2>/dev/null)"; then
             printf '%s\n' 'INTEGRATION FAIL' 'INTEGRATION_EXIT UNKNOWN' || :
@@ -75,7 +76,7 @@ jobs:
           printf 'INTEGRATION %s\n' "$result" || :
           printf 'INTEGRATION_EXIT %s\n' "$status" || :
           # Trusted projection emits no report strings; all Node stderr is private.
-          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" 2>>"$private/output.log"; } 2>/dev/null; then
+          if ! { node scripts/v5d-integration-summary.mjs "$private/report.json" "$status" --sql-fingerprints 2>>"$private/output.log"; } 2>/dev/null; then
             unknown_receipt
           fi
           exit "$status"
